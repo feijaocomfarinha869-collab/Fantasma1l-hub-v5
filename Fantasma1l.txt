@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v24 (RODAPÉS 3D ALINHADOS NO CHÃO + TOMADAS + BACKROOMS ABERTA)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v26 (ROUPA BACKROOMS AO ENTRAR)
     ==========================================================
 ]]--
 
@@ -81,11 +81,18 @@ local FLY_MOVE         = "rbxassetid://134861929761233"
 local KAMUI_IMG        = "rbxassetid://110456504694881"
 local KAMUI_SND        = "rbxassetid://997057912"
 local TACO_ID          = "5132229429"
-local OUTLET_MODEL_ID  = "112967019690019"
+local OUTLET_MODEL_ID  = "134744124250342"
 
 local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
+
+-- IDs de Roupas Cientista Backrooms (Camisa, Calça, Acessório/Roupa)[span_1](start_span)[span_1](end_span)
+local BACKROOMS_CLOTHES = {
+    Shirt = "rbxassetid://10764157786",
+    Pants = "rbxassetid://919222956",
+    Accessory = "rbxassetid://10928561772"
+}
 
 local JUMPS = {
     ["JUMPSCARE_1"] = { Img = "rbxassetid://80832692858099",  Snd = "rbxassetid://6754147732" },
@@ -120,6 +127,33 @@ local lifeformState      = { model = nil, active = false }
 -- ================== HELPERS ==================
 local function notify(t, txt)
     pcall(function() StarterGui:SetCore("SendNotification", { Title = t, Text = txt, Duration = 5 }) end)
+end
+
+local function applyBackroomsOutfit(targetChar)
+    if not targetChar then return end
+    pcall(function()
+        local hum = targetChar:FindFirstChildOfClass("Humanoid")
+        -- Se o personagem usa HumanoidDescription (R15/R6 moderno)
+        local desc = hum and hum:FindFirstChildOfClass("HumanoidDescription")
+        if desc then
+            desc.Shirt = tonumber(BACKROOMS_CLOTHES.Shirt:match("%d+")) or 10764157786
+            desc.Pants = tonumber(BACKROOMS_CLOTHES.Pants:match("%d+")) or 919222956
+        else
+            -- Fallback clássico aplicando em instâncias Shirt/Pants
+            local s = targetChar:FindFirstChildOfClass("Shirt") or Instance.new("Shirt", targetChar)
+            s.ShirtTemplate = BACKROOMS_CLOTHES.Shirt
+            local p = targetChar:FindFirstChildOfClass("Pants") or Instance.new("Pants", targetChar)
+            p.PantsTemplate = BACKROOMS_CLOTHES.Pants
+        end
+
+        -- Tentar equipar o acessório/traje principal (ID 10928561772)[span_2](start_span)[span_2](end_span)
+        local ok, objs = pcall(function() return game:GetObjects(BACKROOMS_CLOTHES.Accessory) end)
+        if ok and objs and #objs > 0 then
+            for _, obj in ipairs(objs) do
+                obj.Parent = targetChar
+            end
+        end
+    end)
 end
 
 local function getRealImageIdDelta(id)
@@ -252,7 +286,7 @@ if IS_ADMIN then
     end)
 end
 
--- ================== C00LKIDD EFFECT (APENAS SKYBOX) ==================
+-- ================== C00LKIDD EFFECT ==================
 local function executeCoolkidEffect()
     pcall(function()
         local oldSky = Lighting:FindFirstChild("CoolkidSky")
@@ -484,9 +518,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA COM RODAPÉS ALINHADOS NO CHÃO ==================
+-- ================== BACKROOMS ABERTA COM ROUPA DE CIENTISTA AUTOMÁTICA ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão aberto com rodapés perfeitamente no chão...")
+    notify("Backrooms", "Gerando salão e vestindo a roupa de cientista (você e o alvo)...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -511,7 +545,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão
+    -- Chão Principal
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -525,6 +559,27 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileU = 5
         tex.StudsPerTileV = 5
     end)
+
+    -- Espalhando manchas no chão
+    for x = -ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40, 60 do
+        for z = -ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40, 60 do
+            if math.random() > 0.3 then
+                local stainPart = Instance.new("Part", folder)
+                stainPart.Name = "FloorStain"
+                stainPart.Size = Vector3.new(math.random(25, 45), 0.1, math.random(25, 45))
+                stainPart.Position = Vector3.new(BASE.X + x + math.random(-15, 15), floorY + 0.01, BASE.Z + z + math.random(-15, 15))
+                stainPart.Anchored, stainPart.CanCollide, stainPart.CastShadow = true, false, false
+                stainPart.Transparency = 1
+                pcall(function()
+                    local stTex = Instance.new("Texture", stainPart)
+                    stTex.Texture = TEX_FLOOR_STAIN
+                    stTex.Face = Enum.NormalId.Top
+                    stTex.StudsPerTileU = math.random(10, 18)
+                    stTex.StudsPerTileV = math.random(10, 18)
+                end)
+            end
+        end
+    end
 
     -- Teto
     local ceil = Instance.new("Part", folder)
@@ -541,7 +596,7 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Função para spawnar tomada 3D
+    -- Função para spawnar tomadas
     local function spawnOutlet(pos, cframeRot)
         task.spawn(function()
             local outletModel = fetchAssetAsModel(OUTLET_MODEL_ID)
@@ -569,7 +624,7 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar parede com rodapés exatos apoiados na superfície do chão (floorY)
+    -- Função para criar parede com rodapés no chão
     local function makeWallWithTrims(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -588,7 +643,6 @@ local function spawnBackrooms(targetPartnerName)
             end
         end)
 
-        -- Rodapés 3D rigorosamente apoiados na superfície exata do chão (floorY + altura/2)
         local b1 = Instance.new("Part", folder)
         b1.Anchored, b1.CanCollide, b1.CastShadow = true, true, false
         b1.Material, b1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
@@ -597,7 +651,6 @@ local function spawnBackrooms(targetPartnerName)
         b2.Anchored, b2.CanCollide, b2.CastShadow = true, true, false
         b2.Material, b2.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(225, 225, 225)
 
-        -- Molduras Superiores 3D no teto
         local t1 = Instance.new("Part", folder)
         t1.Anchored, t1.CanCollide, t1.CastShadow = true, true, false
         t1.Material, t1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
@@ -628,7 +681,6 @@ local function spawnBackrooms(targetPartnerName)
             t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
         end
 
-        -- Sombra concentrada nos cantos do chão
         local shd = Instance.new("Part", folder)
         shd.Anchored, shd.CanCollide, shd.CastShadow = true, false, false
         shd.Material = Enum.Material.SmoothPlastic
@@ -642,7 +694,6 @@ local function spawnBackrooms(targetPartnerName)
             shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
         end
 
-        -- Tomada
         if math.random() > 0.4 then
             local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or (size.X > 0 and 1.1 or -1.1)))
             local rotCF = isHorizontal and CFrame.new(pos.X, floorY + 1.2, pos.Z + 1.1) or CFrame.new(pos.X + 1.1, floorY + 1.2, pos.Z) * CFrame.Angles(0, math.rad(90), 0)
@@ -651,13 +702,11 @@ local function spawnBackrooms(targetPartnerName)
     end
 
     local halfR = ROOM_SIZE / 2
-    -- Paredes limites externas
     makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
     makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
     makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
     makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
 
-    -- Pilares e Paredes Divisórias Internas com Rodapés Corretos no Chão
     local step = 50
     for x = -halfR + 50, halfR - 50, step do
         for z = -halfR + 50, halfR - 50, step do
@@ -678,7 +727,6 @@ local function spawnBackrooms(targetPartnerName)
                     end
                 end)
 
-                -- Rodapés 3D ao redor do pilar perfeitamente no chão
                 for _, offsetZ in ipairs({-3.08, 3.08}) do
                     local pb1 = Instance.new("Part", folder)
                     pb1.Size, pb1.Position, pb1.Anchored, pb1.CanCollide, pb1.CastShadow = Vector3.new(6.15, 0.5, 0.15), Vector3.new(pillar.Position.X, floorY + 0.25, pillar.Position.Z + offsetZ), true, true, false
@@ -696,7 +744,6 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
-    -- Lâmpadas no Teto
     local lampSpacing = 40
     for x = -halfR + 20, halfR - 20, lampSpacing do
         for z = -halfR + 20, halfR - 20, lampSpacing do
@@ -724,7 +771,6 @@ local function spawnBackrooms(targetPartnerName)
         atm.Density, atm.Color = 0.1, Color3.fromRGB(220, 215, 180)
     end)
 
-    -- Áudio ambiente das Backrooms (ID: 7009793551)
     pcall(function()
         local sndPart = Instance.new("Part", folder)
         sndPart.Name = "BackroomsMusicEmitter"
@@ -740,27 +786,35 @@ local function spawnBackrooms(targetPartnerName)
         sound:Play()
     end)
 
-    -- Teleporte
+    -- Teleporte e Vestimenta Automática (Você e o Alvo)
     task.spawn(function()
         task.wait(1)
         local targetCFrame = CFrame.new(BASE.X, floorY + 5, BASE.Z)
+        
         local chr = LocalPlayer.Character
-        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.Anchored = true
-            hrp.CFrame = targetCFrame
-            task.wait(0.3)
-            hrp.Anchored = false
+        if chr then
+            applyBackroomsOutfit(chr)
+            local hrp = chr:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Anchored = true
+                hrp.CFrame = targetCFrame
+                task.wait(0.3)
+                hrp.Anchored = false
+            end
         end
 
         if targetPartnerName and targetPartnerName ~= "" then
             local partner = Players:FindFirstChild(targetPartnerName)
-            if partner and partner.Character and partner.Character:FindFirstChild("HumanoidRootPart") then
-                partner.Character.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(3, 0, 3)
+            if partner and partner.Character then
+                applyBackroomsOutfit(partner.Character)
+                local phrp = partner.Character:FindFirstChild("HumanoidRootPart")
+                if phrp then
+                    phrp.CFrame = targetCFrame + Vector3.new(3, 0, 3)
+                end
             end
         end
 
-        notify("Backrooms", "Teleportado para o salão aberto com rodapés alinhados no chão.")
+        notify("Backrooms", "Teleportados e vestidos como cientistas das Backrooms!")
     end)
 
     return true
