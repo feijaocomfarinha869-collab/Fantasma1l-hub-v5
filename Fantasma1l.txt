@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v26 (ROUPA BACKROOMS AO ENTRAR)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v28 (SOMBRAS IDÊNTICAS + CHÃO TEXTURIZADO + TOMADAS + ROUPAS)
     ==========================================================
 ]]--
 
@@ -87,7 +87,6 @@ local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
 
--- IDs de Roupas Cientista Backrooms (Camisa, Calça, Acessório/Roupa)[span_1](start_span)[span_1](end_span)
 local BACKROOMS_CLOTHES = {
     Shirt = "rbxassetid://10764157786",
     Pants = "rbxassetid://919222956",
@@ -133,20 +132,17 @@ local function applyBackroomsOutfit(targetChar)
     if not targetChar then return end
     pcall(function()
         local hum = targetChar:FindFirstChildOfClass("Humanoid")
-        -- Se o personagem usa HumanoidDescription (R15/R6 moderno)
         local desc = hum and hum:FindFirstChildOfClass("HumanoidDescription")
         if desc then
             desc.Shirt = tonumber(BACKROOMS_CLOTHES.Shirt:match("%d+")) or 10764157786
             desc.Pants = tonumber(BACKROOMS_CLOTHES.Pants:match("%d+")) or 919222956
         else
-            -- Fallback clássico aplicando em instâncias Shirt/Pants
             local s = targetChar:FindFirstChildOfClass("Shirt") or Instance.new("Shirt", targetChar)
             s.ShirtTemplate = BACKROOMS_CLOTHES.Shirt
             local p = targetChar:FindFirstChildOfClass("Pants") or Instance.new("Pants", targetChar)
             p.PantsTemplate = BACKROOMS_CLOTHES.Pants
         end
 
-        -- Tentar equipar o acessório/traje principal (ID 10928561772)[span_2](start_span)[span_2](end_span)
         local ok, objs = pcall(function() return game:GetObjects(BACKROOMS_CLOTHES.Accessory) end)
         if ok and objs and #objs > 0 then
             for _, obj in ipairs(objs) do
@@ -518,9 +514,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA COM ROUPA DE CIENTISTA AUTOMÁTICA ==================
+-- ================== BACKROOMS ABERTA COM SOMBRAS E CHÃO TEXTURIZADO ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão e vestindo a roupa de cientista (você e o alvo)...")
+    notify("Backrooms", "Gerando salão com sombras idênticas e chão manchado integrado...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -545,7 +541,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão Principal
+    -- Chão Principal com Carpete e Manchas Integradas na Textura Real
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -558,28 +554,14 @@ local function spawnBackrooms(targetPartnerName)
         tex.Face = Enum.NormalId.Top
         tex.StudsPerTileU = 5
         tex.StudsPerTileV = 5
-    end)
 
-    -- Espalhando manchas no chão
-    for x = -ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40, 60 do
-        for z = -ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40, 60 do
-            if math.random() > 0.3 then
-                local stainPart = Instance.new("Part", folder)
-                stainPart.Name = "FloorStain"
-                stainPart.Size = Vector3.new(math.random(25, 45), 0.1, math.random(25, 45))
-                stainPart.Position = Vector3.new(BASE.X + x + math.random(-15, 15), floorY + 0.01, BASE.Z + z + math.random(-15, 15))
-                stainPart.Anchored, stainPart.CanCollide, stainPart.CastShadow = true, false, false
-                stainPart.Transparency = 1
-                pcall(function()
-                    local stTex = Instance.new("Texture", stainPart)
-                    stTex.Texture = TEX_FLOOR_STAIN
-                    stTex.Face = Enum.NormalId.Top
-                    stTex.StudsPerTileU = math.random(10, 18)
-                    stTex.StudsPerTileV = math.random(10, 18)
-                end)
-            end
-        end
-    end
+        local stainTex = Instance.new("Texture", floor)
+        stainTex.Texture = TEX_FLOOR_STAIN
+        stainTex.Face = Enum.NormalId.Top
+        stainTex.StudsPerTileU = 25
+        stainTex.StudsPerTileV = 25
+        stainTex.Transparency = 0.2
+    end)
 
     -- Teto
     local ceil = Instance.new("Part", folder)
@@ -624,7 +606,7 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar parede com rodapés no chão
+    -- Função para criar parede com rodapés no chão e sombra idêntica nos cantos
     local function makeWallWithTrims(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -681,18 +663,26 @@ local function spawnBackrooms(targetPartnerName)
             t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
         end
 
-        local shd = Instance.new("Part", folder)
-        shd.Anchored, shd.CanCollide, shd.CastShadow = true, false, false
-        shd.Material = Enum.Material.SmoothPlastic
-        shd.Color = Color3.fromRGB(35, 25, 5)
-        shd.Transparency = 0.4
+        -- Sombra idêntica e realista aplicada colada exatamente na base da parede com textura degradê/escura
+        local shadowDecalPart = Instance.new("Part", folder)
+        shadowDecalPart.Name = "WallShadow"
+        shadowDecalPart.Anchored, shadowDecalPart.CanCollide, shadowDecalPart.CastShadow = true, false, false
+        shadowDecalPart.Transparency = 1
         if isHorizontal then
-            shd.Size = Vector3.new(size.X, 0.5, 0.9)
-            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
+            shadowDecalPart.Size = Vector3.new(size.X, 1.5, 0.1)
+            shadowDecalPart.Position = Vector3.new(pos.X, floorY + 0.75, pos.Z + (size.Z > 0 and 0.05 or -0.05))
         else
-            shd.Size = Vector3.new(0.9, 0.5, size.Z)
-            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
+            shadowDecalPart.Size = Vector3.new(0.1, 1.5, size.Z)
+            shadowDecalPart.Position = Vector3.new(pos.X + (size.X > 0 and 0.05 or -0.05), floorY + 0.75, pos.Z)
         end
+        pcall(function()
+            local sTex = Instance.new("Texture", shadowDecalPart)
+            sTex.Texture = TEX_FLOOR_STAIN
+            sTex.Face = Enum.NormalId.Front
+            sTex.Transparency = 0.35
+            sTex.StudsPerTileU = 15
+            sTex.StudsPerTileV = 15
+        end)
 
         if math.random() > 0.4 then
             local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or (size.X > 0 and 1.1 or -1.1)))
@@ -814,7 +804,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Teleportados e vestidos como cientistas das Backrooms!")
+        notify("Backrooms", "Salão gerado com sombras e roupas idênticas!")
     end)
 
     return true
