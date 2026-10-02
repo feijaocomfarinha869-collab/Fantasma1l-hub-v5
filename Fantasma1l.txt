@@ -1743,7 +1743,7 @@ task.spawn(function()
     TabAudio:AddButton({ "Parar Música", function()
         local chr = LocalPlayer.Character
         if chr and chr:FindFirstChild("HumanoidRootPart") then
-            let s = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
+            local s = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
             if s then s:Stop() s:Destroy() end
         end
     end })
