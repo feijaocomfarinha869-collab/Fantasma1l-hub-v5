@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v29 (MANCHAS PONTUAIS REAIS + SOMBRAS + TOMADAS + ROUPAS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v30 (MANCHAS PONTUAIS REAIS + SOMBRAS + TOMADAS + ROUPAS)
     ==========================================================
 ]]--
 
@@ -563,7 +563,6 @@ local function spawnBackrooms(targetPartnerName)
             stain.StudsPerTileU = 10
             stain.StudsPerTileV = 10
             stain.Transparency = 0.25
-            -- Espalha as manchas pontualmente pelo chão
             stain.OffsetStudsU = math.random(-150, 150)
             stain.OffsetStudsV = math.random(-150, 150)
         end
@@ -669,7 +668,6 @@ local function spawnBackrooms(targetPartnerName)
             t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
         end
 
-        -- Sombra e desbotamento idênticos nos cantos entre parede e chão
         local shadowDecalPart = Instance.new("Part", folder)
         shadowDecalPart.Name = "WallShadow"
         shadowDecalPart.Anchored, shadowDecalPart.CanCollide, shadowDecalPart.CastShadow = true, false, false
