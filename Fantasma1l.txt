@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v30 (MANCHAS PONTUAIS REAIS + SOMBRAS + TOMADAS + ROUPAS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v24 (RODAPÉS 3D ALINHADOS NO CHÃO + TOMADAS + BACKROOMS ABERTA)
     ==========================================================
 ]]--
 
@@ -81,17 +81,11 @@ local FLY_MOVE         = "rbxassetid://134861929761233"
 local KAMUI_IMG        = "rbxassetid://110456504694881"
 local KAMUI_SND        = "rbxassetid://997057912"
 local TACO_ID          = "5132229429"
-local OUTLET_MODEL_ID  = "134744124250342"
+local OUTLET_MODEL_ID  = "112967019690019"
 
 local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
-
-local BACKROOMS_CLOTHES = {
-    Shirt = "rbxassetid://10764157786",
-    Pants = "rbxassetid://919222956",
-    Accessory = "rbxassetid://10928561772"
-}
 
 local JUMPS = {
     ["JUMPSCARE_1"] = { Img = "rbxassetid://80832692858099",  Snd = "rbxassetid://6754147732" },
@@ -126,30 +120,6 @@ local lifeformState      = { model = nil, active = false }
 -- ================== HELPERS ==================
 local function notify(t, txt)
     pcall(function() StarterGui:SetCore("SendNotification", { Title = t, Text = txt, Duration = 5 }) end)
-end
-
-local function applyBackroomsOutfit(targetChar)
-    if not targetChar then return end
-    pcall(function()
-        local hum = targetChar:FindFirstChildOfClass("Humanoid")
-        local desc = hum and hum:FindFirstChildOfClass("HumanoidDescription")
-        if desc then
-            desc.Shirt = tonumber(BACKROOMS_CLOTHES.Shirt:match("%d+")) or 10764157786
-            desc.Pants = tonumber(BACKROOMS_CLOTHES.Pants:match("%d+")) or 919222956
-        else
-            local s = targetChar:FindFirstChildOfClass("Shirt") or Instance.new("Shirt", targetChar)
-            s.ShirtTemplate = BACKROOMS_CLOTHES.Shirt
-            local p = targetChar:FindFirstChildOfClass("Pants") or Instance.new("Pants", targetChar)
-            p.PantsTemplate = BACKROOMS_CLOTHES.Pants
-        end
-
-        local ok, objs = pcall(function() return game:GetObjects(BACKROOMS_CLOTHES.Accessory) end)
-        if ok and objs and #objs > 0 then
-            for _, obj in ipairs(objs) do
-                obj.Parent = targetChar
-            end
-        end
-    end)
 end
 
 local function getRealImageIdDelta(id)
@@ -282,7 +252,7 @@ if IS_ADMIN then
     end)
 end
 
--- ================== C00LKIDD EFFECT ==================
+-- ================== C00LKIDD EFFECT (APENAS SKYBOX) ==================
 local function executeCoolkidEffect()
     pcall(function()
         local oldSky = Lighting:FindFirstChild("CoolkidSky")
@@ -514,9 +484,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA COM MANCHAS PONTUAIS E REAIS ==================
+-- ================== BACKROOMS ABERTA COM RODAPÉS ALINHADOS NO CHÃO ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão com manchas pontuais reais e sombras exatas...")
+    notify("Backrooms", "Gerando salão aberto com rodapés perfeitamente no chão...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -541,7 +511,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão Principal com Carpete (ID original restaurado)
+    -- Chão
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -554,18 +524,6 @@ local function spawnBackrooms(targetPartnerName)
         tex.Face = Enum.NormalId.Top
         tex.StudsPerTileU = 5
         tex.StudsPerTileV = 5
-
-        -- Manchas aplicadas apenas em pequenos trechos localizados (tamanho real da textura, sem exagero)
-        for _ = 1, 12 do
-            local stain = Instance.new("Texture", floor)
-            stain.Texture = TEX_FLOOR_STAIN
-            stain.Face = Enum.NormalId.Top
-            stain.StudsPerTileU = 10
-            stain.StudsPerTileV = 10
-            stain.Transparency = 0.25
-            stain.OffsetStudsU = math.random(-150, 150)
-            stain.OffsetStudsV = math.random(-150, 150)
-        end
     end)
 
     -- Teto
@@ -583,7 +541,7 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Função para spawnar tomadas
+    -- Função para spawnar tomada 3D
     local function spawnOutlet(pos, cframeRot)
         task.spawn(function()
             local outletModel = fetchAssetAsModel(OUTLET_MODEL_ID)
@@ -611,7 +569,7 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar parede com rodapés e sombra idêntica nos cantos
+    -- Função para criar parede com rodapés exatos apoiados na superfície do chão (floorY)
     local function makeWallWithTrims(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -630,6 +588,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end)
 
+        -- Rodapés 3D rigorosamente apoiados na superfície exata do chão (floorY + altura/2)
         local b1 = Instance.new("Part", folder)
         b1.Anchored, b1.CanCollide, b1.CastShadow = true, true, false
         b1.Material, b1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
@@ -638,6 +597,7 @@ local function spawnBackrooms(targetPartnerName)
         b2.Anchored, b2.CanCollide, b2.CastShadow = true, true, false
         b2.Material, b2.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(225, 225, 225)
 
+        -- Molduras Superiores 3D no teto
         local t1 = Instance.new("Part", folder)
         t1.Anchored, t1.CanCollide, t1.CastShadow = true, true, false
         t1.Material, t1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
@@ -668,26 +628,21 @@ local function spawnBackrooms(targetPartnerName)
             t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
         end
 
-        local shadowDecalPart = Instance.new("Part", folder)
-        shadowDecalPart.Name = "WallShadow"
-        shadowDecalPart.Anchored, shadowDecalPart.CanCollide, shadowDecalPart.CastShadow = true, false, false
-        shadowDecalPart.Transparency = 1
+        -- Sombra concentrada nos cantos do chão
+        local shd = Instance.new("Part", folder)
+        shd.Anchored, shd.CanCollide, shd.CastShadow = true, false, false
+        shd.Material = Enum.Material.SmoothPlastic
+        shd.Color = Color3.fromRGB(35, 25, 5)
+        shd.Transparency = 0.4
         if isHorizontal then
-            shadowDecalPart.Size = Vector3.new(size.X, 1.5, 0.1)
-            shadowDecalPart.Position = Vector3.new(pos.X, floorY + 0.75, pos.Z + (size.Z > 0 and 0.05 or -0.05))
+            shd.Size = Vector3.new(size.X, 0.5, 0.9)
+            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
         else
-            shadowDecalPart.Size = Vector3.new(0.1, 1.5, size.Z)
-            shadowDecalPart.Position = Vector3.new(pos.X + (size.X > 0 and 0.05 or -0.05), floorY + 0.75, pos.Z)
+            shd.Size = Vector3.new(0.9, 0.5, size.Z)
+            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
         end
-        pcall(function()
-            local sTex = Instance.new("Texture", shadowDecalPart)
-            sTex.Texture = TEX_FLOOR_STAIN
-            sTex.Face = Enum.NormalId.Front
-            sTex.Transparency = 0.35
-            sTex.StudsPerTileU = 15
-            sTex.StudsPerTileV = 15
-        end)
 
+        -- Tomada
         if math.random() > 0.4 then
             local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or (size.X > 0 and 1.1 or -1.1)))
             local rotCF = isHorizontal and CFrame.new(pos.X, floorY + 1.2, pos.Z + 1.1) or CFrame.new(pos.X + 1.1, floorY + 1.2, pos.Z) * CFrame.Angles(0, math.rad(90), 0)
@@ -696,11 +651,13 @@ local function spawnBackrooms(targetPartnerName)
     end
 
     local halfR = ROOM_SIZE / 2
+    -- Paredes limites externas
     makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
     makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
     makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
     makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
 
+    -- Pilares e Paredes Divisórias Internas com Rodapés Corretos no Chão
     local step = 50
     for x = -halfR + 50, halfR - 50, step do
         for z = -halfR + 50, halfR - 50, step do
@@ -721,6 +678,7 @@ local function spawnBackrooms(targetPartnerName)
                     end
                 end)
 
+                -- Rodapés 3D ao redor do pilar perfeitamente no chão
                 for _, offsetZ in ipairs({-3.08, 3.08}) do
                     local pb1 = Instance.new("Part", folder)
                     pb1.Size, pb1.Position, pb1.Anchored, pb1.CanCollide, pb1.CastShadow = Vector3.new(6.15, 0.5, 0.15), Vector3.new(pillar.Position.X, floorY + 0.25, pillar.Position.Z + offsetZ), true, true, false
@@ -738,6 +696,7 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
+    -- Lâmpadas no Teto
     local lampSpacing = 40
     for x = -halfR + 20, halfR - 20, lampSpacing do
         for z = -halfR + 20, halfR - 20, lampSpacing do
@@ -765,6 +724,7 @@ local function spawnBackrooms(targetPartnerName)
         atm.Density, atm.Color = 0.1, Color3.fromRGB(220, 215, 180)
     end)
 
+    -- Áudio ambiente das Backrooms (ID: 7009793551)
     pcall(function()
         local sndPart = Instance.new("Part", folder)
         sndPart.Name = "BackroomsMusicEmitter"
@@ -780,35 +740,27 @@ local function spawnBackrooms(targetPartnerName)
         sound:Play()
     end)
 
-    -- Teleporte e Vestimenta Automática (Você e o Alvo)
+    -- Teleporte
     task.spawn(function()
         task.wait(1)
         local targetCFrame = CFrame.new(BASE.X, floorY + 5, BASE.Z)
-        
         local chr = LocalPlayer.Character
-        if chr then
-            applyBackroomsOutfit(chr)
-            local hrp = chr:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.Anchored = true
-                hrp.CFrame = targetCFrame
-                task.wait(0.3)
-                hrp.Anchored = false
-            end
+        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = true
+            hrp.CFrame = targetCFrame
+            task.wait(0.3)
+            hrp.Anchored = false
         end
 
         if targetPartnerName and targetPartnerName ~= "" then
             local partner = Players:FindFirstChild(targetPartnerName)
-            if partner and partner.Character then
-                applyBackroomsOutfit(partner.Character)
-                local phrp = partner.Character:FindFirstChild("HumanoidRootPart")
-                if phrp then
-                    phrp.CFrame = targetCFrame + Vector3.new(3, 0, 3)
-                end
+            if partner and partner.Character and partner.Character:FindFirstChild("HumanoidRootPart") then
+                partner.Character.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(3, 0, 3)
             end
         end
 
-        notify("Backrooms", "Salão gerado com manchas pontuais e reais!")
+        notify("Backrooms", "Teleportado para o salão aberto com rodapés alinhados no chão.")
     end)
 
     return true
@@ -1617,7 +1569,7 @@ task.spawn(function()
         local s1 = couch:FindFirstChild("Seat1")
         local s2 = couch:FindFirstChild("Seat2")
         local hd = couch:FindFirstChild("Handle")
-        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = "Handle " end
+        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = true, true, "Handle " end
         couch.Parent = LocalPlayer.Character
         local bv = Instance.new("BodyVelocity", s1)
         bv.MaxForce, bv.P, bv.Velocity = Vector3.new(1e9,1e9,1e9), 1250, Vector3.zero
