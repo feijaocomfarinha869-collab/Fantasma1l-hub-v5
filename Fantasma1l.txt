@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v27 (CORRIGIDO: BURACOS E DESENHOS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v27 (CORRIGIDO: BURACOS EM ORDEM E MANCHAS)
     ==========================================================
 ]]--
 
@@ -484,11 +484,11 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA (CORRIGIDA: CHÃO EM MOSAICO & BURACOS ABERTOS) ==================
+-- ================== BACKROOMS ABERTA (CORRIGIDA: BURACOS EM ORDEM / PONTE & MANCHAS NO CHÃO) ==================
 local drawnIndicesTracker = {}
 
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão com buracos abertos e desenhos nas paredes...")
+    notify("Backrooms", "Gerando salão com buracos organizados (tipo ponte) e manchas no chão...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -514,18 +514,20 @@ local function spawnBackrooms(targetPartnerName)
     local floorY = BASE.Y
     local halfR = ROOM_SIZE / 2
 
-    -- 1. Gerar as posições dos buracos primeiro
+    -- 1. Gerar as posições dos buracos ORGANIZADAS EM ORDEM (tipo ponte: fileiras na esquerda e direita)
     local pitPositions = {}
-    for i = 1, 14 do
-        local rx = math.random(-halfR + 50, halfR - 50)
-        local rz = math.random(-halfR + 50, halfR - 50)
-        table.insert(pitPositions, Vector3.new(BASE.X + rx, floorY, BASE.Z + rz))
+    local spacingZ = 65
+    for z = -halfR + 80, halfR - 80, spacingZ do
+        -- Lado esquerdo (ex: 4 buracos estruturados em ordem)
+        table.insert(pitPositions, Vector3.new(BASE.X - 45, floorY, BASE.Z + z))
+        -- Lado direito (ex: 4 buracos estruturados em ordem)
+        table.insert(pitPositions, Vector3.new(BASE.X + 45, floorY, BASE.Z + z))
     end
 
-    -- Função para criar buracos no chão com poços de sombra e paredes internas
+    -- Função para criar buracos no chão com fundo preto e sombra realista
     local function spawnPitWithShadow(pos)
         task.spawn(function()
-            local pitSize = 12
+            local pitSize = 14
             local pitDepth = 14
 
             local function createPitWall(sz, cframe)
@@ -569,14 +571,14 @@ local function spawnBackrooms(targetPartnerName)
         spawnPitWithShadow(pos)
     end
 
-    -- 2. Gerar o Chão em Mosaico (Blocos que respeitam e abrem espaço para os buracos)
+    -- 2. Gerar o Chão em Mosaico com a textura de carpete original
     local tileSize = 20
     for x = -halfR, halfR - tileSize, tileSize do
         for z = -halfR, halfR - tileSize, tileSize do
             local tileCenter = Vector3.new(BASE.X + x + tileSize/2, floorY, BASE.Z + z + tileSize/2)
             local skip = false
             for _, pitPos in ipairs(pitPositions) do
-                if (Vector3.new(tileCenter.X, 0, tileCenter.Z) - Vector3.new(pitPos.X, 0, pitPos.Z)).Magnitude < 10 then
+                if (Vector3.new(tileCenter.X, 0, tileCenter.Z) - Vector3.new(pitPos.X, 0, pitPos.Z)).Magnitude < 11 then
                     skip = true
                     break
                 end
@@ -597,6 +599,20 @@ local function spawnBackrooms(targetPartnerName)
                 end)
             end
         end
+    end
+
+    -- 3. Adicionar as manchas realistas no chão (conforme visto na imagem)
+    for i = 1, 12 do
+        local stain = Instance.new("Part", folder)
+        stain.Name = "FloorStain"
+        stain.Size = Vector3.new(math.random(16, 28), 0.03, math.random(16, 28))
+        stain.Position = Vector3.new(BASE.X + math.random(-halfR + 60, halfR - 60), floorY - 0.97, BASE.Z + math.random(-halfR + 60, halfR - 60))
+        stain.Anchored = true
+        stain.CanCollide = false
+        stain.Material = Enum.Material.SmoothPlastic
+        stain.Color = Color3.fromRGB(75, 65, 45)
+        stain.Transparency = 0.38
+        stain.CastShadow = false
     end
 
     -- Teto
@@ -676,6 +692,7 @@ local function spawnBackrooms(targetPartnerName)
     end
 
     -- Função para criar paredes
+    local wallThick = 2
     local function makeWall(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -832,7 +849,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Pronto! Buracos abertos e desenhos aplicados.")
+        notify("Backrooms", "Pronto! Buracos ordenados e manchas aplicadas.")
     end)
 
     return true
