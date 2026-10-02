@@ -541,7 +541,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão Principal com Carpete
+    -- Chão Principal com Carpete (ID original restaurado)
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -1617,7 +1617,7 @@ task.spawn(function()
         local s1 = couch:FindFirstChild("Seat1")
         local s2 = couch:FindFirstChild("Seat2")
         local hd = couch:FindFirstChild("Handle")
-        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = true, true, "Handle " end
+        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = "Handle " end
         couch.Parent = LocalPlayer.Character
         local bv = Instance.new("BodyVelocity", s1)
         bv.MaxForce, bv.P, bv.Velocity = Vector3.new(1e9,1e9,1e9), 1250, Vector3.zero
@@ -1734,3 +1734,4 @@ task.spawn(function()
 end)
 
 print("[Fantasma1l Hub] OK - " .. (IS_ADMIN and MY_ROLE or "Brookhaven Only"))
+.
