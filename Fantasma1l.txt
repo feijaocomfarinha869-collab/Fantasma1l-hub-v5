@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v24 (RODAPÉS 3D ALINHADOS NO CHÃO + TOMADAS + BACKROOMS ABERTA)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v25 (BACKROOMS CORRIGIDA E SEM BURACOS)
     ==========================================================
 ]]--
 
@@ -101,7 +101,6 @@ local MEMES = {
 local TEX_WALL        = "rbxassetid://133566929836216"
 local TEX_CEILING     = "rbxassetid://99222905637827"
 local TEX_FLOOR       = "rbxassetid://129329284263154"
-local TEX_FLOOR_STAIN = "rbxassetid://89460285603414"
 
 -- ================== ESTADO ==================
 local kamuiEnabled       = false
@@ -252,7 +251,7 @@ if IS_ADMIN then
     end)
 end
 
--- ================== C00LKIDD EFFECT (APENAS SKYBOX) ==================
+-- ================== C00LKIDD EFFECT ==================
 local function executeCoolkidEffect()
     pcall(function()
         local oldSky = Lighting:FindFirstChild("CoolkidSky")
@@ -484,9 +483,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA COM RODAPÉS ALINHADOS NO CHÃO ==================
+-- ================== BACKROOMS ABERTA (TOTALMENTE CORRIGIDA E SEM BURACOS) ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão aberto com rodapés perfeitamente no chão...")
+    notify("Backrooms", "Gerando salão aberto perfeitamente fechado e alinhado...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -508,10 +507,9 @@ local function spawnBackrooms(targetPartnerName)
     local BASE = Vector3.new(0, 200, 0)
     local ROOM_SIZE = 400
     local WALL_H = 18
-    local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão
+    -- Chão perfeitamente nivelado
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -526,11 +524,11 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Teto
+    -- Teto perfeitamente alinhado
     local ceil = Instance.new("Part", folder)
     ceil.Name = "Ceiling"
     ceil.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
-    ceil.Position = Vector3.new(BASE.X, floorY + WALL_H, BASE.Z)
+    ceil.Position = Vector3.new(BASE.X, floorY + WALL_H + 1, BASE.Z)
     ceil.Anchored, ceil.CanCollide = true, true
     ceil.Material, ceil.Color = Enum.Material.Plastic, Color3.fromRGB(215, 210, 180)
     pcall(function()
@@ -569,11 +567,12 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar parede com rodapés exatos apoiados na superfície do chão (floorY)
-    local function makeWallWithTrims(size, pos, isHorizontal)
+    -- Função para criar paredes perfeitamente ajustadas, coladas do chão ao teto sem vãos
+    local function makeWall(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
-        p.Size, p.Position = size, pos
+        p.Size = size
+        p.Position = pos
         p.Anchored, p.CanCollide = true, true
         p.Material, p.Color = Enum.Material.Plastic, Color3.fromRGB(235, 205, 110)
         p.CastShadow = false
@@ -588,76 +587,47 @@ local function spawnBackrooms(targetPartnerName)
             end
         end)
 
-        -- Rodapés 3D rigorosamente apoiados na superfície exata do chão (floorY + altura/2)
+        -- Rodapés 3D rigorosamente apoiados na superfície exata do chão e colados na parede
         local b1 = Instance.new("Part", folder)
         b1.Anchored, b1.CanCollide, b1.CastShadow = true, true, false
         b1.Material, b1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
 
-        local b2 = Instance.new("Part", folder)
-        b2.Anchored, b2.CanCollide, b2.CastShadow = true, true, false
-        b2.Material, b2.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(225, 225, 225)
-
-        -- Molduras Superiores 3D no teto
         local t1 = Instance.new("Part", folder)
         t1.Anchored, t1.CanCollide, t1.CastShadow = true, true, false
         t1.Material, t1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
 
-        local t2 = Instance.new("Part", folder)
-        t2.Anchored, t2.CanCollide, t2.CastShadow = true, true, false
-        t2.Material, t2.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(225, 225, 225)
-
         if isHorizontal then
-            b1.Size = Vector3.new(size.X, 0.5, size.Z + 0.15)
-            b1.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
-            b2.Size = Vector3.new(size.X, 0.35, size.Z + 0.28)
-            b2.Position = Vector3.new(pos.X, floorY + 0.175, pos.Z)
+            b1.Size = Vector3.new(size.X, 0.4, 0.4)
+            b1.Position = Vector3.new(pos.X, floorY + 0.2, pos.Z + (size.Z > 0 and (size.Z/2 - 0.2) or 0))
 
-            t1.Size = Vector3.new(size.X, 0.4, size.Z + 0.15)
-            t1.Position = Vector3.new(pos.X, floorY + WALL_H - 0.2, pos.Z)
-            t2.Size = Vector3.new(size.X, 0.25, size.Z + 0.28)
-            t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
+            t1.Size = Vector3.new(size.X, 0.4, 0.4)
+            t1.Position = Vector3.new(pos.X, floorY + WALL_H - 0.2, pos.Z + (size.Z > 0 and (size.Z/2 - 0.2) or 0))
         else
-            b1.Size = Vector3.new(size.X + 0.15, 0.5, size.Z)
-            b1.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
-            b2.Size = Vector3.new(size.X + 0.28, 0.35, size.Z)
-            b2.Position = Vector3.new(pos.X, floorY + 0.175, pos.Z)
+            b1.Size = Vector3.new(0.4, 0.4, size.Z)
+            b1.Position = Vector3.new(pos.X + (size.X > 0 and (size.X/2 - 0.2) or 0), floorY + 0.2, pos.Z)
 
-            t1.Size = Vector3.new(size.X + 0.15, 0.4, size.Z)
-            t1.Position = Vector3.new(pos.X, floorY + WALL_H - 0.2, pos.Z)
-            t2.Size = Vector3.new(size.X + 0.28, 0.25, size.Z)
-            t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
+            t1.Size = Vector3.new(0.4, 0.4, size.Z)
+            t1.Position = Vector3.new(pos.X + (size.X > 0 and (size.X/2 - 0.2) or 0), floorY + WALL_H - 0.2, pos.Z)
         end
 
-        -- Sombra concentrada nos cantos do chão
-        local shd = Instance.new("Part", folder)
-        shd.Anchored, shd.CanCollide, shd.CastShadow = true, false, false
-        shd.Material = Enum.Material.SmoothPlastic
-        shd.Color = Color3.fromRGB(35, 25, 5)
-        shd.Transparency = 0.4
-        if isHorizontal then
-            shd.Size = Vector3.new(size.X, 0.5, 0.9)
-            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
-        else
-            shd.Size = Vector3.new(0.9, 0.5, size.Z)
-            shd.Position = Vector3.new(pos.X, floorY + 0.25, pos.Z)
-        end
-
-        -- Tomada
-        if math.random() > 0.4 then
-            local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or (size.X > 0 and 1.1 or -1.1)))
+        -- Tomada opcional
+        if math.random() > 0.5 then
+            local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or 0))
             local rotCF = isHorizontal and CFrame.new(pos.X, floorY + 1.2, pos.Z + 1.1) or CFrame.new(pos.X + 1.1, floorY + 1.2, pos.Z) * CFrame.Angles(0, math.rad(90), 0)
             spawnOutlet(outletPos, rotCF)
         end
     end
 
     local halfR = ROOM_SIZE / 2
-    -- Paredes limites externas
-    makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
-    makeWallWithTrims(Vector3.new(ROOM_SIZE, WALL_H, WALL_T), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
-    makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
-    makeWallWithTrims(Vector3.new(WALL_T, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
+    local wallThick = 2
 
-    -- Pilares e Paredes Divisórias Internas com Rodapés Corretos no Chão
+    -- Paredes limítrofes externas fechando todo o perímetro perfeitamente
+    makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
+    makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
+    makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
+    makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
+
+    -- Divisórias internas labirínticas sem frestas ou buracos
     local step = 50
     for x = -halfR + 50, halfR - 50, step do
         for z = -halfR + 50, halfR - 50, step do
@@ -677,21 +647,11 @@ local function spawnBackrooms(targetPartnerName)
                         tex.StudsPerTileV = 5
                     end
                 end)
-
-                -- Rodapés 3D ao redor do pilar perfeitamente no chão
-                for _, offsetZ in ipairs({-3.08, 3.08}) do
-                    local pb1 = Instance.new("Part", folder)
-                    pb1.Size, pb1.Position, pb1.Anchored, pb1.CanCollide, pb1.CastShadow = Vector3.new(6.15, 0.5, 0.15), Vector3.new(pillar.Position.X, floorY + 0.25, pillar.Position.Z + offsetZ), true, true, false
-                    pb1.Material, pb1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
-                    local pt1 = Instance.new("Part", folder)
-                    pt1.Size, pt1.Position, pt1.Anchored, pt1.CanCollide, pt1.CastShadow = Vector3.new(6.15, 0.4, 0.15), Vector3.new(pillar.Position.X, floorY + WALL_H - 0.2, pillar.Position.Z + offsetZ), true, true, false
-                    pt1.Material, pt1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
-                end
             end
 
-            if math.random() > 0.6 then
-                local pSize = math.random() > 0.5 and Vector3.new(30, WALL_H, 3) or Vector3.new(3, WALL_H, 30)
-                makeWallWithTrims(pSize, Vector3.new(BASE.X + x + 20, floorY + WALL_H/2, BASE.Z + z + 20), pSize.X > pSize.Z)
+            if math.random() > 0.5 then
+                local pSize = math.random() > 0.5 and Vector3.new(35, WALL_H, 2.5) or Vector3.new(2.5, WALL_H, 35)
+                makeWall(pSize, Vector3.new(BASE.X + x + 15, floorY + WALL_H/2, BASE.Z + z + 15), pSize.X > pSize.Z)
             end
         end
     end
@@ -703,7 +663,7 @@ local function spawnBackrooms(targetPartnerName)
             local lamp = Instance.new("Part", folder)
             lamp.Name = "Lamp"
             lamp.Size = Vector3.new(6, 0.4, 6)
-            lamp.Position = Vector3.new(BASE.X + x, floorY + WALL_H - 1.1, BASE.Z + z)
+            lamp.Position = Vector3.new(BASE.X + x, floorY + WALL_H - 0.2, BASE.Z + z)
             lamp.Anchored, lamp.CanCollide = true, false
             lamp.Material, lamp.Color = Enum.Material.Neon, Color3.fromRGB(255, 255, 200)
             lamp.CastShadow = false
@@ -724,7 +684,7 @@ local function spawnBackrooms(targetPartnerName)
         atm.Density, atm.Color = 0.1, Color3.fromRGB(220, 215, 180)
     end)
 
-    -- Áudio ambiente das Backrooms (ID: 7009793551)
+    -- Áudio ambiente das Backrooms
     pcall(function()
         local sndPart = Instance.new("Part", folder)
         sndPart.Name = "BackroomsMusicEmitter"
@@ -760,7 +720,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Teleportado para o salão aberto com rodapés alinhados no chão.")
+        notify("Backrooms", "Teleportado com sucesso! Estrutura fechada sem frestas.")
     end)
 
     return true
