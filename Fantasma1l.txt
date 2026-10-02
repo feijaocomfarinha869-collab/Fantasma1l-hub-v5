@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v28 (SOMBRAS IDÊNTICAS + CHÃO TEXTURIZADO + TOMADAS + ROUPAS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v29 (MANCHAS PONTUAIS REAIS + SOMBRAS + TOMADAS + ROUPAS)
     ==========================================================
 ]]--
 
@@ -514,9 +514,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA COM SOMBRAS E CHÃO TEXTURIZADO ==================
+-- ================== BACKROOMS ABERTA COM MANCHAS PONTUAIS E REAIS ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão com sombras idênticas e chão manchado integrado...")
+    notify("Backrooms", "Gerando salão com manchas pontuais reais e sombras exatas...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -541,7 +541,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_T = 2
     local floorY = BASE.Y
 
-    -- Chão Principal com Carpete e Manchas Integradas na Textura Real
+    -- Chão Principal com Carpete
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -555,12 +555,18 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileU = 5
         tex.StudsPerTileV = 5
 
-        local stainTex = Instance.new("Texture", floor)
-        stainTex.Texture = TEX_FLOOR_STAIN
-        stainTex.Face = Enum.NormalId.Top
-        stainTex.StudsPerTileU = 25
-        stainTex.StudsPerTileV = 25
-        stainTex.Transparency = 0.2
+        -- Manchas aplicadas apenas em pequenos trechos localizados (tamanho real da textura, sem exagero)
+        for _ = 1, 12 do
+            local stain = Instance.new("Texture", floor)
+            stain.Texture = TEX_FLOOR_STAIN
+            stain.Face = Enum.NormalId.Top
+            stain.StudsPerTileU = 10
+            stain.StudsPerTileV = 10
+            stain.Transparency = 0.25
+            -- Espalha as manchas pontualmente pelo chão
+            stain.OffsetStudsU = math.random(-150, 150)
+            stain.OffsetStudsV = math.random(-150, 150)
+        end
     end)
 
     -- Teto
@@ -606,7 +612,7 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar parede com rodapés no chão e sombra idêntica nos cantos
+    -- Função para criar parede com rodapés e sombra idêntica nos cantos
     local function makeWallWithTrims(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -663,7 +669,7 @@ local function spawnBackrooms(targetPartnerName)
             t2.Position = Vector3.new(pos.X, floorY + WALL_H - 0.125, pos.Z)
         end
 
-        -- Sombra idêntica e realista aplicada colada exatamente na base da parede com textura degradê/escura
+        -- Sombra e desbotamento idênticos nos cantos entre parede e chão
         local shadowDecalPart = Instance.new("Part", folder)
         shadowDecalPart.Name = "WallShadow"
         shadowDecalPart.Anchored, shadowDecalPart.CanCollide, shadowDecalPart.CastShadow = true, false, false
@@ -804,7 +810,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Salão gerado com sombras e roupas idênticas!")
+        notify("Backrooms", "Salão gerado com manchas pontuais e reais!")
     end)
 
     return true
