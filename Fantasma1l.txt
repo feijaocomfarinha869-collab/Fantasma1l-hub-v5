@@ -1734,4 +1734,3 @@ task.spawn(function()
 end)
 
 print("[Fantasma1l Hub] OK - " .. (IS_ADMIN and MY_ROLE or "Brookhaven Only"))
-.
