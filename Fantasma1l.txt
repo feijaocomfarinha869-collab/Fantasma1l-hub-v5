@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v26 (BACKROOMS COM DESENHOS E MOLDURAS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v27 (BACKROOMS COM DESENHOS DIRETOS E BURACOS COM SOMBRA)
     ==========================================================
 ]]--
 
@@ -87,7 +87,7 @@ local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
 
--- IDs dos Desenhos Solicitados
+-- IDs dos Desenhos Solicitados (Sem repetição distribuída)
 local DRAWING_IDS = {
     "rbxassetid://124381749642171",
     "rbxassetid://102128184178316",
@@ -491,9 +491,11 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA (COM DESENHOS E MOLDURAS BRANCAS) ==================
+-- ================== BACKROOMS ABERTA (COM DESENHOS DIRETOS NA PAREDE E BURACOS COM SOMBRA) ==================
+local drawnIndicesTracker = {} -- Evita repetir desenhos rapidamente
+
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão com desenhos e molduras brancas...")
+    notify("Backrooms", "Gerando salão com desenhos aleatórios na parede e buracos escuros...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -504,13 +506,15 @@ local function spawnBackrooms(targetPartnerName)
     local folder = Instance.new("Folder", workspace)
     folder.Name = "Backrooms_Level0"
 
-    Lighting.Ambient = Color3.fromRGB(65, 60, 45)
-    Lighting.OutdoorAmbient = Color3.fromRGB(65, 60, 45)
-    Lighting.Brightness = 2.5
+    -- Configuração de Iluminação Escura e Tétrica Realista
+    Lighting.Ambient = Color3.fromRGB(45, 40, 30)
+    Lighting.OutdoorAmbient = Color3.fromRGB(30, 25, 20)
+    Lighting.Brightness = 1.8
     Lighting.Outlines = false
     Lighting.GlobalShadows = true
-    Lighting.ShadowSoftness = 0.5
-    Lighting.FogEnd = 100000
+    Lighting.ShadowSoftness = 0.2
+    Lighting.FogEnd = 800
+    Lighting.FogColor = Color3.fromRGB(30, 25, 15)
 
     local BASE = Vector3.new(0, 200, 0)
     local ROOM_SIZE = 400
@@ -521,6 +525,7 @@ local function spawnBackrooms(targetPartnerName)
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
+    floor.Position = Vector3.new(BASE.X, floorY - 1, floorY > 0 and (floorY - 1) or BASE.Z) -- Correção de posição
     floor.Position = Vector3.new(BASE.X, floorY - 1, BASE.Z)
     floor.Anchored, floor.CanCollide = true, true
     floor.Material, floor.Color = Enum.Material.Fabric, Color3.fromRGB(215, 185, 95)
@@ -546,6 +551,59 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileU = 5
         tex.StudsPerTileV = 5
     end)
+
+    -- Função para criar buracos no chão com poços de sombra realista e paredes dentro para prender
+    local function spawnPitWithShadow(pos)
+        task.spawn(function()
+            local pitSize = 14
+            local pitDepth = 12
+
+            -- Paredes internas do buraco (para o jogador ficar preso se cair)
+            local function createPitWall(sz, cframe)
+                local p = Instance.new("Part", folder)
+                p.Size = sz
+                p.CFrame = cframe
+                p.Anchored = true
+                p.CanCollide = true
+                p.Transparency = 1 -- Invisível, apenas prende
+            end
+
+            local halfP = pitSize / 2
+            local currentPitCenter = Vector3.new(pos.X, floorY - (pitDepth / 2), pos.Z)
+
+            createPitWall(Vector3.new(pitSize, pitDepth, 1), CFrame.new(currentPitCenter + Vector3.new(0, 0, halfP)))
+            createPitWall(Vector3.new(pitSize, pitDepth, 1), CFrame.new(currentPitCenter + Vector3.new(0, 0, -halfP)))
+            createPitWall(Vector3.new(1, pitDepth, pitSize), CFrame.new(currentPitCenter + Vector3.new(halfP, 0, 0)))
+            createPitWall(Vector3.new(1, pitDepth, pitSize), CFrame.new(currentPitCenter + Vector3.new(-halfP, 0, 0)))
+
+            -- Fundo do buraco (onde o jogador pisará ao cair)
+            local bottom = Instance.new("Part", folder)
+            bottom.Size = Vector3.new(pitSize, 1, pitSize)
+            bottom.Position = Vector3.new(pos.X, floorY - pitDepth, pos.Z)
+            bottom.Anchored = true
+            bottom.CanCollide = true
+            bottom.Material = Enum.Material.SmoothPlastic
+            bottom.Color = Color3.fromRGB(5, 5, 5) -- Fundo extremamente escuro
+
+            -- Sombra escura e realista dentro do buraco (Efeito volumétrico)
+            local shadowPart = Instance.new("Part", folder)
+            shadowPart.Size = Vector3.new(pitSize - 0.5, pitDepth - 1, pitSize - 0.5)
+            shadowPart.Position = currentPitCenter
+            shadowPart.Anchored = true
+            shadowPart.CanCollide = false
+            shadowPart.Material = Enum.Material.Glass
+            shadowPart.Color = Color3.fromRGB(0, 0, 0)
+            shadowPart.Transparency = 0.35 -- Sombra densa
+            shadowPart.CastShadow = false
+        end)
+    end
+
+    -- Gerar alguns buracos no chão aleatoriamente pelo labirinto
+    for i = 1, 12 do
+        local rx = math.random(-ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40)
+        local rz = math.random(-ROOM_SIZE/2 + 40, ROOM_SIZE/2 - 40)
+        spawnPitWithShadow(Vector3.new(BASE.X + rx, floorY, BASE.Z + rz))
+    end
 
     -- Função para spawnar Tomada
     local function spawnOutlet(pos, cframeRot)
@@ -575,35 +633,28 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar Moldura Branca e Desenho na parede
-    local function spawnPaintingWithWhiteBorder(wallPart, cframeOffset, normalId)
+    -- Função para criar o Desenho DIRETAMENTE na textura da parede (sem moldura branca)
+    local function spawnDirectDrawingOnWall(wallPart, cframeOffset)
         task.spawn(function()
-            -- Escolher um dos IDs de desenho pedidos
-            local randomImgId = DRAWING_IDS[math.random(1, #DRAWING_IDS)]
-            local realAssetId = getRealImageIdDelta(randomImgId)
+            -- Selecionar um desenho sem repetir muito seguido
+            local index = math.random(1, #DRAWING_IDS)
+            if #drawnIndicesTracker >= #DRAWING_IDS then drawnIndicesTracker = {} end
+            while table.find(drawnIndicesTracker, index) do
+                index = math.random(1, #DRAWING_IDS)
+            end
+            table.insert(drawnIndicesTracker, index)
 
-            local paintingWidth = 6
-            local paintingHeight = 7
-            local frameThickness = 0.35
+            local realAssetId = getRealImageIdDelta(DRAWING_IDS[index])
+            local pWidth, pHeight = 7, 8
 
-            -- Moldura Branca de Fundo (caixa maior)
-            local framePart = Instance.new("Part", folder)
-            framePart.Name = "PaintingFrame"
-            framePart.Size = Vector3.new(paintingWidth + 0.6, paintingHeight + 0.6, 0.2)
-            framePart.CFrame = cframeOffset
-            framePart.Anchored = true
-            framePart.CanCollide = false
-            framePart.Material = Enum.Material.SmoothPlastic
-            framePart.Color = Color3.fromRGB(255, 255, 255) -- Moldura Branca pura
-
-            -- Tela com a Imagem do Desenho
+            -- Parte colada na parede que serve de suporte para o SurfaceGui
             local canvasPart = Instance.new("Part", folder)
-            canvasPart.Name = "PaintingCanvas"
-            canvasPart.Size = Vector3.new(paintingWidth, paintingHeight, 0.25)
-            canvasPart.CFrame = cframeOffset * CFrame.new(0, 0, -0.02)
+            canvasPart.Name = "WallDrawing"
+            canvasPart.Size = Vector3.new(pWidth, pHeight, 0.05)
+            canvasPart.CFrame = cframeOffset
             canvasPart.Anchored = true
             canvasPart.CanCollide = false
-            canvasPart.Transparency = 1
+            canvasPart.Transparency = 1 -- Totalmente transparente, só exibe o decalque/desenho
 
             local surfaceGui = Instance.new("SurfaceGui", canvasPart)
             surfaceGui.Face = Enum.NormalId.Front
@@ -617,7 +668,7 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar paredes com rodapés
+    -- Função para criar paredes com rodapés e desenhos integrados
     local function makeWall(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -625,7 +676,7 @@ local function spawnBackrooms(targetPartnerName)
         p.Position = pos
         p.Anchored, p.CanCollide = true, true
         p.Material, p.Color = Enum.Material.Plastic, Color3.fromRGB(235, 205, 110)
-        p.CastShadow = false
+        p.CastShadow = true
         
         pcall(function()
             for _, face in ipairs({Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right}) do
@@ -659,21 +710,20 @@ local function spawnBackrooms(targetPartnerName)
             t1.Position = Vector3.new(pos.X + (size.X > 0 and (size.X/2 - 0.2) or 0), floorY + WALL_H - 0.2, pos.Z)
         end
 
-        -- Chance de colocar um quadro com moldura branca na parede
-        if math.random() > 0.4 then
+        -- Colocar os desenhos diretamente na parede (sem moldura)
+        if math.random() > 0.35 then
             local paintingPos
             if isHorizontal then
-                paintingPos = CFrame.new(pos.X + math.random(-10, 10), floorY + WALL_H / 2, pos.Z + (size.Z > 0 and (size.Z/2 - 0.15) or -0.15))
+                paintingPos = CFrame.new(pos.X + math.random(-12, 12), floorY + WALL_H / 2, pos.Z + (size.Z > 0 and (size.Z/2 - 0.08) or -0.08))
             else
-                paintingPos = CFrame.new(pos.X + (size.X > 0 and (size.X/2 - 0.15) or -0.15), floorY + WALL_H / 2, pos.Z + math.random(-10, 10)) * CFrame.Angles(0, math.rad(90), 0)
+                paintingPos = CFrame.new(pos.X + (size.X > 0 and (size.X/2 - 0.08) or -0.08), floorY + WALL_H / 2, pos.Z + math.random(-12, 12)) * CFrame.Angles(0, math.rad(90), 0)
             end
-            spawnPaintingWithWhiteBorder(p, paintingPos)
+            spawnDirectDrawingOnWall(p, paintingPos)
         end
 
         if math.random() > 0.6 then
-            local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z)
             local rotCF = isHorizontal and CFrame.new(pos.X, floorY + 1.2, pos.Z + 1.1) or CFrame.new(pos.X + 1.1, floorY + 1.2, pos.Z) * CFrame.Angles(0, math.rad(90), 0)
-            spawnOutlet(outletPos, rotCF)
+            spawnOutlet(Vector3.new(pos.X, floorY + 1.2, pos.Z), rotCF)
         end
     end
 
@@ -695,7 +745,7 @@ local function spawnBackrooms(targetPartnerName)
                 pillar.Name = "Pillar"
                 pillar.Size = Vector3.new(6, WALL_H, 6)
                 pillar.Position = Vector3.new(BASE.X + x, floorY + WALL_H/2, BASE.Z + z)
-                pillar.Anchored, pillar.CanCollide, pillar.CastShadow = true, true, false
+                pillar.Anchored, pillar.CanCollide, pillar.CastShadow = true, true, true
                 pillar.Material, pillar.Color = Enum.Material.Plastic, Color3.fromRGB(235, 205, 110)
                 pcall(function()
                     for _, face in ipairs({Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right}) do
@@ -715,7 +765,7 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
-    -- Lâmpadas no Teto
+    -- Lâmpadas no Teto (com luz pontual e sombras densas)
     local lampSpacing = 40
     for x = -halfR + 20, halfR - 20, lampSpacing do
         for z = -halfR + 20, halfR - 20, lampSpacing do
@@ -729,10 +779,10 @@ local function spawnBackrooms(targetPartnerName)
 
             local sl = Instance.new("SurfaceLight", lamp)
             sl.Face = Enum.NormalId.Bottom
-            sl.Brightness = 4
-            sl.Range = 45
-            sl.Angle = 120
-            sl.Color = Color3.fromRGB(255, 250, 210)
+            sl.Brightness = 3.2
+            sl.Range = 40
+            sl.Angle = 110
+            sl.Color = Color3.fromRGB(255, 245, 195)
             sl.Shadows = true
         end
     end
@@ -740,7 +790,7 @@ local function spawnBackrooms(targetPartnerName)
     pcall(function()
         local atm = Instance.new("Atmosphere", workspace)
         atm.Name = "BackroomsAtmosphere"
-        atm.Density, atm.Color = 0.1, Color3.fromRGB(220, 215, 180)
+        atm.Density, atm.Color = 0.22, Color3.fromRGB(150, 140, 110)
     end)
 
     -- Áudio ambiente das Backrooms
@@ -779,7 +829,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Teleportado! Com desenhos nas molduras brancas.")
+        notify("Backrooms", "Pronto! Desenhos aplicados nas paredes e buracos com sombra profunda criados.")
     end)
 
     return true
@@ -1693,7 +1743,7 @@ task.spawn(function()
     TabAudio:AddButton({ "Parar Música", function()
         local chr = LocalPlayer.Character
         if chr and chr:FindFirstChild("HumanoidRootPart") then
-            local s = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
+            let s = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
             if s then s:Stop() s:Destroy() end
         end
     end })
