@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v25 (BACKROOMS CORRIGIDA E SEM BURACOS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v26 (BACKROOMS COM DESENHOS E MOLDURAS)
     ==========================================================
 ]]--
 
@@ -86,6 +86,14 @@ local OUTLET_MODEL_ID  = "112967019690019"
 local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
+
+-- IDs dos Desenhos Solicitados
+local DRAWING_IDS = {
+    "rbxassetid://124381749642171",
+    "rbxassetid://102128184178316",
+    "rbxassetid://73774479856131",
+    "rbxassetid://92443187697064"
+}
 
 local JUMPS = {
     ["JUMPSCARE_1"] = { Img = "rbxassetid://80832692858099",  Snd = "rbxassetid://6754147732" },
@@ -483,9 +491,9 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA (TOTALMENTE CORRIGIDA E SEM BURACOS) ==================
+-- ================== BACKROOMS ABERTA (COM DESENHOS E MOLDURAS BRANCAS) ==================
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão aberto perfeitamente fechado e alinhado...")
+    notify("Backrooms", "Gerando salão com desenhos e molduras brancas...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -509,7 +517,7 @@ local function spawnBackrooms(targetPartnerName)
     local WALL_H = 18
     local floorY = BASE.Y
 
-    -- Chão perfeitamente nivelado
+    -- Chão
     local floor = Instance.new("Part", folder)
     floor.Name = "Floor"
     floor.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -524,7 +532,7 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Teto perfeitamente alinhado
+    -- Teto
     local ceil = Instance.new("Part", folder)
     ceil.Name = "Ceiling"
     ceil.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -539,7 +547,7 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Função para spawnar tomada 3D
+    -- Função para spawnar Tomada
     local function spawnOutlet(pos, cframeRot)
         task.spawn(function()
             local outletModel = fetchAssetAsModel(OUTLET_MODEL_ID)
@@ -567,7 +575,49 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar paredes perfeitamente ajustadas, coladas do chão ao teto sem vãos
+    -- Função para criar Moldura Branca e Desenho na parede
+    local function spawnPaintingWithWhiteBorder(wallPart, cframeOffset, normalId)
+        task.spawn(function()
+            -- Escolher um dos IDs de desenho pedidos
+            local randomImgId = DRAWING_IDS[math.random(1, #DRAWING_IDS)]
+            local realAssetId = getRealImageIdDelta(randomImgId)
+
+            local paintingWidth = 6
+            local paintingHeight = 7
+            local frameThickness = 0.35
+
+            -- Moldura Branca de Fundo (caixa maior)
+            local framePart = Instance.new("Part", folder)
+            framePart.Name = "PaintingFrame"
+            framePart.Size = Vector3.new(paintingWidth + 0.6, paintingHeight + 0.6, 0.2)
+            framePart.CFrame = cframeOffset
+            framePart.Anchored = true
+            framePart.CanCollide = false
+            framePart.Material = Enum.Material.SmoothPlastic
+            framePart.Color = Color3.fromRGB(255, 255, 255) -- Moldura Branca pura
+
+            -- Tela com a Imagem do Desenho
+            local canvasPart = Instance.new("Part", folder)
+            canvasPart.Name = "PaintingCanvas"
+            canvasPart.Size = Vector3.new(paintingWidth, paintingHeight, 0.25)
+            canvasPart.CFrame = cframeOffset * CFrame.new(0, 0, -0.02)
+            canvasPart.Anchored = true
+            canvasPart.CanCollide = false
+            canvasPart.Transparency = 1
+
+            local surfaceGui = Instance.new("SurfaceGui", canvasPart)
+            surfaceGui.Face = Enum.NormalId.Front
+            surfaceGui.AlwaysOnTop = false
+
+            local imgLabel = Instance.new("ImageLabel", surfaceGui)
+            imgLabel.Size = UDim2.new(1, 0, 1, 0)
+            imgLabel.BackgroundTransparency = 1
+            imgLabel.Image = realAssetId
+            imgLabel.ScaleType = Enum.ScaleType.Fit
+        end)
+    end
+
+    -- Função para criar paredes com rodapés
     local function makeWall(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
         p.Name = "Wall"
@@ -587,7 +637,6 @@ local function spawnBackrooms(targetPartnerName)
             end
         end)
 
-        -- Rodapés 3D rigorosamente apoiados na superfície exata do chão e colados na parede
         local b1 = Instance.new("Part", folder)
         b1.Anchored, b1.CanCollide, b1.CastShadow = true, true, false
         b1.Material, b1.Color = Enum.Material.SmoothPlastic, Color3.fromRGB(245, 245, 245)
@@ -610,9 +659,19 @@ local function spawnBackrooms(targetPartnerName)
             t1.Position = Vector3.new(pos.X + (size.X > 0 and (size.X/2 - 0.2) or 0), floorY + WALL_H - 0.2, pos.Z)
         end
 
-        -- Tomada opcional
-        if math.random() > 0.5 then
-            local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z + (isHorizontal and 0 or 0))
+        -- Chance de colocar um quadro com moldura branca na parede
+        if math.random() > 0.4 then
+            local paintingPos
+            if isHorizontal then
+                paintingPos = CFrame.new(pos.X + math.random(-10, 10), floorY + WALL_H / 2, pos.Z + (size.Z > 0 and (size.Z/2 - 0.15) or -0.15))
+            else
+                paintingPos = CFrame.new(pos.X + (size.X > 0 and (size.X/2 - 0.15) or -0.15), floorY + WALL_H / 2, pos.Z + math.random(-10, 10)) * CFrame.Angles(0, math.rad(90), 0)
+            end
+            spawnPaintingWithWhiteBorder(p, paintingPos)
+        end
+
+        if math.random() > 0.6 then
+            local outletPos = Vector3.new(pos.X, floorY + 1.2, pos.Z)
             local rotCF = isHorizontal and CFrame.new(pos.X, floorY + 1.2, pos.Z + 1.1) or CFrame.new(pos.X + 1.1, floorY + 1.2, pos.Z) * CFrame.Angles(0, math.rad(90), 0)
             spawnOutlet(outletPos, rotCF)
         end
@@ -621,13 +680,13 @@ local function spawnBackrooms(targetPartnerName)
     local halfR = ROOM_SIZE / 2
     local wallThick = 2
 
-    -- Paredes limítrofes externas fechando todo o perímetro perfeitamente
+    -- Paredes externas
     makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
     makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
     makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
     makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
 
-    -- Divisórias internas labirínticas sem frestas ou buracos
+    -- Divisórias internas do labirinto
     local step = 50
     for x = -halfR + 50, halfR - 50, step do
         for z = -halfR + 50, halfR - 50, step do
@@ -720,7 +779,7 @@ local function spawnBackrooms(targetPartnerName)
             end
         end
 
-        notify("Backrooms", "Teleportado com sucesso! Estrutura fechada sem frestas.")
+        notify("Backrooms", "Teleportado! Com desenhos nas molduras brancas.")
     end)
 
     return true
