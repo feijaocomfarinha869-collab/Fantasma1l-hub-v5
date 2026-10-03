@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v27 (CORRIGIDO: BURACOS EM ORDEM E MANCHAS)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v27 (COM FLASH SPEED FORCE v2)
     ==========================================================
 ]]--
 
@@ -12,12 +12,15 @@ local Lighting           = game:GetService("Lighting")
 local RunService         = game:GetService("RunService")
 local UserInputService   = game:GetService("UserInputService")
 local PathfindingService = game:GetService("PathfindingService")
+local CoreGui            = game:GetService("CoreGui")
+local TweenService       = game:GetService("TweenService")
+local Debris             = game:GetService("Debris")
 local LocalPlayer        = Players.LocalPlayer
 
 -- ================== WHITELIST ==================
 local WHITELIST = {
     ["renegado6661l"]         = { Role = "DONO",     Permanent = true },
-    ["gdyfhgfvc"] = { Role = "SUB DONO", Days = 30 },
+    ["PREENCHA_AQUI_SUBDONO"] = { Role = "SUB DONO", Days = 30 },
     ["PREENCHA_AQUI_ADM_1"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_2"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_3"]   = { Role = "ADM",      Days = 30 },
@@ -68,7 +71,6 @@ local AK47_MODEL_ID    = 255662618
 local YORU_MODEL_ID    = 79128297434634
 local CUSTOM_ANIM_ID   = "rbxassetid://15489784732"
 local SKYLINE_MODEL_ID = 96341548276150
-local AURA_ANIM_ID     = "rbxassetid://106708015414624"
 local SUK_SHRINE       = "18726352770"
 local SUK_CUTS         = "17225837968"
 local SUK_AUDIO        = "rbxassetid://6590147536"
@@ -87,7 +89,6 @@ local LIFEFORM_IMG     = "rbxassetid://92640402847884"
 local LIFEFORM_SOUND   = "rbxassetid://1840320106"
 local BACKROOMS_MUSIC  = "rbxassetid://7009793551"
 
--- IDs de Imagens Reais e Válidas para os Desenhos nas Paredes
 local DRAWING_IDS = {
     "rbxassetid://6023426915",
     "rbxassetid://6031094691",
@@ -118,7 +119,6 @@ local activeScriptUsers  = { [LocalPlayer.Name] = true }
 local selectedPlayerName = LocalPlayer.Name
 local customChatText     = ""
 local isControlling      = false
-local auraTrack          = nil
 local flyWingsActive     = false
 local flyConnections     = {}
 local wingsModel, halo1Model, halo2Model
@@ -268,6 +268,132 @@ local function executeCoolkidEffect()
         Lighting.TimeOfDay = 12
     end)
     notify("c00lkidd Effect", "Skybox aplicada com sucesso!")
+end
+
+-- ================== FLASH SPEED FORCE v2 ==================
+local function toggleFlash()
+    local plr = LocalPlayer
+    local char = plr.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
+
+    local oldGui = CoreGui:FindFirstChild("FlashProGui") or (plr:FindFirstChild("PlayerGui") and plr.PlayerGui:FindFirstChild("FlashProGui"))
+    if oldGui then
+        oldGui:Destroy()
+        hum.WalkSpeed = 16
+        notify("Flash", "Speed Force desativada!")
+        return
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "FlashProGui"
+    screenGui.ResetOnSpawn = false
+    pcall(function() screenGui.Parent = CoreGui end)
+    if not screenGui.Parent then
+        screenGui.Parent = plr:WaitForChild("PlayerGui")
+    end
+
+    local mainFrame = Instance.new("Frame", screenGui)
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 230, 0, 220)
+    mainFrame.Position = UDim2.new(0.5, -115, 0.35, -110)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+
+    local uiCorner = Instance.new("UICorner", mainFrame)
+    uiCorner.CornerRadius = UDim.new(0, 12)
+
+    local uiStroke = Instance.new("UIStroke", mainFrame)
+    uiStroke.Color = Color3.fromRGB(255, 190, 0)
+    uiStroke.Thickness = 2.5
+
+    local titleBar = Instance.new("TextLabel", mainFrame)
+    titleBar.Size = UDim2.new(1, 0, 0, 42)
+    titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    titleBar.TextColor3 = Color3.fromRGB(255, 200, 0)
+    titleBar.TextSize = 15
+    titleBar.Font = Enum.Font.GothamBold
+    titleBar.Text = "⚡ FLASH SPEED FORCE"
+
+    local titleCorner = Instance.new("UICorner", titleBar)
+    titleCorner.CornerRadius = UDim.new(0, 12)
+
+    local toggleBtn = Instance.new("TextButton", mainFrame)
+    toggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+    toggleBtn.Size = UDim2.new(0.8, 0, 0, 38)
+    toggleBtn.Text = "Speed Force: ON"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+
+    local closeBtn = Instance.new("TextButton", mainFrame)
+    closeBtn.Position = UDim2.new(0.1, 0, 0.62, 0)
+    closeBtn.Size = UDim2.new(0.8, 0, 0, 38)
+    closeBtn.Text = "Fechar / Desativar"
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+
+    local speedVal = 200
+    hum.WalkSpeed = speedVal
+
+    local boltFolder = Instance.new("Folder", workspace.CurrentCamera)
+    boltFolder.Name = "FlashProBolts"
+
+    local active = true
+    toggleBtn.MouseButton1Click:Connect(function()
+        active = not active
+        if active then
+            hum.WalkSpeed = speedVal
+            toggleBtn.Text = "Speed Force: ON"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        else
+            hum.WalkSpeed = 16
+            toggleBtn.Text = "Speed Force: OFF"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        end
+    end)
+
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        local currentHum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+        local currentHrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+        if not currentHum or not currentHrp then return end
+
+        if active then
+            if currentHum.MoveDirection.Magnitude > 0 then
+                if math.random() < 0.5 then
+                    local bolt = Instance.new("Part", boltFolder)
+                    bolt.Anchored = true
+                    bolt.CanCollide = false
+                    bolt.Material = Enum.Material.Neon
+                    bolt.Color = math.random() > 0.5 and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 215, 40)
+                    bolt.Size = Vector3.new(0.3, 0.3, math.random(4, 14))
+                    local offset = Vector3.new(math.random(-5, 5), math.random(-2, 5), math.random(-5, 5))
+                    bolt.CFrame = CFrame.new(currentHrp.Position + offset, currentHrp.Position)
+                    Debris:AddItem(bolt, 0.08)
+                end
+            end
+        end
+    end)
+
+    screenGui.Destroying:Connect(function()
+        if conn then conn:Disconnect() end
+        if boltFolder then boltFolder:Destroy() end
+        local finalHum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+        if finalHum then finalHum.WalkSpeed = 16 end
+    end)
+
+    notify("Flash", "Speed Force v2 ativada com sucesso!")
 end
 
 -- ================== KAMUI ==================
@@ -484,11 +610,11 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS ABERTA (CORRIGIDA: BURACOS EM ORDEM / PONTE & MANCHAS NO CHÃO) ==================
+-- ================== BACKROOMS ABERTA ==================
 local drawnIndicesTracker = {}
 
 local function spawnBackrooms(targetPartnerName)
-    notify("Backrooms", "Gerando salão com buracos organizados (tipo ponte) e manchas no chão...")
+    notify("Backrooms", "Gerando salão com buracos organizados e manchas no chão...")
 
     local old = workspace:FindFirstChild("Backrooms_Level0")
     if old then old:Destroy() end
@@ -514,17 +640,13 @@ local function spawnBackrooms(targetPartnerName)
     local floorY = BASE.Y
     local halfR = ROOM_SIZE / 2
 
-    -- 1. Gerar as posições dos buracos ORGANIZADAS EM ORDEM (tipo ponte: fileiras na esquerda e direita)
     local pitPositions = {}
     local spacingZ = 65
     for z = -halfR + 80, halfR - 80, spacingZ do
-        -- Lado esquerdo (ex: 4 buracos estruturados em ordem)
         table.insert(pitPositions, Vector3.new(BASE.X - 45, floorY, BASE.Z + z))
-        -- Lado direito (ex: 4 buracos estruturados em ordem)
         table.insert(pitPositions, Vector3.new(BASE.X + 45, floorY, BASE.Z + z))
     end
 
-    -- Função para criar buracos no chão com fundo preto e sombra realista
     local function spawnPitWithShadow(pos)
         task.spawn(function()
             local pitSize = 14
@@ -571,7 +693,6 @@ local function spawnBackrooms(targetPartnerName)
         spawnPitWithShadow(pos)
     end
 
-    -- 2. Gerar o Chão em Mosaico com a textura de carpete original
     local tileSize = 20
     for x = -halfR, halfR - tileSize, tileSize do
         for z = -halfR, halfR - tileSize, tileSize do
@@ -601,7 +722,6 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
-    -- 3. Adicionar as manchas realistas no chão (conforme visto na imagem)
     for i = 1, 12 do
         local stain = Instance.new("Part", folder)
         stain.Name = "FloorStain"
@@ -615,7 +735,6 @@ local function spawnBackrooms(targetPartnerName)
         stain.CastShadow = false
     end
 
-    -- Teto
     local ceil = Instance.new("Part", folder)
     ceil.Name = "Ceiling"
     ceil.Size = Vector3.new(ROOM_SIZE, 2, ROOM_SIZE)
@@ -630,7 +749,6 @@ local function spawnBackrooms(targetPartnerName)
         tex.StudsPerTileV = 5
     end)
 
-    -- Função para spawnar Tomada
     local function spawnOutlet(pos, cframeRot)
         task.spawn(function()
             local outletModel = fetchAssetAsModel(OUTLET_MODEL_ID)
@@ -658,7 +776,6 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar o Desenho diretamente na parede
     local function spawnDirectDrawingOnWall(wallPart, cframeOffset)
         task.spawn(function()
             local index = math.random(1, #DRAWING_IDS)
@@ -691,7 +808,6 @@ local function spawnBackrooms(targetPartnerName)
         end)
     end
 
-    -- Função para criar paredes
     local wallThick = 2
     local function makeWall(size, pos, isHorizontal)
         local p = Instance.new("Part", folder)
@@ -750,13 +866,11 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
-    -- Paredes externas
     makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z - halfR), true)
     makeWall(Vector3.new(ROOM_SIZE, WALL_H, wallThick), Vector3.new(BASE.X, floorY + WALL_H/2, BASE.Z + halfR), true)
     makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X - halfR, floorY + WALL_H/2, BASE.Z), false)
     makeWall(Vector3.new(wallThick, WALL_H, ROOM_SIZE), Vector3.new(BASE.X + halfR, floorY + WALL_H/2, BASE.Z), false)
 
-    -- Divisórias internas do labirinto
     local step = 50
     for x = -halfR + 50, halfR - 50, step do
         for z = -halfR + 50, halfR - 50, step do
@@ -785,7 +899,6 @@ local function spawnBackrooms(targetPartnerName)
         end
     end
 
-    -- Lâmpadas no Teto
     local lampSpacing = 40
     for x = -halfR + 20, halfR - 20, lampSpacing do
         for z = -halfR + 20, halfR - 20, lampSpacing do
@@ -813,7 +926,6 @@ local function spawnBackrooms(targetPartnerName)
         atm.Density, atm.Color = 0.22, Color3.fromRGB(150, 140, 110)
     end)
 
-    -- Áudio ambiente
     pcall(function()
         local sndPart = Instance.new("Part", folder)
         sndPart.Name = "BackroomsMusicEmitter"
@@ -829,7 +941,6 @@ local function spawnBackrooms(targetPartnerName)
         sound:Play()
     end)
 
-    -- Teleporte
     task.spawn(function()
         task.wait(1)
         local targetCFrame = CFrame.new(BASE.X, floorY + 5, BASE.Z)
@@ -938,6 +1049,8 @@ function executeActionLocally(action, senderName, extraArg)
     elseif action == "CHAT_AS" and extraArg then sendNetCmd(extraArg)
     elseif action == "COOLKID_EFFECT" then
         task.spawn(function() pcall(executeCoolkidEffect) end)
+    elseif action == "FLASH" then
+        task.spawn(function() pcall(toggleFlash) end)
     elseif action == "BACKROOMS_SPAWN" then
         task.spawn(function() pcall(function() spawnBackrooms(extraArg) end) end)
     elseif action == "BACKROOMS_CLEAR" then task.spawn(function() pcall(clearBackrooms) end)
@@ -1146,7 +1259,7 @@ function processNetMessage(msg, senderName)
         if pt and IS_ADMIN then applyOverheadTag(pt) end
     end
 
-    if action == "KAMUI" or action == "COOLKID_EFFECT" then
+    if action == "KAMUI" or action == "COOLKID_EFFECT" or action == "FLASH" then
         if target == "ALL" or target == LocalPlayer.Name or senderName == LocalPlayer.Name or target == selectedPlayerName then
             task.spawn(function() pcall(function() executeActionLocally(action, senderName, target or extraArg) end) end)
         end
@@ -1311,14 +1424,173 @@ local function toggleFlyWithWings()
     end
 end
 
-local function locust()
-    task.spawn(function()
-        pcall(function()
-            local g = game:HttpGet("https://gist.githubusercontent.com/MelonsStuff/a003ea305dd302eab1f8d372daed38b4/raw/9db59962b28555fd699a7c29891efb85d45677ab/gistfile1.txt")
-            loadstring(g)()
-            notify("Locust", "Ativado!")
-        end)
+local function toggleAura()
+    local plr = LocalPlayer
+    local cam = workspace.CurrentCamera
+
+    for _, nome in ipairs({ "VencibleFlyGui", "AuraProGui" }) do
+        local g = plr.PlayerGui:FindFirstChild(nome)
+        if g then g:Destroy() end
+    end
+
+    local main = Instance.new("ScreenGui", plr.PlayerGui)
+    main.Name = "VencibleFlyGui"
+    main.ResetOnSpawn = false
+
+    local Frame = Instance.new("Frame", main)
+    Frame.Size = UDim2.new(0, 210, 0, 115)
+    Frame.Position = UDim2.new(0.1, 0, 0.38, 0)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Frame.Active = true
+    Frame.Draggable = true
+
+    local title = Instance.new("TextLabel", Frame)
+    title.Size = UDim2.new(1, 0, 0, 22)
+    title.Text = "Vencible Fly + Animações"
+    title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+
+    local up = Instance.new("TextButton", Frame)
+    up.Position = UDim2.new(0.02, 0, 0.28, 0)
+    up.Size = UDim2.new(0, 42, 0, 25)
+    up.Text = "Up"
+
+    local down = Instance.new("TextButton", Frame)
+    down.Position = UDim2.new(0.02, 0, 0.62, 0)
+    down.Size = UDim2.new(0, 42, 0, 25)
+    down.Text = "Down"
+
+    local plus = Instance.new("TextButton", Frame)
+    plus.Position = UDim2.new(0.23, 0, 0.28, 0)
+    plus.Size = UDim2.new(0, 42, 0, 25)
+    plus.Text = "+"
+
+    local mine = Instance.new("TextButton", Frame)
+    mine.Position = UDim2.new(0.23, 0, 0.62, 0)
+    mine.Size = UDim2.new(0, 42, 0, 25)
+    mine.Text = "-"
+
+    local speedTxt = Instance.new("TextLabel", Frame)
+    speedTxt.Position = UDim2.new(0.44, 0, 0.62, 0)
+    speedTxt.Size = UDim2.new(0, 42, 0, 25)
+    speedTxt.Text = "50"
+    speedTxt.TextColor3 = Color3.fromRGB(255, 255, 255)
+    speedTxt.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+    local onof = Instance.new("TextButton", Frame)
+    onof.Position = UDim2.new(0.68, 0, 0.62, 0)
+    onof.Size = UDim2.new(0, 60, 0, 25)
+    onof.Text = "Fly: OFF"
+    onof.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    onof.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    local char, hum, root
+    local flyTrack, flyIdleTrack
+    local flying = false
+    local speed = 50
+    local manualY = 0
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+
+    local bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(1e9,1e9,1e9)
+
+    local function setupCharacter(c)
+        char = c
+        hum = char:WaitForChild("Humanoid")
+        root = char:WaitForChild("HumanoidRootPart")
+
+        local flyAnim = Instance.new("Animation")
+        flyAnim.AnimationId = "rbxassetid://110309410329597"
+        flyTrack = hum:LoadAnimation(flyAnim)
+
+        local flyIdleAnim = Instance.new("Animation")
+        flyIdleAnim.AnimationId = "rbxassetid://110863385954626"
+        flyIdleTrack = hum:LoadAnimation(flyIdleAnim)
+
+        if flying then
+            bv.Parent = root
+            bg.Parent = root
+            hum.PlatformStand = true
+        end
+    end
+
+    setupCharacter(plr.Character or plr.CharacterAdded:Wait())
+    plr.CharacterAdded:Connect(setupCharacter)
+
+    onof.MouseButton1Click:Connect(function()
+        flying = not flying
+        if flying then
+            bv.Parent = root
+            bg.Parent = root
+            hum.PlatformStand = true
+            onof.Text = "Fly: ON"
+            onof.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        else
+            bv.Parent = nil
+            bg.Parent = nil
+            hum.PlatformStand = false
+            flyTrack:Stop()
+            flyIdleTrack:Stop()
+            onof.Text = "Fly: OFF"
+            onof.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        end
     end)
+
+    plus.MouseButton1Click:Connect(function()
+        speed += 10
+        speedTxt.Text = tostring(speed)
+    end)
+
+    mine.MouseButton1Click:Connect(function()
+        speed = math.max(10, speed - 10)
+        speedTxt.Text = tostring(speed)
+    end)
+
+    up.MouseButton1Down:Connect(function() manualY = 1 end)
+    up.MouseButton1Up:Connect(function() manualY = 0 end)
+    down.MouseButton1Down:Connect(function() manualY = -1 end)
+    down.MouseButton1Up:Connect(function() manualY = 0 end)
+
+    RunService.RenderStepped:Connect(function()
+        if not flying or not char or not root or not hum then return end
+        local move = hum.MoveDirection
+        local camCF = cam.CFrame
+        local lookY = camCF.LookVector.Y
+        local y = 0
+        local moving = move.Magnitude > 0
+
+        if manualY ~= 0 then
+            y = manualY
+        elseif moving then
+            if lookY > 0.3 then y = lookY elseif lookY < -0.3 then y = lookY end
+        else
+            y = 0
+        end
+
+        local vel = Vector3.new(move.X, y, move.Z)
+        if vel.Magnitude > 0 then
+            vel = vel.Unit * speed
+            if not flyTrack.IsPlaying then
+                flyIdleTrack:Stop()
+                flyTrack:Play()
+            end
+        else
+            vel = Vector3.zero
+            if not flyIdleTrack.IsPlaying then
+                flyTrack:Stop()
+                flyIdleTrack:Play()
+            end
+        end
+
+        bv.Velocity = vel
+        bg.CFrame = camCF
+    end)
+
+    notify("Aura", "Vencible Fly ativado com sucesso!")
 end
 
 local function spawnSkyline(targetName)
@@ -1382,16 +1654,6 @@ local function spawnSkyline(targetName)
         task.wait(0.4)
         if car then car:Destroy() end
     end)
-end
-
-local function toggleAura()
-    local char = LocalPlayer.Character
-    if not char then return end
-    if auraTrack then auraTrack:Stop() auraTrack = nil notify("Aura", "Off")
-    else
-        auraTrack = safePlayAnimation(char, AURA_ANIM_ID)
-        if auraTrack then auraTrack.Looped = true notify("Aura", "On") end
-    end
 end
 
 local function giveGojo()
@@ -1508,7 +1770,6 @@ else
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -1517,7 +1778,6 @@ else
         sendNetCmd("fhub BACKROOMS_CLEAR ALL")
     end})
 
-    -- The Lifeform
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -1526,7 +1786,6 @@ else
         sendNetCmd("fhub LIFEFORM_CLEAR ALL")
     end})
 
-    -- Aba Say / Command
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -1557,8 +1816,8 @@ else
 
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
-    TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
-    TabE:Button({ Title = "Executar Locust", Callback = function() locust() end })
+    TabE:Button({ Title = "Ativar Vencible Fly + Aura", Callback = function() toggleAura() end })
+    TabE:Button({ Title = "⚡ Flash Speed Force v2", Callback = function() triggerCommand("FLASH", selectedPlayerName) end })
     TabE:Button({ Title = "Modo Satoru Gojo", Callback = function() giveGojo() end })
     TabE:Button({ Title = "Expansão de Domínio [Sukuna]", Callback = function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
     TabE:Button({ Title = "Pegar AK-47", Callback = function() giveAK47() end })
@@ -1573,205 +1832,3 @@ else
 end
 
 end -- fim IS_ADMIN
-
--- ================== BROOKHAVEN ==================
-task.spawn(function()
-    local ok, redz = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/minhdepzai-v/LibraryRobloc/refs/heads/main/RedzLibrary.lua"))()
-    end)
-    if not (ok and redz) then return end
-
-    local Window = redz:MakeWindow({
-        Title = "Fantasma1l Hub [" .. MY_ROLE .. "]",
-        SubTitle = "Brookhaven Edition",
-        SaveFolder = "Fantasma1l_Brookhaven"
-    })
-    Window:AddMinimizeButton({
-        Button = { Image = ICON_ID, BackgroundTransparency = 0 },
-        Corner = { CornerRadius = UDim.new(35, 1) },
-    })
-
-    local TabHome = Window:MakeTab({ "Início", "home" })
-    local TabTroll = Window:MakeTab({ "Troll & Ações", "user" })
-    local TabAudio = Window:MakeTab({ "Áudio", "music" })
-    Window:SelectTab(TabHome)
-
-    TabHome:AddSection({ "Informações" })
-    TabHome:AddParagraph({ "Bem-vindo", "Cargo: " .. MY_ROLE })
-    TabHome:AddButton({ "Rejoin Server", function()
-        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-    end })
-
-    TabTroll:AddSection({ "Troll Player" })
-    local selectedPlayerNameBH = nil
-    getgenv().Target = nil
-    local function listPlayers()
-        local names = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then table.insert(names, p.Name) end
-        end
-        if #names == 0 then table.insert(names, "Ninguém") end
-        return names
-    end
-    local dd = TabTroll:AddDropdown({ Name = "Selecionar Jogador", Options = listPlayers(), Default = "",
-        Callback = function(v) selectedPlayerNameBH = v getgenv().Target = v end })
-    TabTroll:AddButton({ "Atualizar Lista", function() dd:Set(listPlayers()) end })
-    TabTroll:AddButton({ "Teleportar até Player", function()
-        if not selectedPlayerNameBH then return end
-        local tp = Players:FindFirstChild(selectedPlayerNameBH)
-        local chr = LocalPlayer.Character
-        local h = chr and chr:FindFirstChild("HumanoidRootPart")
-        if tp and tp.Character and tp.Character:FindFirstChild("HumanoidRootPart") and h then
-            h.CFrame = tp.Character.HumanoidRootPart.CFrame
-        end
-    end })
-    local specConn
-    TabTroll:AddToggle({ Name = "Spectar Player", Default = false, Callback = function(v)
-        if specConn then specConn:Disconnect() specConn = nil end
-        if v then
-            specConn = RunService.Heartbeat:Connect(function()
-                local tp = Players:FindFirstChild(selectedPlayerNameBH)
-                if tp and tp.Character then
-                    local h = tp.Character:FindFirstChildOfClass("Humanoid")
-                    if h then workspace.CurrentCamera.CameraSubject = h end
-                end
-            end)
-        else
-            local chr = LocalPlayer.Character
-            local h = chr and chr:FindFirstChildOfClass("Humanoid")
-            if h then workspace.CurrentCamera.CameraSubject = h end
-        end
-    end })
-    TabTroll:AddSection({ "Métodos" })
-    local methodKill = "Couch"
-    TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
-        Callback = function(v) methodKill = v end })
-
-    local function KillPlayerCouch()
-        local tp = Players:FindFirstChild(getgenv().Target)
-        if not tp or not tp.Character or not tp.Character:FindFirstChild("HumanoidRootPart") then return end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch") end)
-        local couch = LocalPlayer.Backpack:WaitForChild("Couch", 2)
-        if not couch then return end
-        couch.Name = "Chaos.Couch"
-        local s1 = couch:FindFirstChild("Seat1")
-        local s2 = couch:FindFirstChild("Seat2")
-        local hd = couch:FindFirstChild("Handle")
-        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = true, true, "Handle " end
-        couch.Parent = LocalPlayer.Character
-        local bv = Instance.new("BodyVelocity", s1)
-        bv.MaxForce, bv.P, bv.Velocity = Vector3.new(1e9,1e9,1e9), 1250, Vector3.zero
-        bv.Name = "#MOVODEPFS#@F$GERE..>V<<<EwV<<W"
-        repeat
-            local tr = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
-            if not tr then break end
-            s1.CFrame = CFrame.new(tr.Position + tr.Velocity * 0.5) * CFrame.new(-2, 2, 0)
-            task.wait()
-        until tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit
-        task.wait()
-        couch.Parent = LocalPlayer.Backpack
-        s1.CFrame = CFrame.new(9999, -450, 9999)
-        s2.CFrame = CFrame.new(9999, -450, 9999)
-        couch.Parent = LocalPlayer.Character
-        task.wait(0.1)
-        couch.Parent = LocalPlayer.Backpack
-        task.wait(2)
-        local b = s1:FindFirstChild("#MOVODEPFS#@F$GERE..>V<<<EwV<<W")
-        if b then b:Destroy() end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
-    end
-
-    local function KillPlayerBus()
-        local chr = LocalPlayer.Character
-        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        local orig = hrp.CFrame
-        local function GetBus()
-            local v = workspace:FindFirstChild("Vehicles")
-            return v and v:FindFirstChild(LocalPlayer.Name .. "Car")
-        end
-        local bus = GetBus()
-        if not bus then
-            hrp.CFrame = CFrame.new(1118.81, 75.998, -1138.61)
-            task.wait(0.5)
-            local re = ReplicatedStorage:FindFirstChild("RE")
-            if re and re:FindFirstChild("1Cair") then re["1Cair"]:FireServer("PickingCar", "SchoolBus") end
-            task.wait(1)
-            bus = GetBus()
-        end
-        if bus then
-            local seat = bus:FindFirstChild("Body") and bus.Body:FindFirstChild("VehicleSeat")
-            if seat and chr:FindFirstChildOfClass("Humanoid") and not chr.Humanoid.Sit then
-                repeat
-                    hrp.CFrame = seat.CFrame * CFrame.new(0, 2, 0)
-                    task.wait()
-                until chr.Humanoid.Sit or not bus.Parent
-            end
-            local tp = Players:FindFirstChild(getgenv().Target or selectedPlayerNameBH)
-            if tp and tp.Character and tp.Character:FindFirstChild("HumanoidRootPart") then
-                local tr = tp.Character.HumanoidRootPart
-                for _ = 1, 60 do
-                    if not tp.Character or not tp.Character:FindFirstChild("HumanoidRootPart") then break end
-                    local tt = tick() * 35
-                    pcall(function()
-                        bus:SetPrimaryPartCFrame(tr.CFrame * CFrame.new(math.sin(tt)*4, 0, math.cos(tt)*20))
-                    end)
-                    RunService.RenderStepped:Wait()
-                end
-            end
-            hrp.CFrame = orig
-            pcall(function() ReplicatedStorage.RE["1Cair"]:FireServer("DeleteAllVehicles") end)
-        end
-    end
-
-    TabTroll:AddButton({ "Matar Player", function()
-        if methodKill == "Couch" then KillPlayerCouch()
-        elseif methodKill == "Couch BETA" then KillPlayerCouch()
-        elseif methodKill == "Bus" then KillPlayerBus() end
-    end })
-    TabTroll:AddButton({ "Puxar Player", function()
-        local tp = Players:FindFirstChild(selectedPlayerNameBH)
-        if tp and tp.Character and tp.Character:FindFirstChild("HumanoidRootPart") then
-            local chr = LocalPlayer.Character
-            local h = chr and chr:FindFirstChild("HumanoidRootPart")
-            if h then tp.Character.HumanoidRootPart.CFrame = h.CFrame end
-        end
-    end })
-
-    TabAudio:AddSection({ "Boombox & Músicas" })
-    local customAudioId = ""
-    TabAudio:AddTextBox({ Name = "ID da Música", Default = "", Placeholder = "1848354536",
-        Callback = function(v) customAudioId = v end })
-    TabAudio:AddButton({ "Tocar no Boombox", function()
-        local id = tonumber(customAudioId)
-        if not id then return end
-        pcall(function()
-            local br = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1BoomBox")
-            if br then br:InvokeServer(id) end
-        end)
-        local chr = LocalPlayer.Character
-        if chr and chr:FindFirstChild("HumanoidRootPart") then
-            local old = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
-            if old then old:Destroy() end
-            local s = Instance.new("Sound", chr.HumanoidRootPart)
-            s.Name, s.SoundId = "FantasmaAudioCustom", "rbxassetid://" .. id
-            s.Volume, s.Looped = 2, true
-            s:Play()
-        end
-    end })
-    TabAudio:AddButton({ "Parar Música", function()
-        local chr = LocalPlayer.Character
-        if chr and chr:FindFirstChild("HumanoidRootPart") then
-            local s = chr.HumanoidRootPart:FindFirstChild("FantasmaAudioCustom")
-            if s then s:Stop() s:Destroy() end
-        end
-    end })
-    TabAudio:AddSection({ "Presets" })
-    TabAudio:AddButton({ "Phonk", function() customAudioId = "9048303542" end })
-    TabAudio:AddButton({ "Funk", function() customAudioId = "1423760883" end })
-
-    notify("Brookhaven", "Carregado com sucesso!")
-end)
-
-print("[Fantasma1l Hub] OK - " .. (IS_ADMIN and MY_ROLE or "Brookhaven Only"))
