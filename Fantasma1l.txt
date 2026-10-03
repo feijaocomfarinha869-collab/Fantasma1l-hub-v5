@@ -106,7 +106,7 @@ local MEMES = {
 }
 
 local TEX_WALL        = "rbxassetid://133566929836216"
-local TEX_CEILING     = "rbxassetid://99222905637827"
+local TEX_CEILING     = "rbxassetid://81871305628274"
 local TEX_FLOOR       = "rbxassetid://129329284263154"
 
 -- ================== ESTADO ==================
