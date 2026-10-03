@@ -1,6 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v29 (+ FLASH & AURA COM REDE NAS FUNÇÕES ESSENCIAIS)
+    PREFIXO DE REDE: ;
     ==========================================================
 ]]--
 
@@ -483,7 +484,7 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS LEVEL 0 (NOVA VERSÃO) ==================
+-- ================== BACKROOMS LEVEL 0 ==================
 local backroomsSaved = nil
 local backroomsToken = 0
 
@@ -1448,10 +1449,11 @@ do
         end
     end
 
+    -- >>> PREFIXO ; AQUI <<<
     function FXNET.send(action, name)
         if not name or name == "" then return end
         FXNET.run(action, name)
-        sendNetCmd("fhub " .. action .. " " .. name)
+        sendNetCmd(";" .. action .. " " .. name)
         notify("Hub", action .. " → " .. name)
     end
 
@@ -1720,12 +1722,15 @@ function executeActionLocally(action, senderName, extraArg)
     end
 end
 
--- ================== REDE ==================
+-- ================== REDE (PREFIXO ;) ==================
 function processNetMessage(msg, senderName)
     if not msg then return end
     local parts = string.split(msg, " ")
     if #parts < 2 then return end
-    if string.lower(parts[1]) ~= "fhub" then return end
+
+    -- Aceita ";" e "fhub" (retrocompatível)
+    local prefix = string.lower(parts[1])
+    if prefix ~= ";" and prefix ~= "fhub" then return end
 
     local action = string.upper(parts[2])
     local target = parts[3]
@@ -1733,7 +1738,7 @@ function processNetMessage(msg, senderName)
 
     if action == "PING" then
         local role = (WHITELIST[LocalPlayer.Name] and WHITELIST[LocalPlayer.Name].Role) or "USER"
-        sendNetCmd("fhub PONG " .. LocalPlayer.Name .. " ROLE_" .. role)
+        sendNetCmd(";PONG " .. LocalPlayer.Name .. " ROLE_" .. role)
     elseif action == "PONG" and target then
         activeScriptUsers[target] = true
         local roleExtra = parts[4] or "ROLE_USER"
@@ -1785,7 +1790,7 @@ task.spawn(function()
         end
     end)
     task.wait(1)
-    sendNetCmd("fhub PING ALL")
+    sendNetCmd(";PING ALL")
 end)
 
 -- ================== ADM HUB ==================
@@ -2052,12 +2057,13 @@ local function giveYoru()
     end)
 end
 
+-- >>> AQUI O PREFIXO ; <<<
 local function triggerCommand(action, target, extraArg)
     if not target or target == "" then return end
     if target == LocalPlayer.Name or target == "ALL" then
         executeActionLocally(action, LocalPlayer.Name, extraArg)
     end
-    local cmd = "fhub " .. action .. " " .. target
+    local cmd = ";" .. action .. " " .. target
     if extraArg then cmd = cmd .. " " .. extraArg end
     sendNetCmd(cmd)
     notify("ADM", action .. " → " .. target)
@@ -2088,9 +2094,10 @@ else
     Players.PlayerAdded:Connect(function() DD:SetValues(getPlayerNames()) end)
     Players.PlayerRemoving:Connect(function() DD:SetValues(getPlayerNames()) end)
 
+    -- >>> PREFIXO ; AQUI <<<
     TabADM:Button({ Title = "Verificar Usuários do Script", Callback = function()
         activeScriptUsers = { [LocalPlayer.Name] = true }
-        sendNetCmd("fhub PONG ALL")
+        sendNetCmd(";PONG ALL")
         local l = ""
         for n, _ in pairs(activeScriptUsers) do l = l .. n .. ", " end
         notify("Rede", l)
@@ -2114,17 +2121,19 @@ else
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
+    -- >>> PREFIXO ; AQUI <<<
     TabADM:Button({ Title = "Backrooms (Limpar)", Callback = function()
         task.spawn(function() pcall(clearBackrooms) end)
-        sendNetCmd("fhub BACKROOMS_CLEAR ALL")
+        sendNetCmd(";BACKROOMS_CLEAR ALL")
     end})
 
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
+    -- >>> PREFIXO ; AQUI <<<
     TabADM:Button({ Title = "Remover The Lifeform", Callback = function()
         task.spawn(function() pcall(clearLifeform) end)
-        sendNetCmd("fhub LIFEFORM_CLEAR ALL")
+        sendNetCmd(";LIFEFORM_CLEAR ALL")
     end})
 
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
