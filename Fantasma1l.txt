@@ -1049,6 +1049,11 @@ do
     local TILE     = 6       -- studs por repetição da textura (ajuste se o azulejo ficar grande/pequeno)
     local WALL_TEX = "rbxassetid://122349893272800"
 
+    -- >>> BRILHO GERAL DAS POOLROOMS <<<
+    -- 1 = como era antes | 0.7 = um pouco mais escuro (padrão) | 0.5 = bem mais escuro
+    local BRILHO = 0.7
+    local function esc(c) return Color3.new(c.R * BRILHO, c.G * BRILHO, c.B * BRILHO) end
+
     local TILE_MAT = Enum.Material.SmoothPlastic
     pcall(function() TILE_MAT = Enum.Material.CeramicTiles end)
 
@@ -1231,14 +1236,14 @@ do
         sl.Face = Enum.NormalId.Bottom
         sl.Angle = 105
         sl.Range = 48
-        sl.Brightness = 2.6
+        sl.Brightness = 2.6 * BRILHO
         sl.Color = Color3.fromRGB(255, 240, 214)
         sl.Shadows = shadow and true or false
         sl.Parent = em
 
         local pl = Instance.new("PointLight")
         pl.Range = 20
-        pl.Brightness = 0.7
+        pl.Brightness = 0.7 * BRILHO
         pl.Color = Color3.fromRGB(255, 236, 205)
         pl.Shadows = false
         pl.Parent = em
@@ -1251,7 +1256,7 @@ do
         d.CastShadow = false
         local pl = Instance.new("PointLight")
         pl.Color = Color3.fromRGB(110, 255, 235)
-        pl.Brightness = 2.4
+        pl.Brightness = 2.4 * BRILHO
         pl.Range = 28
         pl.Shadows = false
         pl.Parent = d
@@ -1462,17 +1467,17 @@ do
     local function envApply()
         local function set(k, v) pcall(function() Lighting[k] = v end) end
         set("ClockTime", 14.8)
-        set("Brightness", 3)
-        set("Ambient", Color3.fromRGB(70, 105, 108))
-        set("OutdoorAmbient", Color3.fromRGB(95, 130, 130))
+        set("Brightness", 3 * BRILHO)
+        set("Ambient", esc(Color3.fromRGB(70, 105, 108)))
+        set("OutdoorAmbient", esc(Color3.fromRGB(95, 130, 130)))
         set("ColorShift_Top", Color3.fromRGB(255, 232, 190))
         set("ColorShift_Bottom", Color3.fromRGB(80, 200, 190))
-        set("ExposureCompensation", 0.2)
+        set("ExposureCompensation", 0.2 - (1 - BRILHO))
         set("GlobalShadows", true)
         set("ShadowSoftness", 0.18)
         set("EnvironmentDiffuseScale", 1)
         set("EnvironmentSpecularScale", 1)
-        set("FogColor", Color3.fromRGB(190, 226, 222))
+        set("FogColor", esc(Color3.fromRGB(190, 226, 222)))
         set("FogStart", 30)
         set("FogEnd", 110)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
@@ -1506,14 +1511,14 @@ do
 
             local bl = Instance.new("BloomEffect")
             bl.Name = "Pool_Bloom"
-            bl.Intensity = 0.45
+            bl.Intensity = 0.45 * BRILHO
             bl.Size = 26
             bl.Threshold = 0.9
             bl.Parent = Lighting
 
             local sr = Instance.new("SunRaysEffect")
             sr.Name = "Pool_Rays"
-            sr.Intensity = 0.16
+            sr.Intensity = 0.16 * BRILHO
             sr.Spread = 0.85
             sr.Parent = Lighting
 
