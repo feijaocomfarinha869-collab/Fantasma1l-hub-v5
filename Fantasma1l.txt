@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v30 (+ POOLROOMS INFINITAS | PREFIXO DE REDE ;)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ POOLROOMS INFINITAS | PREFIXO DE REDE ;)
     ==========================================================
 ]]--
 
@@ -1036,7 +1036,9 @@ end
 -- ================== POOLROOMS (INFINITAS) ==================
 -- Complexo infinito de salas azulejadas alagadas. O mundo é feito de "chunks" 48x48 ligados por
 -- arcos/colunatas; novos chunks nascem à frente e os distantes somem, então nunca acaba.
--- Água: Terrain (nada de verdade) se o executor permitir; senão usa água em Part translúcida.
+-- Teto fechado em TODAS as salas (claraboias agora são painéis de luz embutidos).
+-- Piso, paredes, colunas e teto usam a MESMA textura de azulejo.
+-- Água: Terrain (água de verdade) se o executor permitir; senão usa água em Part de vidro.
 -- Iluminação: Future (sombras reais) se o executor tiver sethiddenproperty; senão ShadowMap.
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
@@ -1050,16 +1052,14 @@ do
     local WALL_TEX = "rbxassetid://122349893272800"
 
     -- >>> BRILHO GERAL DAS POOLROOMS <<<
-    -- 1 = como era antes | 0.7 = um pouco mais escuro (padrão) | 0.5 = bem mais escuro
+    -- 1 = bem claro | 0.7 = padrão | 0.5 = bem mais escuro
     local BRILHO = 0.7
     local function esc(c) return Color3.new(c.R * BRILHO, c.G * BRILHO, c.B * BRILHO) end
 
     local TILE_MAT = Enum.Material.SmoothPlastic
     pcall(function() TILE_MAT = Enum.Material.CeramicTiles end)
 
-    local C_TILE  = Color3.fromRGB(238, 234, 216)
-    local C_FLOOR = Color3.fromRGB(196, 232, 224)
-    local C_WET   = Color3.fromRGB(70, 185, 175)
+    local C_TILE  = Color3.fromRGB(238, 234, 216)   -- cor única: piso, parede, teto
     local C_METAL = Color3.fromRGB(64, 68, 68)
     local C_LAMP  = Color3.fromRGB(255, 244, 222)
 
@@ -1070,6 +1070,7 @@ do
     local FACES_BOT   = { Enum.NormalId.Bottom }
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
     local FACES_ALL   = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom }
+    local FACES_ALL6  = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right }
 
     ----------------------------------------------------------------
     -- PRIMITIVAS
@@ -1090,11 +1091,11 @@ do
         return p
     end
 
-    -- laje azulejada (textura nas faces pedidas)
+    -- laje azulejada: por padrão texturiza as 6 faces (nenhuma parede fica lisa)
     local function slab(S, parent, size, cf, faces, color, collide)
         local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false)
         p.Reflectance = 0.05
-        for _, f in ipairs(faces or FACES_FB) do
+        for _, f in ipairs(faces or FACES_ALL6) do
             local t = Instance.new("Texture")
             t.Texture = S.tex
             t.Face = f
@@ -1107,14 +1108,8 @@ do
         return p
     end
 
-    -- faixa úmida (degradê da parede perto da água)
-    local function wet(S, parent, len, thick, cf)
-        local band = mkPart(parent, Vector3.new(len + 0.02, 4, thick + 0.12),
-            CFrame.new(cf.Position.X, POOL_Y + 2, cf.Position.Z) * cf.Rotation, C_WET, Enum.Material.SmoothPlastic, false)
-        band.Transparency = 0.55
-        band.Reflectance = 0.1
-        band.CastShadow = false
-    end
+    -- (faixa úmida removida: a água já tinge as paredes e o visual fica mais limpo)
+    local function wet() end
 
     -- parede curva feita de lajes (arco de círculo no plano XZ)
     local function arc(S, parent, cx, cz, r, a0, a1, segs, h, thick, y0, skip, withWet)
@@ -1125,8 +1120,7 @@ do
             if not (skip and skip(am)) then
                 local pos = Vector3.new(cx + r * math.cos(am), y0 + h / 2, cz + r * math.sin(am))
                 local cf = CFrame.lookAt(pos, pos + Vector3.new(math.cos(am), 0, math.sin(am)))
-                slab(S, parent, Vector3.new(len, h, thick), cf)
-                if withWet then wet(S, parent, len, thick, cf) end
+                slab(S, parent, Vector3.new(len, h, thick), cf, FACES_FB)
             end
         end
     end
@@ -1148,8 +1142,7 @@ do
         local function block(u0, u1, y0, y1)
             if u1 - u0 < 0.05 or y1 - y0 < 0.05 then return end
             local cf = F * CFrame.new((u0 + u1) / 2, (y0 + y1) / 2, 0)
-            slab(S, parent, Vector3.new(u1 - u0, y1 - y0, T), cf)
-            if y0 <= POOL_Y + 0.1 then wet(S, parent, u1 - u0, T, cf) end
+            slab(S, parent, Vector3.new(u1 - u0, y1 - y0, T), cf) -- 6 faces: batentes também têm azulejo
         end
 
         if kind == "wide" then
@@ -1184,69 +1177,44 @@ do
         for i = 1, segs do
             local t = (i - 0.5) * math.pi / segs
             local cf = F * CFrame.new(Rr * math.cos(t), spring + Rr * math.sin(t), 0) * CFrame.Angles(0, 0, t + math.pi / 2)
-            slab(S, parent, Vector3.new(chord, 1.2, T + 0.1), cf, FACES_ALL)
+            slab(S, parent, Vector3.new(chord, 1.2, T + 0.1), cf, FACES_ALL6)
         end
     end
 
     ----------------------------------------------------------------
-    -- TETO COM CLARABOIA
+    -- LUZES
     ----------------------------------------------------------------
-    local function ceilingSlabs(S, parent, cx, cz, skyW)
-        local y = POOL_Y + WALL_H + 1
-        if not skyW or skyW <= 0 then
-            slab(S, parent, Vector3.new(CH, 2, CH), CFrame.new(cx, y, cz), FACES_BOT)
-            return
-        end
-        local half = skyW / 2
-        local band = (CH - skyW) / 2
-        slab(S, parent, Vector3.new(CH, 2, band), CFrame.new(cx, y, cz - half - band / 2), FACES_BOT)
-        slab(S, parent, Vector3.new(CH, 2, band), CFrame.new(cx, y, cz + half + band / 2), FACES_BOT)
-        slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx - half - band / 2, y, cz), FACES_BOT)
-        slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx + half + band / 2, y, cz), FACES_BOT)
+    -- ponto de luz invisível (spot para baixo + brilho suave)
+    local function lightAt(parent, x, y, z, bright, range, shadow)
+        local em = mkPart(parent, Vector3.new(0.2, 0.2, 0.2), CFrame.new(x, y, z), C_LAMP, Enum.Material.SmoothPlastic, false)
+        em.Transparency = 1
+        em.CastShadow = false
 
-        -- vidro (não projeta sombra: deixa o sol entrar e desenhar manchas de luz no piso/água)
-        local g = mkPart(parent, Vector3.new(skyW, 0.3, skyW), CFrame.new(cx, y + 0.5, cz), Color3.fromRGB(205, 238, 236), Enum.Material.Glass, true)
-        g.Transparency = 0.85
-        g.Reflectance = 0.05
-        g.CastShadow = false
+        local sl = Instance.new("SpotLight")
+        sl.Face = Enum.NormalId.Bottom
+        sl.Angle = 110
+        sl.Range = range
+        sl.Brightness = bright * BRILHO
+        sl.Color = Color3.fromRGB(255, 240, 214)
+        sl.Shadows = shadow and true or false
+        sl.Parent = em
 
-        -- poço de luz (moldura que desce do teto)
-        for _, s in ipairs({ -1, 1 }) do
-            slab(S, parent, Vector3.new(skyW, 3, 0.8), CFrame.new(cx, y - 2.4, cz + s * half), FACES_FB)
-            slab(S, parent, Vector3.new(0.8, 3, skyW), CFrame.new(cx + s * half, y - 2.4, cz), FACES_LR)
-        end
+        local pl = Instance.new("PointLight")
+        pl.Range = range * 0.45
+        pl.Brightness = 0.7 * BRILHO
+        pl.Color = Color3.fromRGB(255, 236, 205)
+        pl.Shadows = false
+        pl.Parent = em
     end
 
-    ----------------------------------------------------------------
-    -- LÂMPADAS
-    ----------------------------------------------------------------
-    -- lâmpada embutida realista: aro metálico + difusor + spot (com sombra) + brilho suave
+    -- lâmpada embutida: aro metálico + difusor + luz
     local function lamp(S, parent, x, y, z, shadow)
         local ring = mkPart(parent, Vector3.new(0.5, 4.4, 4.4), CFrame.new(x, y - 0.25, z) * CFrame.Angles(0, 0, math.rad(90)), C_METAL, Enum.Material.Metal, false)
         ring.Shape = Enum.PartType.Cylinder
         local disk = mkPart(parent, Vector3.new(0.3, 3.5, 3.5), CFrame.new(x, y - 0.55, z) * CFrame.Angles(0, 0, math.rad(90)), C_LAMP, Enum.Material.Neon, false)
         disk.Shape = Enum.PartType.Cylinder
         disk.CastShadow = false
-
-        local em = mkPart(parent, Vector3.new(0.2, 0.2, 0.2), CFrame.new(x, y - 1.0, z), C_LAMP, Enum.Material.SmoothPlastic, false)
-        em.Transparency = 1
-        em.CastShadow = false
-
-        local sl = Instance.new("SpotLight")
-        sl.Face = Enum.NormalId.Bottom
-        sl.Angle = 105
-        sl.Range = 48
-        sl.Brightness = 2.6 * BRILHO
-        sl.Color = Color3.fromRGB(255, 240, 214)
-        sl.Shadows = shadow and true or false
-        sl.Parent = em
-
-        local pl = Instance.new("PointLight")
-        pl.Range = 20
-        pl.Brightness = 0.7 * BRILHO
-        pl.Color = Color3.fromRGB(255, 236, 205)
-        pl.Shadows = false
-        pl.Parent = em
+        lightAt(parent, x, y - 1.0, z, 2.6, 48, shadow)
     end
 
     -- luz submersa (brilho turquesa saindo do fundo da piscina)
@@ -1263,20 +1231,75 @@ do
     end
 
     ----------------------------------------------------------------
+    -- TETO (sempre fechado) COM PAINEL DE LUZ EMBUTIDO
+    ----------------------------------------------------------------
+    local function ceilingSlabs(S, parent, cx, cz, skyW)
+        local y = POOL_Y + WALL_H + 1
+        slab(S, parent, Vector3.new(CH, 2, CH), CFrame.new(cx, y, cz), FACES_BOT)
+
+        if skyW and skyW > 0 then
+            local half = skyW / 2
+            -- moldura azulejada que desce do teto
+            for _, s in ipairs({ -1, 1 }) do
+                slab(S, parent, Vector3.new(skyW, 3, 0.8), CFrame.new(cx, y - 2.4, cz + s * half), FACES_ALL6)
+                slab(S, parent, Vector3.new(0.8, 3, skyW), CFrame.new(cx + s * half, y - 2.4, cz), FACES_ALL6)
+            end
+            -- "luz do dia": painel brilhante rente ao teto
+            local g = mkPart(parent, Vector3.new(skyW - 0.8, 0.3, skyW - 0.8), CFrame.new(cx, y - 1.15, cz), Color3.fromRGB(255, 248, 226), Enum.Material.Neon, false)
+            g.Name = "Skylight"
+            g.CastShadow = false
+            lightAt(parent, cx, y - 2.5, cz, 3.2, 60, false)
+        end
+    end
+
+    ----------------------------------------------------------------
     -- ÁGUA
     ----------------------------------------------------------------
+    -- camada de ondulação: a textura do azulejo "tremendo" por cima da água (efeito de refração)
+    local function waterOverlay(S, parent, cx, cz)
+        local p = mkPart(parent, Vector3.new(CH, 0.05, CH), CFrame.new(cx, POOL_Y + DEPTH + 0.04, cz), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, false)
+        p.Transparency = 1
+        p.CastShadow = false
+        p.Name = "WaterRipple"
+
+        local sg = Instance.new("SurfaceGui")
+        sg.Face = Enum.NormalId.Top
+        sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        sg.PixelsPerStud = 10
+        sg.LightInfluence = 0.3
+        sg.AlwaysOnTop = false
+        pcall(function() sg.MaxDistance = 400 end)
+        sg.Parent = p
+
+        local labels = {}
+        for i, px in ipairs({ TILE * 10, TILE * 10 * 0.83 }) do
+            local lab = Instance.new("ImageLabel")
+            lab.BackgroundTransparency = 1
+            lab.Size = UDim2.new(1, 80, 1, 80)
+            lab.Position = UDim2.fromOffset(-40, -40)
+            lab.Image = S.tex
+            lab.ScaleType = Enum.ScaleType.Tile
+            lab.TileSize = UDim2.fromOffset(px, px)
+            lab.ImageTransparency = (i == 1) and 0.86 or 0.9
+            lab.Parent = sg
+            labels[i] = lab
+        end
+        return labels
+    end
+
     local function waterFill(S, parent, cx, cz)
         if S.terrain then
             pcall(function()
                 workspace.Terrain:FillBlock(CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Vector3.new(CH, DEPTH, CH), Enum.Material.Water)
             end)
         else
-            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Color3.fromRGB(70, 200, 190), Enum.Material.Glass, false)
+            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Color3.fromRGB(78, 205, 190), Enum.Material.Glass, false)
             w.Name = "PoolWater"
-            w.Transparency = 0.5
-            w.Reflectance = 0.15
+            w.Transparency = 0.62
+            w.Reflectance = 0.25
             w.CastShadow = false
         end
+        return waterOverlay(S, parent, cx, cz)
     end
 
     local function terrainOK()
@@ -1305,7 +1328,8 @@ do
         local folder = Instance.new("Folder")
         folder.Name = "Chunk_" .. key
         folder.Parent = S.folder
-        S.chunks[key] = { folder = folder, cx = cx, cz = cz }
+        local chunk = { folder = folder, cx = cx, cz = cz }
+        S.chunks[key] = chunk
 
         local rng = Random.new(cx * 7349 + cz * 9157 + 11)
         local rngE = Random.new(cx * 92821 + cz * 68917 + 7)
@@ -1313,9 +1337,9 @@ do
         local top = POOL_Y + WALL_H
 
         local ok, err = pcall(function()
-            -- piso + água
-            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR).Reflectance = 0.12
-            waterFill(S, folder, wx, wz)
+            -- piso (MESMA textura/cor das paredes) + água
+            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_TILE).Reflectance = 0.1
+            chunk.ripples = waterFill(S, folder, wx, wz)
 
             local first = true
             local function L(x, z, y)
@@ -1323,7 +1347,7 @@ do
                 first = false
             end
 
-            local style = (cx == 0 and cz == 0) and 2 or rng:NextInteger(1, 5)
+            local style = (cx == 0 and cz == 0) and 2 or rng:NextInteger(1, 6)
             local sky = 0
 
             if style == 1 then
@@ -1340,14 +1364,12 @@ do
                 -- coluna central com escada em espiral e plataforma seca
                 sky = 22
                 column(S, folder, wx, wz, 4, WALL_H)
-                local plat = mkPart(folder, Vector3.new(0.8, 22, 22), CFrame.new(wx, POOL_Y + 4.4, wz) * CFrame.Angles(0, 0, math.rad(90)), C_TILE, nil, true)
-                plat.Shape = Enum.PartType.Cylinder
-                plat.Reflectance = 0.08
+                slab(S, folder, Vector3.new(22, 0.8, 22), CFrame.new(wx, POOL_Y + 4.4, wz), FACES_ALL6, C_TILE)
                 for i = 0, 10 do
                     local a = i * math.rad(30)
                     local pos = Vector3.new(wx + 7.5 * math.cos(a), POOL_Y + 5 + i * 1.4, wz + 7.5 * math.sin(a))
                     local cf = CFrame.lookAt(pos, pos + Vector3.new(math.cos(a), 0, math.sin(a)))
-                    slab(S, folder, Vector3.new(5.4, 1.2, 6), cf, FACES_TOP, C_TILE)
+                    slab(S, folder, Vector3.new(5.4, 1.2, 6), cf, FACES_ALL6, C_TILE)
                 end
                 L(wx - 16, wz) L(wx + 16, wz) L(wx, wz - 16) L(wx, wz + 16)
 
@@ -1379,13 +1401,32 @@ do
                 end
                 for _, s in ipairs({ -1, 1 }) do
                     local cfw = F * CFrame.new(0, POOL_Y + 4, s * R)
-                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_FB)
-                    wet(S, folder, CH + 0.4, 1.2, cfw)
+                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_ALL6)
                 end
                 for _, u in ipairs({ -14, 0, 14 }) do
                     local p = F * CFrame.new(u, 0, 0)
                     L(p.Position.X, p.Position.Z, POOL_Y + 20.6)
                 end
+
+            elseif style == 6 then
+                -- salão de janelas: parede com 4 janelas brilhantes e uma passagem no meio
+                local zW = wz - 19
+                slab(S, folder, Vector3.new(19, WALL_H, 2), CFrame.new(wx - 14.5, POOL_Y + WALL_H / 2, zW), FACES_ALL6)
+                slab(S, folder, Vector3.new(19, WALL_H, 2), CFrame.new(wx + 14.5, POOL_Y + WALL_H / 2, zW), FACES_ALL6)
+                for _, ox in ipairs({ -18, -11, 11, 18 }) do
+                    local win = mkPart(folder, Vector3.new(4, 12, 0.3), CFrame.new(wx + ox, POOL_Y + 11, zW + 1.15), Color3.fromRGB(255, 248, 226), Enum.Material.Neon, false)
+                    win.Name = "Window"
+                    win.CastShadow = false
+                    local sl = Instance.new("SurfaceLight")
+                    sl.Face = Enum.NormalId.Back
+                    sl.Angle = 150
+                    sl.Range = 44
+                    sl.Brightness = 3.5 * BRILHO
+                    sl.Color = Color3.fromRGB(255, 240, 210)
+                    sl.Shadows = false
+                    sl.Parent = win
+                end
+                L(wx, wz + 4) L(wx - 14, wz + 14) L(wx + 14, wz + 14) L(wx, wz + 18)
 
             else
                 -- pilastras quadradas
@@ -1400,7 +1441,6 @@ do
 
             ceilingSlabs(S, folder, wx, wz, sky)
             poolLight(S, folder, wx + 6, wz + 6)
-            poolLight(S, folder, wx - 15, wz - 6)
 
             -- bordas norte e oeste (as outras pertencem aos vizinhos)
             local function pick(r)
@@ -1451,6 +1491,7 @@ do
         "ShadowSoftness", "EnvironmentDiffuseScale", "EnvironmentSpecularScale",
     }
     local WATER_PROPS = { "WaterColor", "WaterTransparency", "WaterReflectance", "WaterWaveSize", "WaterWaveSpeed" }
+    local POOL_FX = { "Pool_CC", "Pool_Bloom", "Pool_Rays", "Pool_Atmosphere", "Pool_DOF" }
 
     local function envSave()
         local s = { terrain = {} }
@@ -1479,16 +1520,17 @@ do
         set("EnvironmentSpecularScale", 1)
         set("FogColor", esc(Color3.fromRGB(190, 226, 222)))
         set("FogStart", 30)
-        set("FogEnd", 110)
+        set("FogEnd", 130)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
 
+        -- água: bem translúcida (dá pra ver o azulejo do fundo), muito reflexiva e com ondas suaves
         pcall(function()
             local T = workspace.Terrain
-            T.WaterColor = Color3.fromRGB(60, 200, 190)
-            T.WaterTransparency = 0.6
-            T.WaterReflectance = 0.65
-            T.WaterWaveSize = 0.06
-            T.WaterWaveSpeed = 6
+            T.WaterColor = Color3.fromRGB(70, 205, 190)
+            T.WaterTransparency = 0.72
+            T.WaterReflectance = 0.9
+            T.WaterWaveSize = 0.08
+            T.WaterWaveSpeed = 8
         end)
 
         -- remove atmosferas do jogo (só uma funciona por vez)
@@ -1522,9 +1564,17 @@ do
             sr.Spread = 0.85
             sr.Parent = Lighting
 
+            local dof = Instance.new("DepthOfFieldEffect")
+            dof.Name = "Pool_DOF"
+            dof.FarIntensity = 0.12
+            dof.NearIntensity = 0
+            dof.FocusDistance = 45
+            dof.InFocusRadius = 70
+            dof.Parent = Lighting
+
             local at = Instance.new("Atmosphere")
             at.Name = "Pool_Atmosphere"
-            at.Density = 0.32
+            at.Density = 0.3
             at.Offset = 0.05
             at.Color = Color3.fromRGB(205, 236, 233)
             at.Decay = Color3.fromRGB(92, 168, 168)
@@ -1566,7 +1616,7 @@ do
             end
             if S.folder then pcall(function() S.folder:Destroy() end) end
         end
-        for _, n in ipairs({ "Pool_CC", "Pool_Bloom", "Pool_Rays", "Pool_Atmosphere" }) do
+        for _, n in ipairs(POOL_FX) do
             local o = Lighting:FindFirstChild(n)
             if o then o:Destroy() end
         end
@@ -1630,6 +1680,27 @@ do
                     pcall(streamStep, S, pcx, pcz)
                 end
                 task.wait(0.35)
+            end
+        end)
+
+        -- ondulação da água (azulejo "tremendo" por refração)
+        task.spawn(function()
+            local t0 = os.clock()
+            while POOL.token == myToken do
+                local t = os.clock() - t0
+                for _, ch in pairs(S.chunks) do
+                    if ch.ripples then
+                        for i, lab in ipairs(ch.ripples) do
+                            if lab.Parent then
+                                lab.Position = UDim2.fromOffset(
+                                    -40 + math.sin(t * 0.9 + i * 2) * 16,
+                                    -40 + math.cos(t * 0.7 + i) * 16
+                                )
+                            end
+                        end
+                    end
+                end
+                task.wait(0.06)
             end
         end)
 
