@@ -1,6 +1,7 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ POOLROOMS INFINITAS | PREFIXO DE REDE ;)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v32
+    (+ POOLROOMS INFINITAS | PREFIXO DE REDE ; | COUCH KILL MELHORADO)
     ==========================================================
 ]]--
 
@@ -1034,47 +1035,34 @@ local function clearBackrooms()
 end
 
 -- ================== POOLROOMS (INFINITAS) ==================
--- Complexo infinito de salas azulejadas alagadas. O mundo é feito de "chunks" 48x48 ligados por
--- arcos/colunatas; novos chunks nascem à frente e os distantes somem, então nunca acaba.
--- Teto fechado em TODAS as salas (claraboias agora são painéis de luz embutidos).
--- Piso, paredes, colunas e teto usam a MESMA textura de azulejo.
--- Água: Terrain (água de verdade) se o executor permitir; senão usa água em Part de vidro.
--- Iluminação: Future (sombras reais) se o executor tiver sethiddenproperty; senão ShadowMap.
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
-    local CH       = 48      -- tamanho do chunk (múltiplo de 4)
-    local WALL_H   = 22      -- pé-direito
-    local POOL_Y   = 1000    -- topo do piso (múltiplo de 4)
-    local DEPTH    = 4       -- profundidade da água
-    local RADIUS   = 2       -- chunks carregados em volta de você
-    local TILE     = 6       -- studs por repetição da textura (ajuste se o azulejo ficar grande/pequeno)
+    local CH       = 48
+    local WALL_H   = 22
+    local POOL_Y   = 1000
+    local DEPTH    = 4
+    local RADIUS   = 2
+    local TILE     = 6
     local WALL_TEX = "rbxassetid://122349893272800"
 
-    -- >>> BRILHO GERAL DAS POOLROOMS <<<
-    -- 1 = bem claro | 0.7 = padrão | 0.5 = bem mais escuro
     local BRILHO = 0.7
     local function esc(c) return Color3.new(c.R * BRILHO, c.G * BRILHO, c.B * BRILHO) end
 
     local TILE_MAT = Enum.Material.SmoothPlastic
     pcall(function() TILE_MAT = Enum.Material.CeramicTiles end)
 
-    local C_TILE  = Color3.fromRGB(238, 234, 216)   -- cor única: piso, parede, teto
+    local C_TILE  = Color3.fromRGB(238, 234, 216)
     local C_METAL = Color3.fromRGB(64, 68, 68)
     local C_LAMP  = Color3.fromRGB(255, 244, 222)
 
     local FACES_FB    = { Enum.NormalId.Front, Enum.NormalId.Back }
-    local FACES_LR    = { Enum.NormalId.Left, Enum.NormalId.Right }
     local FACES_TB    = { Enum.NormalId.Top, Enum.NormalId.Bottom }
     local FACES_TOP   = { Enum.NormalId.Top }
     local FACES_BOT   = { Enum.NormalId.Bottom }
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
-    local FACES_ALL   = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom }
     local FACES_ALL6  = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right }
 
-    ----------------------------------------------------------------
-    -- PRIMITIVAS
-    ----------------------------------------------------------------
     local function mkPart(parent, size, cf, color, mat, collide)
         local p = Instance.new("Part")
         p.Anchored = true
@@ -1091,7 +1079,6 @@ do
         return p
     end
 
-    -- laje azulejada: por padrão texturiza as 6 faces (nenhuma parede fica lisa)
     local function slab(S, parent, size, cf, faces, color, collide)
         local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false)
         p.Reflectance = 0.05
@@ -1108,11 +1095,7 @@ do
         return p
     end
 
-    -- (faixa úmida removida: a água já tinge as paredes e o visual fica mais limpo)
-    local function wet() end
-
-    -- parede curva feita de lajes (arco de círculo no plano XZ)
-    local function arc(S, parent, cx, cz, r, a0, a1, segs, h, thick, y0, skip, withWet)
+    local function arc(S, parent, cx, cz, r, a0, a1, segs, h, thick, y0, skip)
         local da = (a1 - a0) / segs
         local len = 2 * r * math.tan(da / 2) + 0.5
         for i = 1, segs do
@@ -1126,12 +1109,9 @@ do
     end
 
     local function column(S, parent, cx, cz, r, h)
-        arc(S, parent, cx, cz, r, 0, math.pi * 2, 14, h, 1.2, POOL_Y, nil, false)
+        arc(S, parent, cx, cz, r, 0, math.pi * 2, 14, h, 1.2, POOL_Y)
     end
 
-    ----------------------------------------------------------------
-    -- PAREDES DE BORDA (arco, colunata ou aberto)
-    ----------------------------------------------------------------
     local function edgeWall(S, parent, ex, ez, alongX, kind)
         if kind == "none" then return end
         local T = 2
@@ -1142,7 +1122,7 @@ do
         local function block(u0, u1, y0, y1)
             if u1 - u0 < 0.05 or y1 - y0 < 0.05 then return end
             local cf = F * CFrame.new((u0 + u1) / 2, (y0 + y1) / 2, 0)
-            slab(S, parent, Vector3.new(u1 - u0, y1 - y0, T), cf) -- 6 faces: batentes também têm azulejo
+            slab(S, parent, Vector3.new(u1 - u0, y1 - y0, T), cf)
         end
 
         if kind == "wide" then
@@ -1157,7 +1137,6 @@ do
             return
         end
 
-        -- arco redondo
         local R, spring = 9, POOL_Y + 10
         block(-HALF, -R, POOL_Y, TOP)
         block(R, HALF, POOL_Y, TOP)
@@ -1181,10 +1160,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- LUZES
-    ----------------------------------------------------------------
-    -- ponto de luz invisível (spot para baixo + brilho suave)
     local function lightAt(parent, x, y, z, bright, range, shadow)
         local em = mkPart(parent, Vector3.new(0.2, 0.2, 0.2), CFrame.new(x, y, z), C_LAMP, Enum.Material.SmoothPlastic, false)
         em.Transparency = 1
@@ -1207,7 +1182,6 @@ do
         pl.Parent = em
     end
 
-    -- lâmpada embutida: aro metálico + difusor + luz
     local function lamp(S, parent, x, y, z, shadow)
         local ring = mkPart(parent, Vector3.new(0.5, 4.4, 4.4), CFrame.new(x, y - 0.25, z) * CFrame.Angles(0, 0, math.rad(90)), C_METAL, Enum.Material.Metal, false)
         ring.Shape = Enum.PartType.Cylinder
@@ -1217,7 +1191,6 @@ do
         lightAt(parent, x, y - 1.0, z, 2.6, 48, shadow)
     end
 
-    -- luz submersa (brilho turquesa saindo do fundo da piscina)
     local function poolLight(S, parent, x, z)
         local d = mkPart(parent, Vector3.new(0.3, 3, 3), CFrame.new(x, POOL_Y + 0.2, z) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(170, 255, 240), Enum.Material.Neon, false)
         d.Shape = Enum.PartType.Cylinder
@@ -1230,21 +1203,16 @@ do
         pl.Parent = d
     end
 
-    ----------------------------------------------------------------
-    -- TETO (sempre fechado) COM PAINEL DE LUZ EMBUTIDO
-    ----------------------------------------------------------------
     local function ceilingSlabs(S, parent, cx, cz, skyW)
         local y = POOL_Y + WALL_H + 1
         slab(S, parent, Vector3.new(CH, 2, CH), CFrame.new(cx, y, cz), FACES_BOT)
 
         if skyW and skyW > 0 then
             local half = skyW / 2
-            -- moldura azulejada que desce do teto
             for _, s in ipairs({ -1, 1 }) do
                 slab(S, parent, Vector3.new(skyW, 3, 0.8), CFrame.new(cx, y - 2.4, cz + s * half), FACES_ALL6)
                 slab(S, parent, Vector3.new(0.8, 3, skyW), CFrame.new(cx + s * half, y - 2.4, cz), FACES_ALL6)
             end
-            -- "luz do dia": painel brilhante rente ao teto
             local g = mkPart(parent, Vector3.new(skyW - 0.8, 0.3, skyW - 0.8), CFrame.new(cx, y - 1.15, cz), Color3.fromRGB(255, 248, 226), Enum.Material.Neon, false)
             g.Name = "Skylight"
             g.CastShadow = false
@@ -1252,10 +1220,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- ÁGUA
-    ----------------------------------------------------------------
-    -- camada de ondulação: a textura do azulejo "tremendo" por cima da água (efeito de refração)
     local function waterOverlay(S, parent, cx, cz)
         local p = mkPart(parent, Vector3.new(CH, 0.05, CH), CFrame.new(cx, POOL_Y + DEPTH + 0.04, cz), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, false)
         p.Transparency = 1
@@ -1319,9 +1283,6 @@ do
         return ok2 and res == true
     end
 
-    ----------------------------------------------------------------
-    -- CHUNK
-    ----------------------------------------------------------------
     local function buildChunk(S, cx, cz)
         local key = cx .. "," .. cz
         if S.chunks[key] then return end
@@ -1337,7 +1298,6 @@ do
         local top = POOL_Y + WALL_H
 
         local ok, err = pcall(function()
-            -- piso (MESMA textura/cor das paredes) + água
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_TILE).Reflectance = 0.1
             chunk.ripples = waterFill(S, folder, wx, wz)
 
@@ -1351,7 +1311,6 @@ do
             local sky = 0
 
             if style == 1 then
-                -- salão de colunas redondas
                 sky = 14
                 for _, dx in ipairs({ -12, 12 }) do
                     for _, dz in ipairs({ -12, 12 }) do
@@ -1359,9 +1318,7 @@ do
                     end
                 end
                 L(wx, wz - 12) L(wx, wz + 12) L(wx - 12, wz) L(wx + 12, wz)
-
             elseif style == 2 then
-                -- coluna central com escada em espiral e plataforma seca
                 sky = 22
                 column(S, folder, wx, wz, 4, WALL_H)
                 slab(S, folder, Vector3.new(22, 0.8, 22), CFrame.new(wx, POOL_Y + 4.4, wz), FACES_ALL6, C_TILE)
@@ -1372,24 +1329,20 @@ do
                     slab(S, folder, Vector3.new(5.4, 1.2, 6), cf, FACES_ALL6, C_TILE)
                 end
                 L(wx - 16, wz) L(wx + 16, wz) L(wx, wz - 16) L(wx, wz + 16)
-
             elseif style == 3 then
-                -- câmara circular com 4 aberturas
                 sky = 18
                 local function gap(a)
                     local m = a % (math.pi / 2)
                     return m < 0.3 or m > math.pi / 2 - 0.3
                 end
-                arc(S, folder, wx, wz, 21, 0, math.pi * 2, 48, WALL_H, 1.4, POOL_Y, gap, true)
-                arc(S, folder, wx, wz, 7, 0, math.pi * 2, 20, 6, 1.2, POOL_Y, nil, false)
+                arc(S, folder, wx, wz, 21, 0, math.pi * 2, 48, WALL_H, 1.4, POOL_Y, gap)
+                arc(S, folder, wx, wz, 7, 0, math.pi * 2, 20, 6, 1.2, POOL_Y)
                 for k = 0, 3 do
                     local a = k * math.pi / 2 + math.pi / 4
                     L(wx + 14 * math.cos(a), wz + 14 * math.sin(a))
                 end
                 L(wx, wz)
-
             elseif style == 4 then
-                -- túnel abobadado (teto curvo)
                 local F = CFrame.new(wx, 0, wz) * (rng:NextNumber() < 0.5 and CFrame.new() or CFrame.Angles(0, math.rad(90), 0))
                 local R, spring = 14, POOL_Y + 8
                 local segs = 18
@@ -1407,9 +1360,7 @@ do
                     local p = F * CFrame.new(u, 0, 0)
                     L(p.Position.X, p.Position.Z, POOL_Y + 20.6)
                 end
-
             elseif style == 6 then
-                -- salão de janelas: parede com 4 janelas brilhantes e uma passagem no meio
                 local zW = wz - 19
                 slab(S, folder, Vector3.new(19, WALL_H, 2), CFrame.new(wx - 14.5, POOL_Y + WALL_H / 2, zW), FACES_ALL6)
                 slab(S, folder, Vector3.new(19, WALL_H, 2), CFrame.new(wx + 14.5, POOL_Y + WALL_H / 2, zW), FACES_ALL6)
@@ -1427,9 +1378,7 @@ do
                     sl.Parent = win
                 end
                 L(wx, wz + 4) L(wx - 14, wz + 14) L(wx + 14, wz + 14) L(wx, wz + 18)
-
             else
-                -- pilastras quadradas
                 sky = 18
                 for _, dx in ipairs({ -12, 12 }) do
                     for _, dz in ipairs({ -12, 12 }) do
@@ -1442,7 +1391,6 @@ do
             ceilingSlabs(S, folder, wx, wz, sky)
             poolLight(S, folder, wx + 6, wz + 6)
 
-            -- bordas norte e oeste (as outras pertencem aos vizinhos)
             local function pick(r)
                 if r < 0.55 then return "arch" elseif r < 0.8 then return "wide" end
                 return "none"
@@ -1482,9 +1430,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- AMBIENTE (luz, sombra, névoa, água)
-    ----------------------------------------------------------------
     local LIGHT_PROPS = {
         "Ambient", "OutdoorAmbient", "Brightness", "ColorShift_Top", "ColorShift_Bottom",
         "ExposureCompensation", "ClockTime", "FogColor", "FogStart", "FogEnd", "GlobalShadows",
@@ -1523,7 +1468,6 @@ do
         set("FogEnd", 130)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
 
-        -- água: bem translúcida (dá pra ver o azulejo do fundo), muito reflexiva e com ondas suaves
         pcall(function()
             local T = workspace.Terrain
             T.WaterColor = Color3.fromRGB(70, 205, 190)
@@ -1533,7 +1477,6 @@ do
             T.WaterWaveSpeed = 8
         end)
 
-        -- remove atmosferas do jogo (só uma funciona por vez)
         pcall(function()
             for _, c in ipairs(Lighting:GetChildren()) do
                 if c:IsA("Atmosphere") then
@@ -1599,9 +1542,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- API
-    ----------------------------------------------------------------
     function POOL.clear(silent)
         POOL.token += 1
         local S = POOL.S
@@ -1652,7 +1592,6 @@ do
         streamStep(S, 0, 0)
         if POOL.token ~= myToken then return end
 
-        -- teleporte
         local spawnCF = CFrame.new(16, POOL_Y + 8, 16)
         local chr = LocalPlayer.Character
         local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
@@ -1669,7 +1608,6 @@ do
             end
         end
 
-        -- streaming infinito: constrói à frente, apaga atrás
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
@@ -1683,7 +1621,6 @@ do
             end
         end)
 
-        -- ondulação da água (azulejo "tremendo" por refração)
         task.spawn(function()
             local t0 = os.clock()
             while POOL.token == myToken do
@@ -1711,7 +1648,7 @@ end
 
 -- ================== FLASH & AURA (REDE) ==================
 local FXNET = {
-    flash = {},   -- estado por nome de jogador
+    flash = {},
     aura  = {},
     actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
 }
@@ -1743,9 +1680,6 @@ do
         st.objs = {}
     end
 
-    ------------------------------------------------------------
-    -- RAIO PROCEDURAL
-    ------------------------------------------------------------
     local function bolt(p0, p1, thick, straight)
         local dist = (p1 - p0).Magnitude
         if dist < 0.5 then return end
@@ -1773,8 +1707,8 @@ do
 
         for i = 1, segs do
             for _, L in ipairs({
-                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 }, -- brilho
-                { Color3.new(1, 1, 1),          0.14 * thick, 0   }, -- nucleo
+                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 },
+                { Color3.new(1, 1, 1),          0.14 * thick, 0   },
             }) do
                 local b = Instance.new("Beam")
                 b.Attachment0, b.Attachment1 = atts[i], atts[i + 1]
@@ -1789,9 +1723,6 @@ do
         Debris:AddItem(part, rr(0.07, 0.13))
     end
 
-    ------------------------------------------------------------
-    -- FLASH
-    ------------------------------------------------------------
     local function flashApply(plr, st)
         local char = plr.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1804,7 +1735,6 @@ do
 
         if plr == LocalPlayer and hum then hum.WalkSpeed = 200 end
 
-        -- faiscas
         local att = keep(Instance.new("Attachment"))
         att.Parent = root
         local em = Instance.new("ParticleEmitter")
@@ -1820,7 +1750,6 @@ do
         em.LightEmission = 1
         em.Parent = att
 
-        -- rastro
         local top = keep(Instance.new("Attachment"))
         top.Position = Vector3.new(0, 2, 0)
         top.Parent = root
@@ -1838,7 +1767,6 @@ do
         trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.3, 0.01
         trail.Parent = root
 
-        -- luz + aura
         local light = keep(Instance.new("PointLight"))
         light.Color, light.Brightness, light.Range = Color3.fromRGB(255, 220, 60), 3, 14
         light.Parent = root
@@ -1849,7 +1777,6 @@ do
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
         hl.Parent = char
 
-        -- loop dos raios
         task.spawn(function()
             while FXNET.flash[plr.Name] == st and st.char == char and root.Parent do
                 local vel = root.AssemblyLinearVelocity
@@ -1863,7 +1790,6 @@ do
                     local velH = Vector3.new(vel.X, 0, vel.Z)
 
                     if velH.Magnitude > 20 then
-                        -- correndo: raios retos para tras
                         local dir = (-velH.Unit + rnd.Unit * 0.06).Unit
                         bolt(origem, origem + dir * rr(18, 36), rr(0.9, 1.3), true)
                     else
@@ -1905,9 +1831,6 @@ do
         end
     end
 
-    ------------------------------------------------------------
-    -- AURA
-    ------------------------------------------------------------
     local function column(groundPos, height, thick)
         local part = Instance.new("Part")
         part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
@@ -1965,7 +1888,6 @@ do
 
         local groundDist = hum.RigType == Enum.HumanoidRigType.R6 and 3 or (hum.HipHeight + root.Size.Y / 2)
 
-        -- brilho no corpo + luz
         local hl = keep(Instance.new("Highlight"))
         hl.FillColor, hl.OutlineColor = GOLD, BRIGHT
         hl.FillTransparency, hl.OutlineTransparency = 0.8, 0.1
@@ -1976,7 +1898,6 @@ do
         light.Color, light.Brightness, light.Range = GOLD, 4, 24
         light.Parent = root
 
-        -- chamas em cada parte do corpo
         local parts = {}
         for _, p in ipairs(char:GetChildren()) do
             if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then table.insert(parts, p) end
@@ -2007,7 +1928,6 @@ do
             fl.Parent = att
         end
 
-        -- nevoa + faiscas no centro
         local attRoot = keep(Instance.new("Attachment"))
         attRoot.Parent = root
 
@@ -2042,7 +1962,6 @@ do
         sp.LightEmission = 1
         sp.Parent = attRoot
 
-        -- aneis no chao (soldados ao personagem)
         local function ring(d, t, off)
             local a = keep(Instance.new("Part"))
             a.Shape = Enum.PartType.Cylinder
@@ -2057,14 +1976,12 @@ do
         end
         local r1, r2 = ring(6, 0.5, 0), ring(9, 0.7, 0.05)
 
-        -- bloom so para quem esta com a aura (efeito de tela local)
         if plr == LocalPlayer then
             local bloom = keep(Instance.new("BloomEffect"))
             bloom.Intensity, bloom.Size, bloom.Threshold = 0.8, 28, 0.85
             bloom.Parent = Lighting
         end
 
-        -- loop principal
         task.spawn(function()
             local tc, tw = 0, 0
             while FXNET.aura[plr.Name] == st and st.char == char and root.Parent do
@@ -2118,10 +2035,6 @@ do
         clearObjs(st)
     end
 
-    ------------------------------------------------------------
-    -- REDE
-    ------------------------------------------------------------
-    -- Executa a acao localmente (todo cliente com o hub desenha o efeito no alvo)
     function FXNET.run(action, name)
         if not name or name == "" then return end
         local isOn = action:sub(-3) == "_ON"
@@ -2148,7 +2061,6 @@ do
         end
     end
 
-    -- Executa aqui + envia pela rede (chat) para os outros usuarios do hub
     function FXNET.send(action, name)
         if not name or name == "" then return end
         FXNET.run(action, name)
@@ -2156,7 +2068,6 @@ do
         notify("Hub", action .. " → " .. name)
     end
 
-    -- limpeza quando alguem sai do servidor
     Players.PlayerRemoving:Connect(function(p)
         FXNET.flashOff(p.Name)
         FXNET.auraOff(p.Name)
@@ -2259,7 +2170,6 @@ function executeActionLocally(action, senderName, extraArg)
         end)
     elseif action == "LIFEFORM_CLEAR" then
         task.spawn(function() pcall(clearLifeform) end)
-    -- >>> FLASH & AURA (REDE) <<<
     elseif FXNET.actions[action] then
         FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
@@ -2428,7 +2338,6 @@ function executeActionLocally(action, senderName, extraArg)
 end
 
 -- ================== REDE (PREFIXO ;) ==================
--- Formato: ;ACAO ALVO [EXTRA]   ex.: ;KILL Fulano   ;FLASH_ON ALL   (também aceita "fhub ACAO ALVO")
 function processNetMessage(msg, senderName)
     if not msg then return end
     local body
@@ -2457,7 +2366,6 @@ function processNetMessage(msg, senderName)
         if pt and IS_ADMIN then applyOverheadTag(pt) end
     end
 
-    -- >>> FLASH & AURA (REDE): todo cliente do hub desenha o efeito no personagem do alvo <<<
     if FXNET.actions[action] then
         if target then
             task.spawn(function() pcall(executeActionLocally, action, senderName, target) end)
@@ -2827,7 +2735,6 @@ else
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -2836,7 +2743,6 @@ else
         sendNetCmd(";BACKROOMS_CLEAR ALL")
     end})
 
-    -- The Lifeform
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -2845,7 +2751,6 @@ else
         sendNetCmd(";LIFEFORM_CLEAR ALL")
     end})
 
-    -- Poolrooms infinitas
     TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -2854,7 +2759,6 @@ else
         sendNetCmd(";POOLROOMS_CLEAR ALL")
     end})
 
-    -- Aba Say / Command
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -2899,8 +2803,7 @@ else
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    -- >>> FLASH & AURA (REDE): aperta uma vez liga, aperta de novo desliga <<<
-    local function toggleFX(kind) -- kind = "FLASH" ou "AURA"
+    local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
         local isOn = stateTable[LocalPlayer.Name] ~= nil
         FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
@@ -2984,39 +2887,117 @@ task.spawn(function()
     TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
         Callback = function(v) methodKill = v end })
 
+    -- ================== KILLPLAYERCOUCH (NOVO - baseado nas prints) ==================
     local function KillPlayerCouch()
         local tp = Players:FindFirstChild(getgenv().Target)
-        if not tp or not tp.Character or not tp.Character:FindFirstChild("HumanoidRootPart") then return end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch") end)
-        local couch = LocalPlayer.Backpack:WaitForChild("Couch", 2)
-        if not couch then return end
-        couch.Name = "Chaos.Couch"
-        local s1 = couch:FindFirstChild("Seat1")
-        local s2 = couch:FindFirstChild("Seat2")
-        local hd = couch:FindFirstChild("Handle")
-        if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = true, true, "Handle " end
-        couch.Parent = LocalPlayer.Character
-        local bv = Instance.new("BodyVelocity", s1)
-        bv.MaxForce, bv.P, bv.Velocity = Vector3.new(1e9,1e9,1e9), 1250, Vector3.zero
-        bv.Name = "#MOVODEPFS#@F$GERE..>V<<<EwV<<W"
-        repeat
-            local tr = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
-            if not tr then break end
-            s1.CFrame = CFrame.new(tr.Position + tr.Velocity * 0.5) * CFrame.new(-2, 2, 0)
-            task.wait()
-        until tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit
-        task.wait()
-        couch.Parent = LocalPlayer.Backpack
-        s1.CFrame = CFrame.new(9999, -450, 9999)
-        s2.CFrame = CFrame.new(9999, -450, 9999)
-        couch.Parent = LocalPlayer.Character
+        if not tp or not tp.Character then
+            warn("Erro: Jogador alvo não encontrado ou sem personagem")
+            return
+        end
+
+        local char = LocalPlayer.Character
+        if not char then
+            warn("Erro: Personagem do jogador local não encontrado")
+            return
+        end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+        local tHum = tp.Character and tp.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or not root or not tRoot or not tHum then
+            warn("Erro: Componentes necessários não encontrados")
+            return
+        end
+
+        local originalPos = root.Position
+        local sitPos = Vector3.new(145.51, -350.09, 21.58)
+
+        -- limpar ferramentas
+        pcall(function()
+            ReplicatedStorage:WaitForChild("RE"):WaitForChild("1ClearToolis"):FireServer("ClearAllTools")
+        end)
+        task.wait(0.2)
+
+        -- pegar o Couch
+        pcall(function()
+            ReplicatedStorage.RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch")
+        end)
+        task.wait(0.3)
+
+        local tool = LocalPlayer.Backpack:FindFirstChild("Couch")
+        if tool then tool.Parent = char end
         task.wait(0.1)
-        couch.Parent = LocalPlayer.Backpack
-        task.wait(2)
-        local b = s1:FindFirstChild("#MOVODEPFS#@F$GERE..>V<<<EwV<<W")
-        if b then b:Destroy() end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
+
+        -- força o pulo (VirtualInputManager)
+        pcall(function()
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.F, false, game)
+        end)
+        task.wait(0.1)
+
+        -- estado do humanoid
+        hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        hum.PlatformStand = false
+        pcall(function()
+            workspace.CurrentCamera.CameraSubject = tp.Character:FindFirstChild("Head") or tRoot or tHum
+        end)
+
+        -- BodyPosition que gruda no alvo
+        local align = Instance.new("BodyPosition")
+        align.Name = "BringPosition"
+        align.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        align.D = 10
+        align.P = 30000
+        align.Position = root.Position
+        align.Parent = tRoot
+
+        -- loop que segue o alvo e empurra o couch
+        task.spawn(function()
+            local angle = 0
+            local startTime = tick()
+            while (tick() - startTime < 5) and tp and tp.Character and tp.Character:FindFirstChildOfClass("Humanoid") do
+                local tHum2 = tp.Character:FindFirstChildOfClass("Humanoid")
+                if not tHum2 or tHum2.Sit then break end
+
+                local tHRP = tp.Character:FindFirstChild("HumanoidRootPart")
+                if not tHRP then break end
+
+                local adjustedPos = tHRP.Position + (tHRP.Velocity / 1.5)
+                angle += 50
+                root.CFrame = CFrame.new(adjustedPos + Vector3.new(0, 2, 0)) * CFrame.Angles(math.rad(angle), 0, 0)
+                align.Position = root.Position + Vector3.new(2, 0, 0)
+
+                task.wait()
+            end
+
+            align:Destroy()
+
+            hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+            hum.PlatformStand = false
+            pcall(function()
+                workspace.CurrentCamera.CameraSubject = hum
+            end)
+
+            for _, p in pairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.Velocity = Vector3.zero
+                    p.RotVelocity = Vector3.zero
+                end
+            end
+
+            task.wait(0.1)
+            root.CFrame = CFrame.new(sitPos)
+            task.wait(0.3)
+
+            local tool2 = char:FindFirstChild("Couch")
+            if tool2 then tool2.Parent = LocalPlayer.Backpack end
+            task.wait(0.01)
+
+            pcall(function()
+                ReplicatedStorage.RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch")
+            end)
+            task.wait(0.2)
+            root.CFrame = CFrame.new(originalPos)
+        end)
     end
 
     local function KillPlayerBus()
