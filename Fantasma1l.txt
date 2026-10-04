@@ -1,6 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
+    (v31b: Couch corrigido)
     ==========================================================
 ]]--
 
@@ -4750,28 +4751,72 @@ task.spawn(function()
     TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
         Callback = function(v) methodKill = v end })
 
+    -- ===== COUCH (CORRIGIDO) =====
+    -- Procura o sofá no Backpack E no Character, por nome parecido
+    local function findCouch()
+        local chr = LocalPlayer.Character
+        for _, c in ipairs({ LocalPlayer:FindFirstChild("Backpack"), chr }) do
+            if c then
+                for _, t in ipairs(c:GetChildren()) do
+                    if t:IsA("Tool") then
+                        local n = t.Name:lower()
+                        if t.Name == "Couch" or t.Name == "Chaos.Couch" or n:find("couch") or n:find("sofa") then
+                            return t
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     local function KillPlayerCouch()
-        local tp = Players:FindFirstChild(getgenv().Target)
-        if not tp or not tp.Character or not tp.Character:FindFirstChild("HumanoidRootPart") then return end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch") end)
-        local couch = LocalPlayer.Backpack:WaitForChild("Couch", 2)
-        if not couch then return end
+        local targetName = getgenv().Target or selectedPlayerNameBH
+        local tp = targetName and Players:FindFirstChild(targetName)
+        if not tp or not tp.Character or not tp.Character:FindFirstChild("HumanoidRootPart") then
+            notify("Couch", "Selecione um jogador válido.")
+            return
+        end
+
+        local RE = ReplicatedStorage:FindFirstChild("RE")
+        if not RE then notify("Couch", "Remote RE não encontrado.") return end
+
+        -- limpa ferramentas e pede o sofá (com tentativas)
+        pcall(function() RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
+        task.wait(0.4)
+
+        local couch
+        for _ = 1, 5 do
+            pcall(function() RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch") end)
+            local t0 = tick()
+            repeat
+                couch = findCouch()
+                task.wait(0.1)
+            until couch or tick() - t0 > 1.5
+            if couch then break end
+        end
+        if not couch then notify("Couch", "Sofá não encontrado.") return end
+
         couch.Name = "Chaos.Couch"
-        local s1 = couch:FindFirstChild("Seat1")
-        local s2 = couch:FindFirstChild("Seat2")
+        local s1 = couch:FindFirstChild("Seat1") or couch:FindFirstChildWhichIsA("Seat", true)
+        local s2 = couch:FindFirstChild("Seat2") or s1
         local hd = couch:FindFirstChild("Handle")
+        if not s1 then notify("Couch", "Sofá sem assento.") return end
         if s1 and s2 and hd then s1.Disabled, s2.Disabled, hd.Name = true, true, "Handle " end
+
         couch.Parent = LocalPlayer.Character
         local bv = Instance.new("BodyVelocity", s1)
         bv.MaxForce, bv.P, bv.Velocity = Vector3.new(1e9,1e9,1e9), 1250, Vector3.zero
         bv.Name = "#MOVODEPFS#@F$GERE..>V<<<EwV<<W"
+
+        local t0 = tick()
         repeat
             local tr = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
             if not tr then break end
             s1.CFrame = CFrame.new(tr.Position + tr.Velocity * 0.5) * CFrame.new(-2, 2, 0)
             task.wait()
-        until tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit
+        until (tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit)
+            or tick() - t0 > 8
+
         task.wait()
         couch.Parent = LocalPlayer.Backpack
         s1.CFrame = CFrame.new(9999, -450, 9999)
@@ -4782,7 +4827,7 @@ task.spawn(function()
         task.wait(2)
         local b = s1:FindFirstChild("#MOVODEPFS#@F$GERE..>V<<<EwV<<W")
         if b then b:Destroy() end
-        pcall(function() ReplicatedStorage.RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
+        pcall(function() RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
     end
 
     local function KillPlayerBus()
