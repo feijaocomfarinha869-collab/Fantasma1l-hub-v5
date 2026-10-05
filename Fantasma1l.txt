@@ -18,7 +18,7 @@ local LocalPlayer        = Players.LocalPlayer
 -- ================== WHITELIST ==================
 local WHITELIST = {
     ["renegado6661l"]         = { Role = "DONO",     Permanent = true },
-    ["PREENCHA_AQUI_SUBDONO"] = { Role = "SUB DONO", Days = 30 },
+    ["gdyfhgfvc"] = { Role = "SUB DONO", Days = 30 },
     ["PREENCHA_AQUI_ADM_1"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_2"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_3"]   = { Role = "ADM",      Days = 30 },
