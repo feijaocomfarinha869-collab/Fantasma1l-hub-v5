@@ -1,7 +1,8 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v31c: Poolrooms com brilho reduzido + sombras realistas)
+    FANTASMA1L HUB - COMPLETO UNIFICADO v31
+    (v31d: Poolrooms com brilho baixo + sombras reais
+            + TAG LOCUST em rede corrigida)
     ==========================================================
 ]]--
 
@@ -210,7 +211,7 @@ function applyOverheadTag(player)
         st.Color, st.Thickness = Color3.fromRGB(168, 85, 247), 1.8
 
         local ic = Instance.new("ImageLabel", fr)
-        ic.Size, ic.Position, ic.BackgroundTransparency, ic.Image = UDim2.new(0, 32, 0, 32), UDim.new(0, 8, 0.5, -16), 1, ICON_ID
+        ic.Size, ic.Position, ic.BackgroundTransparency, ic.Image = UDim2.new(0, 32, 0, 32), UDim2.new(0, 8, 0.5, -16), 1, ICON_ID
 
         local lbl = Instance.new("TextLabel", fr)
         lbl.Size, lbl.Position, lbl.BackgroundTransparency = UDim2.new(1, -50, 1, 0), UDim2.new(0, 45, 0, 0), 1
@@ -1036,7 +1037,6 @@ local function clearBackrooms()
 end
 
 -- ================== POOLROOMS (INFINITAS) ==================
--- v31c: brilho reduzido (Bloom/SunRays/Exposure baixos) + sombras realistas nos túneis e lâmpadas
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
@@ -1065,9 +1065,6 @@ do
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
     local FACES_ALL   = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom }
 
-    ----------------------------------------------------------------
-    -- PRIMITIVAS
-    ----------------------------------------------------------------
     local function mkPart(parent, size, cf, color, mat, collide, castShadow)
         local p = Instance.new("Part")
         p.Anchored = true
@@ -1078,14 +1075,13 @@ do
         p.CanCollide = collide and true or false
         p.CanQuery = collide and true or false
         p.CanTouch = false
-        p.CastShadow = castShadow ~= false -- default: projeta sombra
+        p.CastShadow = castShadow ~= false
         p.TopSurface = Enum.SurfaceType.Smooth
         p.BottomSurface = Enum.SurfaceType.Smooth
         p.Parent = parent
         return p
     end
 
-    -- laje azulejada (sombra ativa por padrão)
     local function slab(S, parent, size, cf, faces, color, collide, noShadow)
         local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false, not noShadow)
         p.Reflectance = 0.05
@@ -1129,9 +1125,6 @@ do
         arc(S, parent, cx, cz, r, 0, math.pi * 2, 14, h, 1.2, POOL_Y, nil, false)
     end
 
-    ----------------------------------------------------------------
-    -- PAREDES DE BORDA
-    ----------------------------------------------------------------
     local function edgeWall(S, parent, ex, ez, alongX, kind)
         if kind == "none" then return end
         local T = 2
@@ -1181,9 +1174,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- TETO COM CLARABOIA (poço de luz projeta sombra real)
-    ----------------------------------------------------------------
     local function ceilingSlabs(S, parent, cx, cz, skyW)
         local y = POOL_Y + WALL_H + 1
         if not skyW or skyW <= 0 then
@@ -1197,23 +1187,18 @@ do
         slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx - half - band / 2, y, cz), FACES_BOT)
         slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx + half + band / 2, y, cz), FACES_BOT)
 
-        -- vidro deixa o sol entrar (não projeta sombra)
         local g = mkPart(parent, Vector3.new(skyW, 0.3, skyW), CFrame.new(cx, y + 0.5, cz),
             Color3.fromRGB(205, 238, 236), Enum.Material.Glass, true, false)
         g.Transparency = 0.9
         g.Reflectance = 0.05
         g.CastShadow = false
 
-        -- moldura do poço de luz: PROJETA sombra → desenha "quadro de sol" no piso
         for _, s in ipairs({ -1, 1 }) do
             slab(S, parent, Vector3.new(skyW, 3, 0.8), CFrame.new(cx, y - 2.4, cz + s * half), FACES_FB)
             slab(S, parent, Vector3.new(0.8, 3, skyW), CFrame.new(cx + s * half, y - 2.4, cz), FACES_LR)
         end
     end
 
-    ----------------------------------------------------------------
-    -- LÂMPADAS (todas com SpotLight.Shadows = true)
-    ----------------------------------------------------------------
     local function lamp(S, parent, x, y, z, shadow)
         local ring = mkPart(parent, Vector3.new(0.5, 4.4, 4.4),
             CFrame.new(x, y - 0.25, z) * CFrame.Angles(0, 0, math.rad(90)), C_METAL,
@@ -1260,9 +1245,6 @@ do
         pl.Parent = d
     end
 
-    ----------------------------------------------------------------
-    -- ÁGUA
-    ----------------------------------------------------------------
     local function waterFill(S, parent, cx, cz)
         if S.terrain then
             pcall(function()
@@ -1295,9 +1277,6 @@ do
         return ok2 and res == true
     end
 
-    ----------------------------------------------------------------
-    -- CHUNK
-    ----------------------------------------------------------------
     local function buildChunk(S, cx, cz)
         local key = cx .. "," .. cz
         if S.chunks[key] then return end
@@ -1315,7 +1294,6 @@ do
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR).Reflectance = 0.12
             waterFill(S, folder, wx, wz)
 
-            -- TODAS as lâmpadas com sombra real
             local function L(x, z, y)
                 lamp(S, folder, x, y or top, z, true)
             end
@@ -1363,7 +1341,6 @@ do
                 L(wx, wz)
 
             elseif style == 4 then
-                -- TÚNEL ABOBADADO — TODAS as lajes do teto e paredes projetam sombra real
                 local F = CFrame.new(wx, 0, wz) * (rng:NextNumber() < 0.5 and CFrame.new() or CFrame.Angles(0, math.rad(90), 0))
                 local R, spring = 14, POOL_Y + 8
                 local segs = 18
@@ -1371,11 +1348,11 @@ do
                 for i = 1, segs do
                     local phi = (i - 0.5) * math.pi / segs
                     local cf = F * CFrame.new(0, spring + R * math.sin(phi), R * math.cos(phi)) * CFrame.Angles(-(phi + math.pi / 2), 0, 0)
-                    slab(S, folder, Vector3.new(CH + 0.4, 1.2, chord), cf, FACES_TB) -- sombra ativa
+                    slab(S, folder, Vector3.new(CH + 0.4, 1.2, chord), cf, FACES_TB)
                 end
                 for _, s in ipairs({ -1, 1 }) do
                     local cfw = F * CFrame.new(0, POOL_Y + 4, s * R)
-                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_FB)   -- sombra ativa
+                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_FB)
                     wet(S, folder, CH + 0.4, 1.2, cfw)
                 end
                 for _, u in ipairs({ -14, 0, 14 }) do
@@ -1437,9 +1414,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- AMBIENTE (brilho reduzido + sombras realistas)
-    ----------------------------------------------------------------
     local LIGHT_PROPS = {
         "Ambient", "OutdoorAmbient", "Brightness", "ColorShift_Top", "ColorShift_Bottom",
         "ExposureCompensation", "ClockTime", "FogColor", "FogStart", "FogEnd", "GlobalShadows",
@@ -1462,16 +1436,16 @@ do
     local function envApply()
         local function set(k, v) pcall(function() Lighting[k] = v end) end
         set("ClockTime", 14.8)
-        set("Brightness", 1.8)                 -- era 3
+        set("Brightness", 1.8)
         set("Ambient", Color3.fromRGB(50, 75, 80))
         set("OutdoorAmbient", Color3.fromRGB(70, 100, 105))
         set("ColorShift_Top", Color3.fromRGB(255, 232, 190))
         set("ColorShift_Bottom", Color3.fromRGB(55, 150, 150))
-        set("ExposureCompensation", -0.15)     -- era +0.2
+        set("ExposureCompensation", -0.15)
         set("GlobalShadows", true)
-        set("ShadowSoftness", 0.1)             -- era 0.18 (sombras mais firmes/realistas)
-        set("EnvironmentDiffuseScale", 0.6)    -- era 1
-        set("EnvironmentSpecularScale", 0.7)   -- era 1
+        set("ShadowSoftness", 0.1)
+        set("EnvironmentDiffuseScale", 0.6)
+        set("EnvironmentSpecularScale", 0.7)
         set("FogColor", Color3.fromRGB(180, 218, 214))
         set("FogStart", 25)
         set("FogEnd", 100)
@@ -1500,22 +1474,20 @@ do
             cc.Name = "Pool_CC"
             cc.TintColor = Color3.fromRGB(232, 255, 250)
             cc.Saturation = 0.12
-            cc.Contrast = 0.14                 -- era 0.1
-            cc.Brightness = -0.03              -- era 0
+            cc.Contrast = 0.14
+            cc.Brightness = -0.03
             cc.Parent = Lighting
 
-            -- Bloom bem mais suave
             local bl = Instance.new("BloomEffect")
             bl.Name = "Pool_Bloom"
-            bl.Intensity = 0.15                -- era 0.45
-            bl.Size = 16                       -- era 26
-            bl.Threshold = 1.5                 -- era 0.9
+            bl.Intensity = 0.15
+            bl.Size = 16
+            bl.Threshold = 1.5
             bl.Parent = Lighting
 
-            -- SunRays quase desligado
             local sr = Instance.new("SunRaysEffect")
             sr.Name = "Pool_Rays"
-            sr.Intensity = 0.03                -- era 0.16
+            sr.Intensity = 0.03
             sr.Spread = 0.9
             sr.Parent = Lighting
 
@@ -1525,7 +1497,7 @@ do
             at.Offset = 0.05
             at.Color = Color3.fromRGB(205, 236, 233)
             at.Decay = Color3.fromRGB(92, 168, 168)
-            at.Glare = 0.02                    -- era 0.15
+            at.Glare = 0.02
             at.Haze = 1.2
             at.Parent = Lighting
         end)
@@ -1546,9 +1518,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- API
-    ----------------------------------------------------------------
     function POOL.clear(silent)
         POOL.token += 1
         local S = POOL.S
@@ -1634,10 +1603,124 @@ do
 end
 
 -- ================== LOCUST (REANIMATE) + REDE ==================
--- Script "Locust" (FEVerse) embutido como função. Liga/desliga localmente ou pela rede:
---   ;LOCUST_ON <alvo|ALL>      ;LOCUST_OFF <alvo|ALL>
--- Controles: X = modo kill | Q = agachar | C = sentar | E = waypoint/teleporte | Shift = correr
-local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil }
+local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil, users = {}, tagObjs = {} }
+
+-- >>> Sistema de TAG do Locust (rede) <<<
+function applyLocustTag(player, active)
+    if not player then return end
+    local name = player.Name
+
+    -- remove tag antiga (Head e Character inteiro, evita ficar presa)
+    local function wipeOldTags()
+        local containers = { player.Character, player.Character and player.Character:FindFirstChild("Head") }
+        for _, c in ipairs(containers) do
+            if c then
+                for _, ch in ipairs(c:GetChildren()) do
+                    if ch.Name == "LocustActiveTag" then
+                        pcall(function() ch:Destroy() end)
+                    end
+                end
+            end
+        end
+        LOCUST.tagObjs[name] = nil
+    end
+    wipeOldTags()
+
+    if not active then return end
+
+    local char = player.Character
+    local head = char and char:FindFirstChild("Head")
+    if not head then return end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "LocustActiveTag"
+    bb.Size = UDim2.new(0, 240, 0, 44)
+    bb.StudsOffset = Vector3.new(0, 3.6, 0)
+    bb.AlwaysOnTop = true
+    bb.LightInfluence = 0
+    bb.MaxDistance = 500
+    bb.Parent = head
+    LOCUST.tagObjs[name] = bb
+
+    local fr = Instance.new("Frame", bb)
+    fr.Size = UDim2.new(1, 0, 1, 0)
+    fr.BackgroundColor3 = Color3.fromRGB(30, 5, 5)
+    fr.BackgroundTransparency = 0.15
+    fr.BorderSizePixel = 0
+    Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+
+    local stroke = Instance.new("UIStroke", fr)
+    stroke.Color = Color3.fromRGB(255, 40, 40)
+    stroke.Thickness = 2
+    stroke.Transparency = 0
+
+    local icon = Instance.new("ImageLabel", fr)
+    icon.Size = UDim2.new(0, 32, 0, 32)
+    icon.Position = UDim2.new(0, 8, 0.5, -16)
+    icon.BackgroundTransparency = 1
+    icon.Image = ICON_ID
+    icon.ScaleType = Enum.ScaleType.Fit
+
+    local lbl = Instance.new("TextLabel", fr)
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.new(0, 45, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "LOCUST ATIVO"
+    lbl.TextColor3 = Color3.fromRGB(255, 90, 90)
+    lbl.TextSize = 15
+    lbl.Font = Enum.Font.GothamBlack
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextStrokeTransparency = 0.3
+    lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+    -- pulso controlado (para sozinho quando bb for destruída)
+    local pulseConn
+    pulseConn = RunService.Heartbeat:Connect(function()
+        if not bb or not bb.Parent or LOCUST.tagObjs[name] ~= bb then
+            if pulseConn then pulseConn:Disconnect() end
+            return
+        end
+        local pulse = (math.sin(os.clock() * 6) + 1) / 2
+        stroke.Transparency = 1 - pulse * 0.7
+        lbl.TextTransparency = 1 - (0.4 + pulse * 0.6)
+    end)
+    bb.Destroying:Connect(function()
+        if pulseConn then pulseConn:Disconnect() end
+    end)
+end
+
+-- Handler da rede: recebe estado ON/OFF de outros usuários
+function handleLocustNetState(state, name)
+    if not name or name == "" then return end
+    if state == "ON" then
+        LOCUST.users[name] = true
+        local plr = Players:FindFirstChild(name)
+        if plr then applyLocustTag(plr, true) end
+    else
+        LOCUST.users[name] = nil
+        local plr = Players:FindFirstChild(name)
+        if plr then applyLocustTag(plr, false) end
+    end
+end
+
+-- Reaplica tag se a pessoa respawnar
+local function bindLocustRespawn(plr)
+    if not plr then return end
+    plr.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        if LOCUST.users[plr.Name] then
+            applyLocustTag(plr, true)
+        else
+            applyLocustTag(plr, false)
+        end
+    end)
+end
+for _, p in ipairs(Players:GetPlayers()) do bindLocustRespawn(p) end
+Players.PlayerAdded:Connect(bindLocustRespawn)
+Players.PlayerRemoving:Connect(function(p)
+    LOCUST.users[p.Name] = nil
+    LOCUST.tagObjs[p.Name] = nil
+end)
 
 function LOCUST.start()
     if LOCUST.running or LOCUST.busy then return end
@@ -1651,46 +1734,15 @@ LOCUST.fem = LOCUST.fem or loadstring(game:HttpGet("https://gist.githubuserconte
 local FEManager = LOCUST.fem
 if not FEManager then error("FEManager não carregou") end
 
--- tables
 local ScriptOptions = {
-	Settings = {
-		AnimationSpeed = 1.25;
-		Fling = true;
-		Music = true;
-		FOVEffects = true;
-		CameraEffects = true;
-		InfiniteJump = false;
-	};
-	Customization = { 
-		HitboxColor = Color3.fromRGB(255, 255, 255);
-		Hitmarker = 103397225855135;
-	};
-	FlingOptions = {
-		HatFling = false,
-		Highlight = false,
-		PredictionFling = true,
-		Timeout = 0.5,
-		ToolFling = false,
-	};
-	Reanimate_Settings = {
-		Frequency = 6,
-		Amplification = 6,
-		FrontOffset = 2.5,
-	}
+	Settings = { AnimationSpeed = 1.25; Fling = true; Music = true; FOVEffects = true; CameraEffects = true; InfiniteJump = false; };
+	Customization = { HitboxColor = Color3.fromRGB(255, 255, 255); Hitmarker = 103397225855135; };
+	FlingOptions = { HatFling = false, Highlight = false, PredictionFling = true, Timeout = 0.5, ToolFling = false; };
+	Reanimate_Settings = { Frequency = 6, Amplification = 6, FrontOffset = 2.5; }
 }
 
-local AnimatorCache = {
-	Joints = {};
-	AnimDefaults = {};
-	Rigs = {};
-}
-
-local ScriptCache = {
-	StoredMotors = {};
-	TrashBin = {};
-	HitHumanoids = {};
-	ActiveConnections = {};
-}
+local AnimatorCache = { Joints = {}; AnimDefaults = {}; Rigs = {}; }
+local ScriptCache = { StoredMotors = {}; TrashBin = {}; HitHumanoids = {}; ActiveConnections = {}; }
 
 local function Cleanup()
 	for _, v in ipairs(ScriptCache.TrashBin) do pcall(function() v:Destroy() end) end
@@ -1700,30 +1752,12 @@ local function Cleanup()
 	pcall(function() workspace.CurrentCamera.FieldOfView = 70 end)
 end
 
-local Directories = {
-	Main = "FEVerse/",
-	RBXMs ="FEVerse/RBXMs/",
-	Sounds = "FEVerse/Sounds/",
-	Songs = "FEVerse/Songs/",
-}
+local Directories = { Main = "FEVerse/", RBXMs ="FEVerse/RBXMs/", Sounds = "FEVerse/Sounds/", Songs = "FEVerse/Songs/" }
 
 local States = {
-	Movement = {
-		Idle = false;
-		Walking = false;
-		Running = false;
-		Crouching = false;
-		Sitting = false;
-	};
-	Input = {
-		Debounce = false;
-		Shift = false;
-		KillMode = false;
-	};
-	Waypoint = {
-		SavedPosition = nil;
-		TVLocation = nil;
-	}
+	Movement = { Idle = false; Walking = false; Running = false; Crouching = false; Sitting = false; };
+	Input = { Debounce = false; Shift = false; KillMode = false; };
+	Waypoint = { SavedPosition = nil; TVLocation = nil; }
 }
 
 local Services = {
@@ -3430,12 +3464,17 @@ end)
 
     LOCUST.busy = false
     if ok then
+        LOCUST.users[LocalPlayer.Name] = true
+        applyLocustTag(LocalPlayer, true)
+        sendNetCmd(";LOCUST_STATE ON " .. LocalPlayer.Name)
         notify("Locust", "Ativado! X = modo kill | Q agachar | C sentar | E waypoint | Shift correr")
     else
         warn("[Locust] " .. tostring(err))
         if LOCUST.stopFn then pcall(LOCUST.stopFn) end
         LOCUST.running = false
         LOCUST.stopFn = nil
+        LOCUST.users[LocalPlayer.Name] = nil
+        applyLocustTag(LocalPlayer, false)
         notify("Locust", "Erro: " .. tostring(err))
     end
 end
@@ -3447,6 +3486,9 @@ function LOCUST.stop()
         notify("Locust", "Desligado.")
     end
     LOCUST.running = false
+    LOCUST.users[LocalPlayer.Name] = nil
+    applyLocustTag(LocalPlayer, false)
+    sendNetCmd(";LOCUST_STATE OFF " .. LocalPlayer.Name)
 end
 
 -- ================== FLASH & AURA (REDE) ==================
@@ -3977,6 +4019,8 @@ function executeActionLocally(action, senderName, extraArg)
         task.spawn(function() pcall(LOCUST.start) end)
     elseif action == "LOCUST_OFF" then
         task.spawn(function() pcall(LOCUST.stop) end)
+    elseif action == "LOCUST_STATE" then
+        task.spawn(function() pcall(handleLocustNetState, extraArg, senderName or selectedPlayerName) end)
     elseif FXNET.actions[action] then
         FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
@@ -4177,6 +4221,12 @@ function processNetMessage(msg, senderName)
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
 
+    -- >>> Estado do Locust pela rede (ON/OFF) <<<
+    if action == "LOCUST_STATE" then
+        task.spawn(function() pcall(handleLocustNetState, target, extraArg) end)
+        return
+    end
+
     if FXNET.actions[action] then
         if target then
             task.spawn(function() pcall(executeActionLocally, action, senderName, target) end)
@@ -4221,6 +4271,10 @@ task.spawn(function()
     end)
     task.wait(1)
     sendNetCmd(";PING ALL")
+    -- envia o estado atual do Locust se já estiver ligado
+    if LOCUST.running then
+        sendNetCmd(";LOCUST_STATE ON " .. LocalPlayer.Name)
+    end
 end)
 
 -- ================== ADM HUB ==================
