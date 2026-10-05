@@ -1,7 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v31b: Couch corrigido)
+    (v31c: Poolrooms com brilho reduzido + sombras realistas)
     ==========================================================
 ]]--
 
@@ -18,7 +18,7 @@ local LocalPlayer        = Players.LocalPlayer
 -- ================== WHITELIST ==================
 local WHITELIST = {
     ["renegado6661l"]         = { Role = "DONO",     Permanent = true },
-    ["gdyfhgfvc"] = { Role = "SUB DONO", Days = 30 },
+    ["PREENCHA_AQUI_SUBDONO"] = { Role = "SUB DONO", Days = 30 },
     ["PREENCHA_AQUI_ADM_1"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_2"]   = { Role = "ADM",      Days = 30 },
     ["PREENCHA_AQUI_ADM_3"]   = { Role = "ADM",      Days = 30 },
@@ -29,7 +29,7 @@ local WHITELIST = {
 }
 
 local NETWORK_ROLES = {}
-local REQUIRE_WHITELIST = true -- true = só obedece comandos de quem está na WHITELIST (evita estranhos usando ;KICK ALL etc.)
+local REQUIRE_WHITELIST = true
 local IS_ADMIN, MY_ROLE = false, "USER"
 do
     local entry = WHITELIST[LocalPlayer.Name]
@@ -210,7 +210,7 @@ function applyOverheadTag(player)
         st.Color, st.Thickness = Color3.fromRGB(168, 85, 247), 1.8
 
         local ic = Instance.new("ImageLabel", fr)
-        ic.Size, ic.Position, ic.BackgroundTransparency, ic.Image = UDim2.new(0, 32, 0, 32), UDim2.new(0, 8, 0.5, -16), 1, ICON_ID
+        ic.Size, ic.Position, ic.BackgroundTransparency, ic.Image = UDim2.new(0, 32, 0, 32), UDim.new(0, 8, 0.5, -16), 1, ICON_ID
 
         local lbl = Instance.new("TextLabel", fr)
         lbl.Size, lbl.Position, lbl.BackgroundTransparency = UDim2.new(1, -50, 1, 0), UDim2.new(0, 45, 0, 0), 1
@@ -1036,19 +1036,16 @@ local function clearBackrooms()
 end
 
 -- ================== POOLROOMS (INFINITAS) ==================
--- Complexo infinito de salas azulejadas alagadas. O mundo é feito de "chunks" 48x48 ligados por
--- arcos/colunatas; novos chunks nascem à frente e os distantes somem, então nunca acaba.
--- Água: Terrain (nada de verdade) se o executor permitir; senão usa água em Part translúcida.
--- Iluminação: Future (sombras reais) se o executor tiver sethiddenproperty; senão ShadowMap.
+-- v31c: brilho reduzido (Bloom/SunRays/Exposure baixos) + sombras realistas nos túneis e lâmpadas
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
-    local CH       = 48      -- tamanho do chunk (múltiplo de 4)
-    local WALL_H   = 22      -- pé-direito
-    local POOL_Y   = 1000    -- topo do piso (múltiplo de 4)
-    local DEPTH    = 4       -- profundidade da água
-    local RADIUS   = 2       -- chunks carregados em volta de você
-    local TILE     = 6       -- studs por repetição da textura (ajuste se o azulejo ficar grande/pequeno)
+    local CH       = 48
+    local WALL_H   = 22
+    local POOL_Y   = 1000
+    local DEPTH    = 4
+    local RADIUS   = 2
+    local TILE     = 6
     local WALL_TEX = "rbxassetid://122349893272800"
 
     local TILE_MAT = Enum.Material.SmoothPlastic
@@ -1071,7 +1068,7 @@ do
     ----------------------------------------------------------------
     -- PRIMITIVAS
     ----------------------------------------------------------------
-    local function mkPart(parent, size, cf, color, mat, collide)
+    local function mkPart(parent, size, cf, color, mat, collide, castShadow)
         local p = Instance.new("Part")
         p.Anchored = true
         p.Size = size
@@ -1081,15 +1078,16 @@ do
         p.CanCollide = collide and true or false
         p.CanQuery = collide and true or false
         p.CanTouch = false
+        p.CastShadow = castShadow ~= false -- default: projeta sombra
         p.TopSurface = Enum.SurfaceType.Smooth
         p.BottomSurface = Enum.SurfaceType.Smooth
         p.Parent = parent
         return p
     end
 
-    -- laje azulejada (textura nas faces pedidas)
-    local function slab(S, parent, size, cf, faces, color, collide)
-        local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false)
+    -- laje azulejada (sombra ativa por padrão)
+    local function slab(S, parent, size, cf, faces, color, collide, noShadow)
+        local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false, not noShadow)
         p.Reflectance = 0.05
         for _, f in ipairs(faces or FACES_FB) do
             local t = Instance.new("Texture")
@@ -1104,16 +1102,15 @@ do
         return p
     end
 
-    -- faixa úmida (degradê da parede perto da água)
     local function wet(S, parent, len, thick, cf)
         local band = mkPart(parent, Vector3.new(len + 0.02, 4, thick + 0.12),
-            CFrame.new(cf.Position.X, POOL_Y + 2, cf.Position.Z) * cf.Rotation, C_WET, Enum.Material.SmoothPlastic, false)
+            CFrame.new(cf.Position.X, POOL_Y + 2, cf.Position.Z) * cf.Rotation, C_WET,
+            Enum.Material.SmoothPlastic, false, false)
         band.Transparency = 0.55
         band.Reflectance = 0.1
         band.CastShadow = false
     end
 
-    -- parede curva feita de lajes (arco de círculo no plano XZ)
     local function arc(S, parent, cx, cz, r, a0, a1, segs, h, thick, y0, skip, withWet)
         local da = (a1 - a0) / segs
         local len = 2 * r * math.tan(da / 2) + 0.5
@@ -1133,7 +1130,7 @@ do
     end
 
     ----------------------------------------------------------------
-    -- PAREDES DE BORDA (arco, colunata ou aberto)
+    -- PAREDES DE BORDA
     ----------------------------------------------------------------
     local function edgeWall(S, parent, ex, ez, alongX, kind)
         if kind == "none" then return end
@@ -1161,7 +1158,6 @@ do
             return
         end
 
-        -- arco redondo
         local R, spring = 9, POOL_Y + 10
         block(-HALF, -R, POOL_Y, TOP)
         block(R, HALF, POOL_Y, TOP)
@@ -1186,7 +1182,7 @@ do
     end
 
     ----------------------------------------------------------------
-    -- TETO COM CLARABOIA
+    -- TETO COM CLARABOIA (poço de luz projeta sombra real)
     ----------------------------------------------------------------
     local function ceilingSlabs(S, parent, cx, cz, skyW)
         local y = POOL_Y + WALL_H + 1
@@ -1201,13 +1197,14 @@ do
         slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx - half - band / 2, y, cz), FACES_BOT)
         slab(S, parent, Vector3.new(band, 2, skyW), CFrame.new(cx + half + band / 2, y, cz), FACES_BOT)
 
-        -- vidro (não projeta sombra: deixa o sol entrar e desenhar manchas de luz no piso/água)
-        local g = mkPart(parent, Vector3.new(skyW, 0.3, skyW), CFrame.new(cx, y + 0.5, cz), Color3.fromRGB(205, 238, 236), Enum.Material.Glass, true)
-        g.Transparency = 0.85
+        -- vidro deixa o sol entrar (não projeta sombra)
+        local g = mkPart(parent, Vector3.new(skyW, 0.3, skyW), CFrame.new(cx, y + 0.5, cz),
+            Color3.fromRGB(205, 238, 236), Enum.Material.Glass, true, false)
+        g.Transparency = 0.9
         g.Reflectance = 0.05
         g.CastShadow = false
 
-        -- poço de luz (moldura que desce do teto)
+        -- moldura do poço de luz: PROJETA sombra → desenha "quadro de sol" no piso
         for _, s in ipairs({ -1, 1 }) do
             slab(S, parent, Vector3.new(skyW, 3, 0.8), CFrame.new(cx, y - 2.4, cz + s * half), FACES_FB)
             slab(S, parent, Vector3.new(0.8, 3, skyW), CFrame.new(cx + s * half, y - 2.4, cz), FACES_LR)
@@ -1215,46 +1212,50 @@ do
     end
 
     ----------------------------------------------------------------
-    -- LÂMPADAS
+    -- LÂMPADAS (todas com SpotLight.Shadows = true)
     ----------------------------------------------------------------
-    -- lâmpada embutida realista: aro metálico + difusor + spot (com sombra) + brilho suave
     local function lamp(S, parent, x, y, z, shadow)
-        local ring = mkPart(parent, Vector3.new(0.5, 4.4, 4.4), CFrame.new(x, y - 0.25, z) * CFrame.Angles(0, 0, math.rad(90)), C_METAL, Enum.Material.Metal, false)
+        local ring = mkPart(parent, Vector3.new(0.5, 4.4, 4.4),
+            CFrame.new(x, y - 0.25, z) * CFrame.Angles(0, 0, math.rad(90)), C_METAL,
+            Enum.Material.Metal, false, false)
         ring.Shape = Enum.PartType.Cylinder
-        local disk = mkPart(parent, Vector3.new(0.3, 3.5, 3.5), CFrame.new(x, y - 0.55, z) * CFrame.Angles(0, 0, math.rad(90)), C_LAMP, Enum.Material.Neon, false)
-        disk.Shape = Enum.PartType.Cylinder
-        disk.CastShadow = false
 
-        local em = mkPart(parent, Vector3.new(0.2, 0.2, 0.2), CFrame.new(x, y - 1.0, z), C_LAMP, Enum.Material.SmoothPlastic, false)
+        local disk = mkPart(parent, Vector3.new(0.3, 3.5, 3.5),
+            CFrame.new(x, y - 0.55, z) * CFrame.Angles(0, 0, math.rad(90)), C_LAMP,
+            Enum.Material.Neon, false, false)
+        disk.Shape = Enum.PartType.Cylinder
+
+        local em = mkPart(parent, Vector3.new(0.2, 0.2, 0.2), CFrame.new(x, y - 1.0, z),
+            C_LAMP, Enum.Material.SmoothPlastic, false, false)
         em.Transparency = 1
-        em.CastShadow = false
 
         local sl = Instance.new("SpotLight")
         sl.Face = Enum.NormalId.Bottom
-        sl.Angle = 105
-        sl.Range = 48
-        sl.Brightness = 2.6
+        sl.Angle = 100
+        sl.Range = 46
+        sl.Brightness = 2.0
         sl.Color = Color3.fromRGB(255, 240, 214)
         sl.Shadows = shadow and true or false
         sl.Parent = em
 
         local pl = Instance.new("PointLight")
-        pl.Range = 20
-        pl.Brightness = 0.7
+        pl.Range = 16
+        pl.Brightness = 0.4
         pl.Color = Color3.fromRGB(255, 236, 205)
         pl.Shadows = false
         pl.Parent = em
     end
 
-    -- luz submersa (brilho turquesa saindo do fundo da piscina)
     local function poolLight(S, parent, x, z)
-        local d = mkPart(parent, Vector3.new(0.3, 3, 3), CFrame.new(x, POOL_Y + 0.2, z) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(170, 255, 240), Enum.Material.Neon, false)
+        local d = mkPart(parent, Vector3.new(0.3, 3, 3),
+            CFrame.new(x, POOL_Y + 0.2, z) * CFrame.Angles(0, 0, math.rad(90)),
+            Color3.fromRGB(170, 255, 240), Enum.Material.Neon, false, false)
         d.Shape = Enum.PartType.Cylinder
         d.CastShadow = false
         local pl = Instance.new("PointLight")
         pl.Color = Color3.fromRGB(110, 255, 235)
-        pl.Brightness = 2.4
-        pl.Range = 28
+        pl.Brightness = 1.6
+        pl.Range = 24
         pl.Shadows = false
         pl.Parent = d
     end
@@ -1268,9 +1269,10 @@ do
                 workspace.Terrain:FillBlock(CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Vector3.new(CH, DEPTH, CH), Enum.Material.Water)
             end)
         else
-            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Color3.fromRGB(70, 200, 190), Enum.Material.Glass, false)
+            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH / 2, cz),
+                Color3.fromRGB(70, 200, 190), Enum.Material.Glass, false, false)
             w.Name = "PoolWater"
-            w.Transparency = 0.5
+            w.Transparency = 0.55
             w.Reflectance = 0.15
             w.CastShadow = false
         end
@@ -1310,21 +1312,18 @@ do
         local top = POOL_Y + WALL_H
 
         local ok, err = pcall(function()
-            -- piso + água
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR).Reflectance = 0.12
             waterFill(S, folder, wx, wz)
 
-            local first = true
+            -- TODAS as lâmpadas com sombra real
             local function L(x, z, y)
-                lamp(S, folder, x, y or top, z, first)
-                first = false
+                lamp(S, folder, x, y or top, z, true)
             end
 
             local style = (cx == 0 and cz == 0) and 2 or rng:NextInteger(1, 5)
             local sky = 0
 
             if style == 1 then
-                -- salão de colunas redondas
                 sky = 14
                 for _, dx in ipairs({ -12, 12 }) do
                     for _, dz in ipairs({ -12, 12 }) do
@@ -1334,10 +1333,11 @@ do
                 L(wx, wz - 12) L(wx, wz + 12) L(wx - 12, wz) L(wx + 12, wz)
 
             elseif style == 2 then
-                -- coluna central com escada em espiral e plataforma seca
                 sky = 22
                 column(S, folder, wx, wz, 4, WALL_H)
-                local plat = mkPart(folder, Vector3.new(0.8, 22, 22), CFrame.new(wx, POOL_Y + 4.4, wz) * CFrame.Angles(0, 0, math.rad(90)), C_TILE, nil, true)
+                local plat = mkPart(folder, Vector3.new(0.8, 22, 22),
+                    CFrame.new(wx, POOL_Y + 4.4, wz) * CFrame.Angles(0, 0, math.rad(90)),
+                    C_TILE, nil, true)
                 plat.Shape = Enum.PartType.Cylinder
                 plat.Reflectance = 0.08
                 for i = 0, 10 do
@@ -1349,7 +1349,6 @@ do
                 L(wx - 16, wz) L(wx + 16, wz) L(wx, wz - 16) L(wx, wz + 16)
 
             elseif style == 3 then
-                -- câmara circular com 4 aberturas
                 sky = 18
                 local function gap(a)
                     local m = a % (math.pi / 2)
@@ -1364,7 +1363,7 @@ do
                 L(wx, wz)
 
             elseif style == 4 then
-                -- túnel abobadado (teto curvo)
+                -- TÚNEL ABOBADADO — TODAS as lajes do teto e paredes projetam sombra real
                 local F = CFrame.new(wx, 0, wz) * (rng:NextNumber() < 0.5 and CFrame.new() or CFrame.Angles(0, math.rad(90), 0))
                 local R, spring = 14, POOL_Y + 8
                 local segs = 18
@@ -1372,11 +1371,11 @@ do
                 for i = 1, segs do
                     local phi = (i - 0.5) * math.pi / segs
                     local cf = F * CFrame.new(0, spring + R * math.sin(phi), R * math.cos(phi)) * CFrame.Angles(-(phi + math.pi / 2), 0, 0)
-                    slab(S, folder, Vector3.new(CH + 0.4, 1.2, chord), cf, FACES_TB)
+                    slab(S, folder, Vector3.new(CH + 0.4, 1.2, chord), cf, FACES_TB) -- sombra ativa
                 end
                 for _, s in ipairs({ -1, 1 }) do
                     local cfw = F * CFrame.new(0, POOL_Y + 4, s * R)
-                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_FB)
+                    slab(S, folder, Vector3.new(CH + 0.4, 8, 1.2), cfw, FACES_FB)   -- sombra ativa
                     wet(S, folder, CH + 0.4, 1.2, cfw)
                 end
                 for _, u in ipairs({ -14, 0, 14 }) do
@@ -1385,11 +1384,11 @@ do
                 end
 
             else
-                -- pilastras quadradas
                 sky = 18
                 for _, dx in ipairs({ -12, 12 }) do
                     for _, dz in ipairs({ -12, 12 }) do
-                        slab(S, folder, Vector3.new(6, WALL_H, 6), CFrame.new(wx + dx, POOL_Y + WALL_H / 2, wz + dz), FACES_SIDES, C_TILE)
+                        slab(S, folder, Vector3.new(6, WALL_H, 6),
+                            CFrame.new(wx + dx, POOL_Y + WALL_H / 2, wz + dz), FACES_SIDES, C_TILE)
                     end
                 end
                 L(wx, wz) L(wx - 12, wz) L(wx + 12, wz) L(wx, wz - 12) L(wx, wz + 12)
@@ -1399,7 +1398,6 @@ do
             poolLight(S, folder, wx + 6, wz + 6)
             poolLight(S, folder, wx - 15, wz - 6)
 
-            -- bordas norte e oeste (as outras pertencem aos vizinhos)
             local function pick(r)
                 if r < 0.55 then return "arch" elseif r < 0.8 then return "wide" end
                 return "none"
@@ -1440,7 +1438,7 @@ do
     end
 
     ----------------------------------------------------------------
-    -- AMBIENTE (luz, sombra, névoa, água)
+    -- AMBIENTE (brilho reduzido + sombras realistas)
     ----------------------------------------------------------------
     local LIGHT_PROPS = {
         "Ambient", "OutdoorAmbient", "Brightness", "ColorShift_Top", "ColorShift_Bottom",
@@ -1464,19 +1462,19 @@ do
     local function envApply()
         local function set(k, v) pcall(function() Lighting[k] = v end) end
         set("ClockTime", 14.8)
-        set("Brightness", 3)
-        set("Ambient", Color3.fromRGB(70, 105, 108))
-        set("OutdoorAmbient", Color3.fromRGB(95, 130, 130))
+        set("Brightness", 1.8)                 -- era 3
+        set("Ambient", Color3.fromRGB(50, 75, 80))
+        set("OutdoorAmbient", Color3.fromRGB(70, 100, 105))
         set("ColorShift_Top", Color3.fromRGB(255, 232, 190))
-        set("ColorShift_Bottom", Color3.fromRGB(80, 200, 190))
-        set("ExposureCompensation", 0.2)
+        set("ColorShift_Bottom", Color3.fromRGB(55, 150, 150))
+        set("ExposureCompensation", -0.15)     -- era +0.2
         set("GlobalShadows", true)
-        set("ShadowSoftness", 0.18)
-        set("EnvironmentDiffuseScale", 1)
-        set("EnvironmentSpecularScale", 1)
-        set("FogColor", Color3.fromRGB(190, 226, 222))
-        set("FogStart", 30)
-        set("FogEnd", 110)
+        set("ShadowSoftness", 0.1)             -- era 0.18 (sombras mais firmes/realistas)
+        set("EnvironmentDiffuseScale", 0.6)    -- era 1
+        set("EnvironmentSpecularScale", 0.7)   -- era 1
+        set("FogColor", Color3.fromRGB(180, 218, 214))
+        set("FogStart", 25)
+        set("FogEnd", 100)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
 
         pcall(function()
@@ -1488,7 +1486,6 @@ do
             T.WaterWaveSpeed = 6
         end)
 
-        -- remove atmosferas do jogo (só uma funciona por vez)
         pcall(function()
             for _, c in ipairs(Lighting:GetChildren()) do
                 if c:IsA("Atmosphere") then
@@ -1503,30 +1500,33 @@ do
             cc.Name = "Pool_CC"
             cc.TintColor = Color3.fromRGB(232, 255, 250)
             cc.Saturation = 0.12
-            cc.Contrast = 0.1
+            cc.Contrast = 0.14                 -- era 0.1
+            cc.Brightness = -0.03              -- era 0
             cc.Parent = Lighting
 
+            -- Bloom bem mais suave
             local bl = Instance.new("BloomEffect")
             bl.Name = "Pool_Bloom"
-            bl.Intensity = 0.45
-            bl.Size = 26
-            bl.Threshold = 0.9
+            bl.Intensity = 0.15                -- era 0.45
+            bl.Size = 16                       -- era 26
+            bl.Threshold = 1.5                 -- era 0.9
             bl.Parent = Lighting
 
+            -- SunRays quase desligado
             local sr = Instance.new("SunRaysEffect")
             sr.Name = "Pool_Rays"
-            sr.Intensity = 0.16
-            sr.Spread = 0.85
+            sr.Intensity = 0.03                -- era 0.16
+            sr.Spread = 0.9
             sr.Parent = Lighting
 
             local at = Instance.new("Atmosphere")
             at.Name = "Pool_Atmosphere"
-            at.Density = 0.32
+            at.Density = 0.28
             at.Offset = 0.05
             at.Color = Color3.fromRGB(205, 236, 233)
             at.Decay = Color3.fromRGB(92, 168, 168)
-            at.Glare = 0.15
-            at.Haze = 1.4
+            at.Glare = 0.02                    -- era 0.15
+            at.Haze = 1.2
             at.Parent = Lighting
         end)
     end
@@ -1599,7 +1599,6 @@ do
         streamStep(S, 0, 0)
         if POOL.token ~= myToken then return end
 
-        -- teleporte
         local spawnCF = CFrame.new(16, POOL_Y + 8, 16)
         local chr = LocalPlayer.Character
         local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
@@ -1616,7 +1615,6 @@ do
             end
         end
 
-        -- streaming infinito: constrói à frente, apaga atrás
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
@@ -1675,9 +1673,9 @@ local ScriptOptions = {
 		ToolFling = false,
 	};
 	Reanimate_Settings = {
-		Frequency = 6, -- this is basically how fast the oscillation goes
-		Amplification = 6, -- this is how far the oscillation goes
-		FrontOffset = 2.5, -- this is how much youre in front of the player during prediction
+		Frequency = 6,
+		Amplification = 6,
+		FrontOffset = 2.5,
 	}
 }
 
@@ -1694,7 +1692,6 @@ local ScriptCache = {
 	ActiveConnections = {};
 }
 
--- limpeza (usada no reset do personagem e no ;LOCUST_OFF)
 local function Cleanup()
 	for _, v in ipairs(ScriptCache.TrashBin) do pcall(function() v:Destroy() end) end
 	for _, v in ipairs(ScriptCache.ActiveConnections) do pcall(function() v:Disconnect() end) end
@@ -1740,7 +1737,6 @@ local Services = {
 
 for i, v in pairs(Directories) do FEManager.EnsureFolder(v) end
 
--- baixa os arquivos se faltarem (antes de carregar o .rbxm, então não precisa rodar 2x)
 local function haveFiles()
 	if typeof(isfile) ~= "function" then return false end
 	return isfile(Directories.RBXMs .. "Locust.rbxm") and isfile(Directories.Songs .. "LocustTheme.mp3")
@@ -1756,12 +1752,10 @@ if not haveFiles() then
 	notify("Locust", "Arquivos baixados.")
 end
 
--- effects setup
 local script = Services.InsertService:LoadLocalAsset(getcustomasset(Directories.RBXMs.."Locust.rbxm"))
 local Animations = script:WaitForChild("Animations")
 local Objects = script:WaitForChild("Objects")
 
--- reanim start
 local Start, Stop
 local Empyrean
 do
@@ -2414,7 +2408,6 @@ do
 			tableclear(Aligns)
 			tableclear(Blacklist)
 			tableclear(Accessories)
-			-- pretty much FORCE welds to delete cause games with ragdoll messed ts up and only 3 hats worked (fixed)
 			for i, v in next, GetChildren(Rig) do
 				if IsA(v, "Accoutrement") then
 					Destroy(v)
@@ -2763,7 +2756,6 @@ local Rad = math.rad
 
 Empyrean = Start({
 	Accessories = {
-		-- Swords / Spears Rig
 		{ Name = "RigTorso", MeshId = "92048094600083",  TextureId = "89519907183882", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(60)) },
 		{ Name = "RigUpperRL", MeshId = "76624859423759",  TextureId = "81203167910667", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), Rad(-180), Rad(135)) },
 		{ Name = "RigUpperLL", MeshId = "76624859423759",  TextureId = "124580012086562", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), 0, Rad(135)) },
@@ -2773,7 +2765,6 @@ Empyrean = Start({
 		{ Name = "RigUpperRA", MeshId = "17605983196",  TextureId = "17606581728", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(0)) },
 		{ Name = "RigLowerLA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
 		{ Name = "RigLowerRA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-		-- Block Rig
 		{ Name = "RigTorso", MeshId = "17345242336",  TextureId = "17345250641", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(0)) },
 		{ Name = "RigUpperLL", MeshId = "70807086513216",  TextureId = "87564259970629", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
 		{ Name = "RigLowerLL", MeshId = "98818051326497",  TextureId = "87142331045456", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
@@ -2813,7 +2804,6 @@ Empyrean = Start({
 })
 if not Empyrean then error("reanimação já estava ativa") end
 
--- a partir daqui já dá pra desligar pela rede (;LOCUST_OFF)
 LOCUST.running = true
 LOCUST.stopFn = function()
 	pcall(function() Empyrean.BindableEvent:Fire() end)
@@ -2822,7 +2812,6 @@ LOCUST.stopFn = function()
 	LOCUST.stopFn = nil
 end
 
--- character setup
 local Camera = workspace.CurrentCamera
 local Player = Services.Players.LocalPlayer
 local Character = Empyrean.Rig
@@ -2842,7 +2831,6 @@ Theme.Volume = 1
 Theme.Looped = true
 Theme:Play()
 
--- animator module
 local Contains = function(Table, Check)
 	for Index, Value in next, Table do 
 		if rawequal(Check, Index) or rawequal(Check, Value) then 
@@ -2878,7 +2866,7 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 	Class.Speed = 1
 	Class.KeepLast = 0
 	local Keyframes = KeyframeSequence:GetKeyframes()
-	table.sort(Keyframes, function(a, b) return a.Time < b.Time end) -- Thanks 10k_i, roblox not sorting by default.
+	table.sort(Keyframes, function(a, b) return a.Time < b.Time end)
 	Class.Length = Keyframes[#(Keyframes)].Time
 	local Yield = function(Seconds)
 		local Elapsed = 0
@@ -2887,7 +2875,7 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 			Elapsed += Services.RunService.Heartbeat:Wait()
 		until Elapsed >= Target
 	end
-	if Sequence:FindFirstChild("xSIXxNull", true) or Sequence:FindFirstChild("xSIXxCustomDir", true) or Sequence:FindFirstChild("xSIXxCustomStyle", true) then -- Moon Suite Fix
+	if Sequence:FindFirstChild("xSIXxNull", true) or Sequence:FindFirstChild("xSIXxCustomDir", true) or Sequence:FindFirstChild("xSIXxCustomStyle", true) then
 		local Children = Sequence:GetChildren()
 		for i = 1, #(Children) do
 			if Children[i]:FindFirstChild("Torso") then
@@ -2998,7 +2986,6 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 	return Class
 end
 
--- animator functions
 local PlayAnim = function(Rig, Animation, AnimSpeed)
 	if not AnimatorCache.Rigs[Rig] then
 		AnimatorCache.Rigs[Rig] = {}
@@ -3042,7 +3029,6 @@ local RestoreMovement = function()
 	end
 end
 
--- functions
 local PlayUISFX = function(Audio)
 	local Sound = Instance.new("Sound", workspace)
 	Sound.SoundId = "rbxassetid://" .. Audio
@@ -3106,7 +3092,7 @@ local NewHitbox = function(Position, Size, HitSound)
 	Hitbox.CanCollide = false
 	Hitbox.CanQuery = false
 	Hitbox.CanTouch = true
-	Hitbox.CFrame = Position or RootPart.CFrame -- RootPart.CFrame * CFrame.new(0, 0, -(4 / 2 + 2))
+	Hitbox.CFrame = Position or RootPart.CFrame
 	Hitbox.Parent = workspace
 	local OverlapParams = OverlapParams.new()
 	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -3129,7 +3115,7 @@ local NewHitbox = function(Position, Size, HitSound)
 	local HitboxFade = game:GetService("TweenService"):Create(Hitbox, TweenInfo.new(0.5), {Transparency = 1})
 	HitboxFade:Play()
 	game:GetService("Debris"):AddItem(Hitbox, 0.5)
-	return Hitbox -- added incase you wanna make it animated or even position it somewhere else
+	return Hitbox
 end
 
 local SetWalkSpeed = function(Speed)
@@ -3140,7 +3126,6 @@ local SetRootAnchored = function(Anchored)
 	RootPart.Anchored = Anchored
 end
 
--- attacks
 local ToggleCrouch = function()
 	States.Movement.Crouching = not States.Movement.Crouching
 	States.Movement.Idle = false
@@ -3207,7 +3192,6 @@ local Kill = function(Target)
 	RestoreMovement()
 end
 
--- input
 local KeyDown = Services.UserInputService.InputBegan:Connect(function(Key, GPE)
 	if GPE then return end
 	if Key.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -3248,7 +3232,6 @@ local InfiniteJump = Services.UserInputService.JumpRequest:Connect(function()
 end)
 table.insert(ScriptCache.ActiveConnections, InfiniteJump)
 
--- mobile ui
 local GUI = script:WaitForChild("UIs").MobileUI
 GUI.Parent = game:GetService("CoreGui")
 table.insert(ScriptCache.TrashBin, GUI)
@@ -3263,7 +3246,6 @@ end
 
 UpdateUI()
 
-
 table.insert(ScriptCache.ActiveConnections, Services.UserInputService.LastInputTypeChanged:Connect(UpdateUI))
 
 GUI.AbilitiesUI["ToggleKill"].MouseButton1Down:connect(function() ToggleKillMode() end)
@@ -3272,7 +3254,6 @@ GUI.AbilitiesUI["Sit"].MouseButton1Down:connect(function() ToggleSit() end)
 GUI.AbilitiesUI["Crouch"].MouseButton1Down:connect(function() ToggleCrouch() end)
 GUI.AbilitiesUI["Sprint"].MouseButton1Down:connect(function() States.Input.Shift = not States.Input.Shift end)
 
--- settings ui
 local MainGUI = script.UIs:WaitForChild("MainGUI")
 MainGUI.Parent = game:GetService("CoreGui")
 table.insert(ScriptCache.TrashBin, MainGUI)
@@ -3305,7 +3286,7 @@ local SetupToggle = function(Setting)
 	end)
 end
 
-local SetupTextBox = function(Setting) -- currently only used in the rigsize (no other textboxes will exist i think)
+local SetupTextBox = function(Setting)
 	local Object = SettingsHolder:FindFirstChild(Setting)
 	if not Object then return end
 	local TextBox = Object:FindFirstChildWhichIsA("TextBox")
@@ -3355,7 +3336,6 @@ SettingsHolder.TPToNearestSpawn.Button.MouseButton1Click:Connect(function()
 	end
 end)
 
--- runservice connection
 local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 	if States.Input.Debounce then
 		StopAnim(Locust,Animations.Idle)
@@ -3446,7 +3426,7 @@ Empyrean.BindableEvent.Event:Once(function()
 	LOCUST.stopFn = nil
 end)
 
-    end) -- fim do pcall
+    end)
 
     LOCUST.busy = false
     if ok then
@@ -3471,7 +3451,7 @@ end
 
 -- ================== FLASH & AURA (REDE) ==================
 local FXNET = {
-    flash = {},   -- estado por nome de jogador
+    flash = {},
     aura  = {},
     actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
 }
@@ -3503,9 +3483,6 @@ do
         st.objs = {}
     end
 
-    ------------------------------------------------------------
-    -- RAIO PROCEDURAL
-    ------------------------------------------------------------
     local function bolt(p0, p1, thick, straight)
         local dist = (p1 - p0).Magnitude
         if dist < 0.5 then return end
@@ -3533,8 +3510,8 @@ do
 
         for i = 1, segs do
             for _, L in ipairs({
-                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 }, -- brilho
-                { Color3.new(1, 1, 1),          0.14 * thick, 0   }, -- nucleo
+                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 },
+                { Color3.new(1, 1, 1),          0.14 * thick, 0   },
             }) do
                 local b = Instance.new("Beam")
                 b.Attachment0, b.Attachment1 = atts[i], atts[i + 1]
@@ -3549,9 +3526,6 @@ do
         Debris:AddItem(part, rr(0.07, 0.13))
     end
 
-    ------------------------------------------------------------
-    -- FLASH
-    ------------------------------------------------------------
     local function flashApply(plr, st)
         local char = plr.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -3564,7 +3538,6 @@ do
 
         if plr == LocalPlayer and hum then hum.WalkSpeed = 200 end
 
-        -- faiscas
         local att = keep(Instance.new("Attachment"))
         att.Parent = root
         local em = Instance.new("ParticleEmitter")
@@ -3580,7 +3553,6 @@ do
         em.LightEmission = 1
         em.Parent = att
 
-        -- rastro
         local top = keep(Instance.new("Attachment"))
         top.Position = Vector3.new(0, 2, 0)
         top.Parent = root
@@ -3598,7 +3570,6 @@ do
         trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.3, 0.01
         trail.Parent = root
 
-        -- luz + aura
         local light = keep(Instance.new("PointLight"))
         light.Color, light.Brightness, light.Range = Color3.fromRGB(255, 220, 60), 3, 14
         light.Parent = root
@@ -3609,7 +3580,6 @@ do
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
         hl.Parent = char
 
-        -- loop dos raios
         task.spawn(function()
             while FXNET.flash[plr.Name] == st and st.char == char and root.Parent do
                 local vel = root.AssemblyLinearVelocity
@@ -3623,7 +3593,6 @@ do
                     local velH = Vector3.new(vel.X, 0, vel.Z)
 
                     if velH.Magnitude > 20 then
-                        -- correndo: raios retos para tras
                         local dir = (-velH.Unit + rnd.Unit * 0.06).Unit
                         bolt(origem, origem + dir * rr(18, 36), rr(0.9, 1.3), true)
                     else
@@ -3665,9 +3634,6 @@ do
         end
     end
 
-    ------------------------------------------------------------
-    -- AURA
-    ------------------------------------------------------------
     local function column(groundPos, height, thick)
         local part = Instance.new("Part")
         part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
@@ -3725,7 +3691,6 @@ do
 
         local groundDist = hum.RigType == Enum.HumanoidRigType.R6 and 3 or (hum.HipHeight + root.Size.Y / 2)
 
-        -- brilho no corpo + luz
         local hl = keep(Instance.new("Highlight"))
         hl.FillColor, hl.OutlineColor = GOLD, BRIGHT
         hl.FillTransparency, hl.OutlineTransparency = 0.8, 0.1
@@ -3736,7 +3701,6 @@ do
         light.Color, light.Brightness, light.Range = GOLD, 4, 24
         light.Parent = root
 
-        -- chamas em cada parte do corpo
         local parts = {}
         for _, p in ipairs(char:GetChildren()) do
             if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then table.insert(parts, p) end
@@ -3767,7 +3731,6 @@ do
             fl.Parent = att
         end
 
-        -- nevoa + faiscas no centro
         local attRoot = keep(Instance.new("Attachment"))
         attRoot.Parent = root
 
@@ -3802,7 +3765,6 @@ do
         sp.LightEmission = 1
         sp.Parent = attRoot
 
-        -- aneis no chao (soldados ao personagem)
         local function ring(d, t, off)
             local a = keep(Instance.new("Part"))
             a.Shape = Enum.PartType.Cylinder
@@ -3817,14 +3779,12 @@ do
         end
         local r1, r2 = ring(6, 0.5, 0), ring(9, 0.7, 0.05)
 
-        -- bloom so para quem esta com a aura (efeito de tela local)
         if plr == LocalPlayer then
             local bloom = keep(Instance.new("BloomEffect"))
             bloom.Intensity, bloom.Size, bloom.Threshold = 0.8, 28, 0.85
             bloom.Parent = Lighting
         end
 
-        -- loop principal
         task.spawn(function()
             local tc, tw = 0, 0
             while FXNET.aura[plr.Name] == st and st.char == char and root.Parent do
@@ -3878,10 +3838,6 @@ do
         clearObjs(st)
     end
 
-    ------------------------------------------------------------
-    -- REDE
-    ------------------------------------------------------------
-    -- Executa a acao localmente (todo cliente com o hub desenha o efeito no alvo)
     function FXNET.run(action, name)
         if not name or name == "" then return end
         local isOn = action:sub(-3) == "_ON"
@@ -3908,7 +3864,6 @@ do
         end
     end
 
-    -- Executa aqui + envia pela rede (chat) para os outros usuarios do hub
     function FXNET.send(action, name)
         if not name or name == "" then return end
         FXNET.run(action, name)
@@ -3916,7 +3871,6 @@ do
         notify("Hub", action .. " → " .. name)
     end
 
-    -- limpeza quando alguem sai do servidor
     Players.PlayerRemoving:Connect(function(p)
         FXNET.flashOff(p.Name)
         FXNET.auraOff(p.Name)
@@ -4023,7 +3977,6 @@ function executeActionLocally(action, senderName, extraArg)
         task.spawn(function() pcall(LOCUST.start) end)
     elseif action == "LOCUST_OFF" then
         task.spawn(function() pcall(LOCUST.stop) end)
-    -- >>> FLASH & AURA (REDE) <<<
     elseif FXNET.actions[action] then
         FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
@@ -4192,7 +4145,6 @@ function executeActionLocally(action, senderName, extraArg)
 end
 
 -- ================== REDE (PREFIXO ;) ==================
--- Formato: ;ACAO ALVO [EXTRA]   ex.: ;KILL Fulano   ;FLASH_ON ALL   (também aceita "fhub ACAO ALVO")
 function processNetMessage(msg, senderName)
     if not msg then return end
     local body
@@ -4221,8 +4173,6 @@ function processNetMessage(msg, senderName)
         if pt and IS_ADMIN then applyOverheadTag(pt) end
     end
 
-    -- >>> FLASH & AURA (REDE): todo cliente do hub desenha o efeito no personagem do alvo <<<
-    -- Segurança: comandos só valem se vierem de você ou de alguém da WHITELIST
     if action ~= "PING" and action ~= "PONG" then
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
@@ -4586,7 +4536,6 @@ else
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4595,7 +4544,6 @@ else
         sendNetCmd(";BACKROOMS_CLEAR ALL")
     end})
 
-    -- The Lifeform
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4604,7 +4552,6 @@ else
         sendNetCmd(";LIFEFORM_CLEAR ALL")
     end})
 
-    -- Poolrooms infinitas
     TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4613,7 +4560,6 @@ else
         sendNetCmd(";POOLROOMS_CLEAR ALL")
     end})
 
-    -- Aba Say / Command
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -4645,7 +4591,6 @@ else
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
     TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
-    -- Locust (reanimate) com rede: aperta uma vez liga, aperta de novo desliga
     TabE:Button({ Title = "Locust (ligar/desligar)", Callback = function()
         local isOn = LOCUST.running or LOCUST.busy
         triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", LocalPlayer.Name)
@@ -4666,8 +4611,7 @@ else
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    -- >>> FLASH & AURA (REDE): aperta uma vez liga, aperta de novo desliga <<<
-    local function toggleFX(kind) -- kind = "FLASH" ou "AURA"
+    local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
         local isOn = stateTable[LocalPlayer.Name] ~= nil
         FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
@@ -4751,8 +4695,6 @@ task.spawn(function()
     TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
         Callback = function(v) methodKill = v end })
 
-    -- ===== COUCH (CORRIGIDO) =====
-    -- Procura o sofá no Backpack E no Character, por nome parecido
     local function findCouch()
         local chr = LocalPlayer.Character
         for _, c in ipairs({ LocalPlayer:FindFirstChild("Backpack"), chr }) do
@@ -4780,7 +4722,6 @@ task.spawn(function()
         local RE = ReplicatedStorage:FindFirstChild("RE")
         if not RE then notify("Couch", "Remote RE não encontrado.") return end
 
-        -- limpa ferramentas e pede o sofá (com tentativas)
         pcall(function() RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
         task.wait(0.4)
 
