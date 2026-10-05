@@ -1,8 +1,9 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31
-    (v31d: Poolrooms com brilho baixo + sombras reais
-            + TAG LOCUST em rede corrigida)
+    (v31e: comandos simplificados ;BACKROOMS ;POOLROOMS ;LOCUST ;FLASH ;AURA
+            + Locust em rede com efeito visual (sem tag)
+            + Poolrooms com brilho baixo e sombras reais)
     ==========================================================
 ]]--
 
@@ -1603,123 +1604,169 @@ do
 end
 
 -- ================== LOCUST (REANIMATE) + REDE ==================
-local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil, users = {}, tagObjs = {} }
+-- Sistema com efeito visual (sem tag). Quando alguém ativa:
+--   ;LOCUST_STATE ON <nome>
+-- Todos os clientes do hub aplicam um efeito vermelho no personagem + notificação.
+local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil, users = {}, fx = {} }
 
--- >>> Sistema de TAG do Locust (rede) <<<
-function applyLocustTag(player, active)
-    if not player then return end
-    local name = player.Name
+function applyLocustFX(plr)
+    if not plr or LOCUST.fx[plr.Name] then return end
+    local char = plr.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-    -- remove tag antiga (Head e Character inteiro, evita ficar presa)
-    local function wipeOldTags()
-        local containers = { player.Character, player.Character and player.Character:FindFirstChild("Head") }
-        for _, c in ipairs(containers) do
-            if c then
-                for _, ch in ipairs(c:GetChildren()) do
-                    if ch.Name == "LocustActiveTag" then
-                        pcall(function() ch:Destroy() end)
-                    end
-                end
-            end
-        end
-        LOCUST.tagObjs[name] = nil
-    end
-    wipeOldTags()
+    local st = { objs = {}, conn = nil }
+    LOCUST.fx[plr.Name] = st
+    local function keep(o) table.insert(st.objs, o) return o end
 
-    if not active then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "LocustHighlight"
+    hl.FillColor = Color3.fromRGB(120, 0, 0)
+    hl.OutlineColor = Color3.fromRGB(255, 30, 30)
+    hl.FillTransparency = 0.7
+    hl.OutlineTransparency = 0.15
+    hl.DepthMode = Enum.HighlightDepthMode.Occluded
+    hl.Parent = char
+    keep(hl)
 
-    local char = player.Character
-    local head = char and char:FindFirstChild("Head")
-    if not head then return end
+    local light = Instance.new("PointLight")
+    light.Color = Color3.fromRGB(255, 40, 40)
+    light.Brightness = 3
+    light.Range = 14
+    light.Shadows = false
+    light.Parent = root
+    keep(light)
 
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "LocustActiveTag"
-    bb.Size = UDim2.new(0, 240, 0, 44)
-    bb.StudsOffset = Vector3.new(0, 3.6, 0)
-    bb.AlwaysOnTop = true
-    bb.LightInfluence = 0
-    bb.MaxDistance = 500
-    bb.Parent = head
-    LOCUST.tagObjs[name] = bb
+    local att = Instance.new("Attachment")
+    att.Parent = root
+    keep(att)
 
-    local fr = Instance.new("Frame", bb)
-    fr.Size = UDim2.new(1, 0, 1, 0)
-    fr.BackgroundColor3 = Color3.fromRGB(30, 5, 5)
-    fr.BackgroundTransparency = 0.15
-    fr.BorderSizePixel = 0
-    Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+    local em = Instance.new("ParticleEmitter")
+    em.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    em.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0)),
+    })
+    em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 5) })
+    em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+    em.Lifetime = NumberRange.new(0.6, 1.1)
+    em.Rate = 40
+    em.Speed = NumberRange.new(2, 5)
+    em.SpreadAngle = Vector2.new(35, 35)
+    em.EmissionDirection = Enum.NormalId.Top
+    em.LightEmission = 1
+    em.Parent = att
 
-    local stroke = Instance.new("UIStroke", fr)
-    stroke.Color = Color3.fromRGB(255, 40, 40)
-    stroke.Thickness = 2
-    stroke.Transparency = 0
+    local sp = Instance.new("ParticleEmitter")
+    sp.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.new(1, 0.3, 0.3)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0)),
+    })
+    sp.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+    sp.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+    sp.Lifetime = NumberRange.new(0.8, 1.6)
+    sp.Rate = 70
+    sp.Speed = NumberRange.new(6, 14)
+    sp.SpreadAngle = Vector2.new(45, 45)
+    sp.EmissionDirection = Enum.NormalId.Top
+    sp.Acceleration = Vector3.new(0, 6, 0)
+    sp.LightEmission = 1
+    sp.Parent = att
+    keep(sp)
 
-    local icon = Instance.new("ImageLabel", fr)
-    icon.Size = UDim2.new(0, 32, 0, 32)
-    icon.Position = UDim2.new(0, 8, 0.5, -16)
-    icon.BackgroundTransparency = 1
-    icon.Image = ICON_ID
-    icon.ScaleType = Enum.ScaleType.Fit
+    local top = Instance.new("Attachment")
+    top.Position = Vector3.new(0, 2, 0)
+    top.Parent = root
+    keep(top)
 
-    local lbl = Instance.new("TextLabel", fr)
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.Position = UDim2.new(0, 45, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "LOCUST ATIVO"
-    lbl.TextColor3 = Color3.fromRGB(255, 90, 90)
-    lbl.TextSize = 15
-    lbl.Font = Enum.Font.GothamBlack
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextStrokeTransparency = 0.3
-    lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+    local bot = Instance.new("Attachment")
+    bot.Position = Vector3.new(0, -2, 0)
+    bot.Parent = root
+    keep(bot)
 
-    -- pulso controlado (para sozinho quando bb for destruída)
-    local pulseConn
-    pulseConn = RunService.Heartbeat:Connect(function()
-        if not bb or not bb.Parent or LOCUST.tagObjs[name] ~= bb then
-            if pulseConn then pulseConn:Disconnect() end
+    local trail = Instance.new("Trail")
+    trail.Attachment0, trail.Attachment1 = top, bot
+    trail.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.new(1, 0.2, 0.2)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0)),
+    })
+    trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+    trail.LightEmission = 1
+    trail.Lifetime = 0.35
+    trail.MinLength = 0.01
+    trail.Parent = root
+    keep(trail)
+
+    st.conn = RunService.Heartbeat:Connect(function()
+        if not light.Parent or not hl.Parent then
+            if st.conn then st.conn:Disconnect() end
             return
         end
-        local pulse = (math.sin(os.clock() * 6) + 1) / 2
-        stroke.Transparency = 1 - pulse * 0.7
-        lbl.TextTransparency = 1 - (0.4 + pulse * 0.6)
+        local pulse = (math.sin(os.clock() * 5) + 1) / 2
+        light.Brightness = 2 + pulse * 4
+        hl.FillTransparency = 0.6 + pulse * 0.25
     end)
-    bb.Destroying:Connect(function()
-        if pulseConn then pulseConn:Disconnect() end
+
+    st.respawnConn = plr.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        if LOCUST.users[plr.Name] then
+            LOCUST.fx[plr.Name] = nil
+            if st.conn then st.conn:Disconnect() end
+            applyLocustFX(plr)
+        end
     end)
 end
 
--- Handler da rede: recebe estado ON/OFF de outros usuários
+function clearLocustFX(plrName)
+    local st = LOCUST.fx[plrName]
+    if not st then return end
+    LOCUST.fx[plrName] = nil
+    if st.conn then pcall(function() st.conn:Disconnect() end) end
+    if st.respawnConn then pcall(function() st.respawnConn:Disconnect() end) end
+    for _, o in ipairs(st.objs) do pcall(function() o:Destroy() end) end
+end
+
 function handleLocustNetState(state, name)
     if not name or name == "" then return end
+    local plr = Players:FindFirstChild(name)
+
     if state == "ON" then
         LOCUST.users[name] = true
-        local plr = Players:FindFirstChild(name)
-        if plr then applyLocustTag(plr, true) end
+        if plr then
+            applyLocustFX(plr)
+            pcall(function()
+                StarterGui:SetCore("SendNotification", {
+                    Title = "🩸 Locust",
+                    Text = name .. " ativou o Locust!",
+                    Duration = 4
+                })
+            end)
+        end
     else
         LOCUST.users[name] = nil
-        local plr = Players:FindFirstChild(name)
-        if plr then applyLocustTag(plr, false) end
+        clearLocustFX(name)
     end
 end
 
--- Reaplica tag se a pessoa respawnar
-local function bindLocustRespawn(plr)
+local function bindLocustPlayer(plr)
     if not plr then return end
     plr.CharacterAdded:Connect(function()
         task.wait(1.5)
         if LOCUST.users[plr.Name] then
-            applyLocustTag(plr, true)
-        else
-            applyLocustTag(plr, false)
+            LOCUST.fx[plr.Name] = nil
+            applyLocustFX(plr)
         end
     end)
+    if plr.Character and LOCUST.users[plr.Name] then
+        applyLocustFX(plr)
+    end
 end
-for _, p in ipairs(Players:GetPlayers()) do bindLocustRespawn(p) end
-Players.PlayerAdded:Connect(bindLocustRespawn)
+for _, p in ipairs(Players:GetPlayers()) do bindLocustPlayer(p) end
+Players.PlayerAdded:Connect(bindLocustPlayer)
 Players.PlayerRemoving:Connect(function(p)
     LOCUST.users[p.Name] = nil
-    LOCUST.tagObjs[p.Name] = nil
+    clearLocustFX(p.Name)
 end)
 
 function LOCUST.start()
@@ -1729,7 +1776,6 @@ function LOCUST.start()
 
     local ok, err = pcall(function()
 
--- FEManager (baixa/gerencia arquivos) - cacheado entre execuções
 LOCUST.fem = LOCUST.fem or loadstring(game:HttpGet("https://gist.githubusercontent.com/MelonsStuff/a003ea305dd302eab1f8d372daed38b4/raw/9db59962b28555fd699a7c29891efb85d45677ab/gistfile1.txt"))()
 local FEManager = LOCUST.fem
 if not FEManager then error("FEManager não carregou") end
@@ -3465,7 +3511,6 @@ end)
     LOCUST.busy = false
     if ok then
         LOCUST.users[LocalPlayer.Name] = true
-        applyLocustTag(LocalPlayer, true)
         sendNetCmd(";LOCUST_STATE ON " .. LocalPlayer.Name)
         notify("Locust", "Ativado! X = modo kill | Q agachar | C sentar | E waypoint | Shift correr")
     else
@@ -3474,7 +3519,6 @@ end)
         LOCUST.running = false
         LOCUST.stopFn = nil
         LOCUST.users[LocalPlayer.Name] = nil
-        applyLocustTag(LocalPlayer, false)
         notify("Locust", "Erro: " .. tostring(err))
     end
 end
@@ -3487,7 +3531,6 @@ function LOCUST.stop()
     end
     LOCUST.running = false
     LOCUST.users[LocalPlayer.Name] = nil
-    applyLocustTag(LocalPlayer, false)
     sendNetCmd(";LOCUST_STATE OFF " .. LocalPlayer.Name)
 end
 
@@ -3990,13 +4033,63 @@ function executeActionLocally(action, senderName, extraArg)
     elseif action == "CHAT_AS" and extraArg then sendNetCmd(extraArg)
     elseif action == "COOLKID_EFFECT" then
         task.spawn(function() pcall(executeCoolkidEffect) end)
+
+    -- ===== NOVOS COMANDOS SIMPLIFICADOS =====
+    elseif action == "BACKROOMS" then
+        task.spawn(function() pcall(POOL.clear, true) pcall(function() spawnBackrooms(extraArg) end) end)
+    elseif action == "POOLROOMS" then
+        task.spawn(function() pcall(function() POOL.spawn(extraArg) end) end)
+    elseif action == "POOLROOMS_CLEAR" then
+        task.spawn(function() pcall(POOL.clear) end)
+    elseif action == "BACKROOMS_CLEAR" then
+        task.spawn(function() pcall(clearBackrooms) end)
+    elseif action == "LOCUST" then
+        task.spawn(function()
+            if LOCUST.running or LOCUST.busy then
+                pcall(LOCUST.stop)
+            else
+                pcall(LOCUST.start)
+            end
+        end)
+    elseif action == "LOCUST_OFF" then
+        task.spawn(function() pcall(LOCUST.stop) end)
+    elseif action == "FLASH" then
+        task.spawn(function()
+            if FXNET.flash[LocalPlayer.Name] then
+                FXNET.flashOff(LocalPlayer.Name)
+                sendNetCmd(";FLASH_STATE OFF " .. LocalPlayer.Name)
+            else
+                FXNET.flashOn(LocalPlayer)
+                sendNetCmd(";FLASH_STATE ON " .. LocalPlayer.Name)
+            end
+        end)
+    elseif action == "AURA" then
+        task.spawn(function()
+            if FXNET.aura[LocalPlayer.Name] then
+                FXNET.auraOff(LocalPlayer.Name)
+                sendNetCmd(";AURA_STATE OFF " .. LocalPlayer.Name)
+            else
+                FXNET.auraOn(LocalPlayer)
+                sendNetCmd(";AURA_STATE ON " .. LocalPlayer.Name)
+            end
+        end)
+    elseif action == "FLASH_OFF" then
+        task.spawn(function()
+            FXNET.flashOff(LocalPlayer.Name)
+            sendNetCmd(";FLASH_STATE OFF " .. LocalPlayer.Name)
+        end)
+    elseif action == "AURA_OFF" then
+        task.spawn(function()
+            FXNET.auraOff(LocalPlayer.Name)
+            sendNetCmd(";AURA_STATE OFF " .. LocalPlayer.Name)
+        end)
+
+    -- fallback antigo (compatibilidade)
     elseif action == "BACKROOMS_SPAWN" then
         task.spawn(function() pcall(POOL.clear, true) pcall(function() spawnBackrooms(extraArg) end) end)
     elseif action == "POOLROOMS_SPAWN" then
         task.spawn(function() pcall(function() POOL.spawn(extraArg) end) end)
-    elseif action == "POOLROOMS_CLEAR" then
-        task.spawn(function() pcall(POOL.clear) end)
-    elseif action == "BACKROOMS_CLEAR" then task.spawn(function() pcall(clearBackrooms) end)
+
     elseif action == "LIFEFORM_SPAWN" then
         task.spawn(function()
             local folder = workspace:FindFirstChild("Backrooms_Level0")
@@ -4221,9 +4314,95 @@ function processNetMessage(msg, senderName)
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
 
-    -- >>> Estado do Locust pela rede (ON/OFF) <<<
+    -- Estado do Locust pela rede
     if action == "LOCUST_STATE" then
         task.spawn(function() pcall(handleLocustNetState, target, extraArg) end)
+        return
+    end
+
+    -- Estados de Flash/Aura pela rede
+    if action == "FLASH_STATE" then
+        task.spawn(function()
+            if target == "ON" then
+                local plr = Players:FindFirstChild(extraArg)
+                if plr then FXNET.flashOn(plr) end
+            else
+                FXNET.flashOff(extraArg)
+            end
+        end)
+        return
+    end
+    if action == "AURA_STATE" then
+        task.spawn(function()
+            if target == "ON" then
+                local plr = Players:FindFirstChild(extraArg)
+                if plr then FXNET.auraOn(plr) end
+            else
+                FXNET.auraOff(extraArg)
+            end
+        end)
+        return
+    end
+
+    -- ===== NOVOS COMANDOS SIMPLIFICADOS =====
+    if action == "BACKROOMS" then
+        if target and (target == "ALL" or target == LocalPlayer.Name or target == selectedPlayerName) then
+            task.spawn(function() pcall(executeActionLocally, "BACKROOMS", senderName, extraArg or target) end)
+        end
+        return
+    end
+    if action == "POOLROOMS" then
+        if target and (target == "ALL" or target == LocalPlayer.Name or target == selectedPlayerName) then
+            task.spawn(function() pcall(executeActionLocally, "POOLROOMS", senderName, extraArg or target) end)
+        end
+        return
+    end
+    if action == "LOCUST" then
+        if target == "ALL" or target == LocalPlayer.Name then
+            task.spawn(function() pcall(executeActionLocally, "LOCUST", senderName) end)
+        else
+            if LOCUST.users[target] then
+                LOCUST.users[target] = nil
+                sendNetCmd(";LOCUST_STATE OFF " .. target)
+            elseif Players:FindFirstChild(target) then
+                LOCUST.users[target] = true
+                sendNetCmd(";LOCUST_STATE ON " .. target)
+            end
+        end
+        return
+    end
+    if action == "FLASH" then
+        if target == "ALL" or target == LocalPlayer.Name then
+            task.spawn(function() pcall(executeActionLocally, "FLASH", senderName) end)
+        else
+            local plr = Players:FindFirstChild(target)
+            if plr then
+                if FXNET.flash[target] then
+                    FXNET.flashOff(target)
+                    sendNetCmd(";FLASH_STATE OFF " .. target)
+                else
+                    FXNET.flashOn(plr)
+                    sendNetCmd(";FLASH_STATE ON " .. target)
+                end
+            end
+        end
+        return
+    end
+    if action == "AURA" then
+        if target == "ALL" or target == LocalPlayer.Name then
+            task.spawn(function() pcall(executeActionLocally, "AURA", senderName) end)
+        else
+            local plr = Players:FindFirstChild(target)
+            if plr then
+                if FXNET.aura[target] then
+                    FXNET.auraOff(target)
+                    sendNetCmd(";AURA_STATE OFF " .. target)
+                else
+                    FXNET.auraOn(plr)
+                    sendNetCmd(";AURA_STATE ON " .. target)
+                end
+            end
+        end
         return
     end
 
@@ -4271,7 +4450,6 @@ task.spawn(function()
     end)
     task.wait(1)
     sendNetCmd(";PING ALL")
-    -- envia o estado atual do Locust se já estiver ligado
     if LOCUST.running then
         sendNetCmd(";LOCUST_STATE ON " .. LocalPlayer.Name)
     end
@@ -4591,7 +4769,7 @@ else
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
-        triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
+        triggerCommand("BACKROOMS", selectedPlayerName, selectedPlayerName)
     end})
     TabADM:Button({ Title = "Backrooms (Limpar)", Callback = function()
         task.spawn(function() pcall(clearBackrooms) end)
@@ -4607,7 +4785,7 @@ else
     end})
 
     TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
-        triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
+        triggerCommand("POOLROOMS", selectedPlayerName, selectedPlayerName)
     end})
     TabADM:Button({ Title = "Poolrooms (Limpar)", Callback = function()
         task.spawn(function() pcall(POOL.clear) end)
@@ -4644,15 +4822,16 @@ else
 
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
-    TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
+    TabE:Button({ Title = "Ativar/Desativar Aura (Anim)", Callback = function() toggleAura() end })
     TabE:Button({ Title = "Locust (ligar/desligar)", Callback = function()
-        local isOn = LOCUST.running or LOCUST.busy
-        triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", LocalPlayer.Name)
+        triggerCommand("LOCUST", LocalPlayer.Name)
     end })
-    TabE:Button({ Title = "Locust ON (Alvo)",    Callback = function() triggerCommand("LOCUST_ON", selectedPlayerName) end })
-    TabE:Button({ Title = "Locust OFF (Alvo)",   Callback = function() triggerCommand("LOCUST_OFF", selectedPlayerName) end })
-    TabE:Button({ Title = "Locust ON (Todos)",   Callback = function() triggerCommand("LOCUST_ON", "ALL") end })
-    TabE:Button({ Title = "Locust OFF (Todos)",  Callback = function() triggerCommand("LOCUST_OFF", "ALL") end })
+    TabE:Button({ Title = "Locust ON/OFF (Alvo)", Callback = function()
+        triggerCommand("LOCUST", selectedPlayerName)
+    end })
+    TabE:Button({ Title = "Locust ON/OFF (Todos)", Callback = function()
+        triggerCommand("LOCUST", "ALL")
+    end })
     TabE:Button({ Title = "Modo Satoru Gojo", Callback = function() giveGojo() end })
     TabE:Button({ Title = "Expansão de Domínio [Sukuna]", Callback = function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
     TabE:Button({ Title = "Pegar AK-47", Callback = function() giveAK47() end })
@@ -4665,13 +4844,19 @@ else
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    local function toggleFX(kind)
-        local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
-        local isOn = stateTable[LocalPlayer.Name] ~= nil
-        FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
-    end
-    TabE:Button({ Title = "Flash (ligar/desligar)",        Callback = function() toggleFX("FLASH") end })
-    TabE:Button({ Title = "Aura Dourada (ligar/desligar)", Callback = function() toggleFX("AURA") end })
+    -- Flash / Aura com novos comandos simplificados
+    TabE:Button({ Title = "Flash (ligar/desligar)", Callback = function()
+        triggerCommand("FLASH", LocalPlayer.Name)
+    end })
+    TabE:Button({ Title = "Flash ON/OFF (Alvo)", Callback = function()
+        triggerCommand("FLASH", selectedPlayerName)
+    end })
+    TabE:Button({ Title = "Aura Dourada (ligar/desligar)", Callback = function()
+        triggerCommand("AURA", LocalPlayer.Name)
+    end })
+    TabE:Button({ Title = "Aura Dourada ON/OFF (Alvo)", Callback = function()
+        triggerCommand("AURA", selectedPlayerName)
+    end })
 end
 
 end -- fim IS_ADMIN
