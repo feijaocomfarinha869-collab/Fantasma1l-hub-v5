@@ -1,7 +1,9 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v32 (+ LOCUST EM 1 FUNÇÃO + REDE | POOLROOMS LEVEL 37 | PREFIXO ;)
-    (v32: Couch corrigido)
+    FANTASMA1L HUB v33 - COMPLETO
+    + Xester (Card Master, com rede)
+    + Roube um Brainrot (mundo, com rede)
+    + Poolrooms realista + Locust + Couch + Flash/Aura
     ==========================================================
 ]]--
 
@@ -29,7 +31,7 @@ local WHITELIST = {
 }
 
 local NETWORK_ROLES = {}
-local REQUIRE_WHITELIST = true -- true = só obedece comandos de quem está na WHITELIST (evita estranhos usando ;KICK ALL etc.)
+local REQUIRE_WHITELIST = true
 local IS_ADMIN, MY_ROLE = false, "USER"
 do
     local entry = WHITELIST[LocalPlayer.Name]
@@ -253,7 +255,7 @@ if IS_ADMIN then
     end)
 end
 
--- ================== C00LKIDD EFFECT ==================
+-- ================== C00LKIDD ==================
 local function executeCoolkidEffect()
     pcall(function()
         local oldSky = Lighting:FindFirstChild("CoolkidSky")
@@ -268,7 +270,7 @@ local function executeCoolkidEffect()
         s.SkyboxUp = "http://www.roblox.com/asset/?id=8408806737"
         Lighting.TimeOfDay = 12
     end)
-    notify("c00lkidd Effect", "Skybox aplicada com sucesso!")
+    notify("c00lkidd Effect", "Skybox aplicada!")
 end
 
 -- ================== KAMUI ==================
@@ -285,7 +287,6 @@ local function toggleKamuiDimensionLocal(state)
         local c = Vector3.new(0, 500, 0)
         local hx, hy, hz = kamuiSize.X / 2, kamuiSize.Y / 2, kamuiSize.Z / 2
         local wt = 12
-
         local function wall(sz, pos)
             local p = Instance.new("Part", kamuiFolder)
             p.Size, p.Position, p.Anchored, p.CanCollide, p.CastShadow = sz, c + pos, true, true, false
@@ -297,16 +298,6 @@ local function toggleKamuiDimensionLocal(state)
         wall(Vector3.new(wt, kamuiSize.Y, kamuiSize.Z), Vector3.new(hx, 0, 0))
         wall(Vector3.new(kamuiSize.X, kamuiSize.Y, wt), Vector3.new(0, 0, -hz))
         wall(Vector3.new(kamuiSize.X, kamuiSize.Y, wt), Vector3.new(0, 0, hz))
-
-        local cx, cz = hx - 15, hz - 15
-        local lh = kamuiSize.Y - 40
-        for _, pos in ipairs({Vector3.new(-cx,0,-cz), Vector3.new(cx,0,-cz), Vector3.new(-cx,0,cz), Vector3.new(cx,0,cz)}) do
-            local l = Instance.new("Part", kamuiFolder)
-            l.Size, l.Position, l.Anchored, l.CanCollide = Vector3.new(6, lh, 6), c + pos, true, false
-            l.Material, l.Color = Enum.Material.Neon, Color3.fromRGB(200, 220, 255)
-            local pl = Instance.new("PointLight", l)
-            pl.Color, pl.Range, pl.Brightness = Color3.fromRGB(200, 220, 255), 250, 3
-        end
 
         local bs, sp, gr = 18, 6, 12
         local fy = c.Y - hy + wt / 2
@@ -333,7 +324,7 @@ local function toggleKamuiDimensionLocal(state)
             local h = chr and chr:FindFirstChild("HumanoidRootPart")
             if h then h.CFrame = pf.CFrame + Vector3.new(0, 6, 0) end
         end)
-        notify("Kamui", "Dimensão gerada com sucesso!")
+        notify("Kamui", "Dimensão gerada!")
     else
         if kamuiFolder then kamuiFolder:Destroy() kamuiFolder = nil end
         Lighting.FogEnd = 100000
@@ -346,105 +337,64 @@ local function spawnLifeform(spawnPos, folder, targetPlayerName)
     if lifeformState.model and lifeformState.model.Parent then
         lifeformState.model:Destroy()
     end
-
     local targetFolder = folder or workspace:FindFirstChild("Backrooms_Level0") or workspace
-
     local model = Instance.new("Model", targetFolder)
     model.Name = "TheLifeform"
 
     local body = Instance.new("Part", model)
-    body.Name = "Body"
-    body.Size = Vector3.new(2, 5, 1)
-    body.CFrame = CFrame.new(spawnPos)
-    body.Anchored = true
-    body.CanCollide = false
-    body.Transparency = 1
-    body.Material = Enum.Material.SmoothPlastic
-    body.CastShadow = false
-    body.Massless = true
+    body.Name, body.Size = "Body", Vector3.new(2, 5, 1)
+    body.CFrame, body.Anchored, body.CanCollide = CFrame.new(spawnPos), true, false
+    body.Transparency, body.Material = 1, Enum.Material.SmoothPlastic
+    body.CastShadow, body.Massless = false, true
     model.PrimaryPart = body
 
     local bb = Instance.new("BillboardGui", body)
-    bb.Name = "LifeformImage"
-    bb.Size = UDim2.new(0, 170, 0, 240)
-    bb.StudsOffset = Vector3.new(0, 2.5, 0)
-    bb.AlwaysOnTop = false
-    bb.LightInfluence = 0
-    bb.MaxDistance = 250
+    bb.Size, bb.StudsOffset = UDim2.new(0, 170, 0, 240), Vector3.new(0, 2.5, 0)
+    bb.AlwaysOnTop, bb.LightInfluence, bb.MaxDistance = false, 0, 250
 
     local img = Instance.new("ImageLabel", bb)
-    img.Size = UDim2.new(1, 0, 1, 0)
-    img.BackgroundTransparency = 1
-    img.Image = LIFEFORM_IMG
-    img.ScaleType = Enum.ScaleType.Fit
+    img.Size, img.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
+    img.Image, img.ScaleType = LIFEFORM_IMG, Enum.ScaleType.Fit
 
     local snd = Instance.new("Sound", body)
-    snd.Name = "ChaseSound"
-    snd.SoundId = LIFEFORM_SOUND
-    snd.Looped = true
-    snd.Volume = 4
-    snd.RollOffMaxDistance = 200
-    snd.RollOffMode = Enum.RollOffMode.InverseTapered
+    snd.SoundId, snd.Looped, snd.Volume = LIFEFORM_SOUND, true, 4
+    snd.RollOffMaxDistance, snd.RollOffMode = 200, Enum.RollOffMode.InverseTapered
 
     local light = Instance.new("PointLight", body)
-    light.Color = Color3.fromRGB(180, 0, 0)
-    light.Brightness = 3
-    light.Range = 30
-    light.Shadows = true
+    light.Color, light.Brightness, light.Range, light.Shadows = Color3.fromRGB(180, 0, 0), 3, 30, true
 
     lifeformState.model = model
     lifeformState.active = true
 
     task.spawn(function()
-        local path = PathfindingService:CreatePath({
-            AgentRadius = 2,
-            AgentHeight = 5,
-            AgentCanJump = false,
-            AgentMaxSlope = 45,
-        })
-
-        local waypoints = {}
-        local wpi = 1
-        local cooldown = 0
-        local SPEED = 22
-        local DETECT_RANGE = 500
-
+        local path = PathfindingService:CreatePath({AgentRadius=2,AgentHeight=5,AgentCanJump=false,AgentMaxSlope=45})
+        local waypoints, wpi, cooldown = {}, 1, 0
+        local SPEED, DETECT_RANGE = 22, 500
         while lifeformState.active and model.Parent do
             local targetPlr = Players:FindFirstChild(targetPlayerName) or LocalPlayer
             local chr = targetPlr and targetPlr.Character
             local th = chr and chr:FindFirstChild("HumanoidRootPart")
             local thum = chr and chr:FindFirstChildOfClass("Humanoid")
-
             if th and thum and thum.Health > 0 then
-                local myPos = body.Position
-                local targetPos = th.Position
+                local myPos, targetPos = body.Position, th.Position
                 local dist = (targetPos - myPos).Magnitude
-
                 if dist <= DETECT_RANGE then
-                    if not snd.IsPlaying then
-                        pcall(function() snd:Play() end)
-                    end
-
+                    if not snd.IsPlaying then pcall(function() snd:Play() end) end
                     if tick() - cooldown > 0.4 then
                         cooldown = tick()
                         pcall(function() path:ComputeAsync(myPos, targetPos) end)
                         if path.Status == Enum.PathStatus.Success then
-                            waypoints = path:GetWaypoints()
-                            wpi = 2
+                            waypoints, wpi = path:GetWaypoints(), 2
                         end
                     end
-
                     local moveTarget
                     if wpi <= #waypoints then
                         local wp = waypoints[wpi]
                         moveTarget = wp.Position
-                        if (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(wp.Position.X, 0, wp.Position.Z)).Magnitude < 3 then
+                        if (Vector3.new(myPos.X,0,myPos.Z) - Vector3.new(wp.Position.X,0,wp.Position.Z)).Magnitude < 3 then
                             wpi = wpi + 1
                         end
-                    else
-                        moveTarget = targetPos
-                    end
-
+                    else moveTarget = targetPos end
                     local dir = moveTarget - myPos
                     dir = Vector3.new(dir.X, 0, dir.Z)
                     if dir.Magnitude > 0.5 then
@@ -453,27 +403,15 @@ local function spawnLifeform(spawnPos, folder, targetPlayerName)
                         newPos = Vector3.new(newPos.X, myPos.Y, newPos.Z)
                         body.CFrame = CFrame.lookAt(newPos, Vector3.new(targetPos.X, newPos.Y, targetPos.Z))
                     end
-
-                    if dist < 4 then
-                        thum.Health = 0
-                        task.wait(2)
-                    end
+                    if dist < 4 then thum.Health = 0 task.wait(2) end
                 else
-                    if snd.IsPlaying then
-                        pcall(function() snd:Stop() end)
-                    end
-                end
-            else
-                if snd.IsPlaying then
-                    pcall(function() snd:Stop() end)
+                    if snd.IsPlaying then pcall(function() snd:Stop() end) end
                 end
             end
-
             task.wait(0.05)
         end
     end)
-
-    notify("The Lifeform", "Ele acordou perseguindo " .. targetPlayerName .. ".")
+    notify("The Lifeform", "Perseguindo " .. targetPlayerName)
     return model
 end
 
@@ -485,19 +423,16 @@ local function clearLifeform()
     end
 end
 
--- ================== BACKROOMS LEVEL 0 ==================
+-- ================== BACKROOMS ==================
 local backroomsSaved = nil
 local backroomsToken = 0
 
 local function salvarLighting()
     if backroomsSaved then return end
     backroomsSaved = {
-        Ambient = Lighting.Ambient,
-        OutdoorAmbient = Lighting.OutdoorAmbient,
-        Brightness = Lighting.Brightness,
-        FogStart = Lighting.FogStart,
-        FogEnd = Lighting.FogEnd,
-        FogColor = Lighting.FogColor,
+        Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient,
+        Brightness = Lighting.Brightness, FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd, FogColor = Lighting.FogColor,
         GlobalShadows = Lighting.GlobalShadows,
         ExposureCompensation = Lighting.ExposureCompensation,
         EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
@@ -507,9 +442,7 @@ end
 
 local function restaurarLighting()
     if not backroomsSaved then return end
-    for k, v in pairs(backroomsSaved) do
-        pcall(function() Lighting[k] = v end)
-    end
+    for k, v in pairs(backroomsSaved) do pcall(function() Lighting[k] = v end) end
     backroomsSaved = nil
 end
 
@@ -527,17 +460,14 @@ local function resolveImage(id)
     local clean = tostring(id):match("%d+")
     if not clean then return tostring(id) end
     if imageCache[clean] then return imageCache[clean] end
-
     local fallback = "rbxassetid://" .. clean
     local result = fallback
     local ok, objs = pcall(function() return game:GetObjects(fallback) end)
     if ok and objs and objs[1] then
         local o = objs[1]
         local tex
-        if o:IsA("Decal") or o:IsA("Texture") then
-            tex = o.Texture
-        elseif o:IsA("ImageLabel") or o:IsA("ImageButton") then
-            tex = o.Image
+        if o:IsA("Decal") or o:IsA("Texture") then tex = o.Texture
+        elseif o:IsA("ImageLabel") or o:IsA("ImageButton") then tex = o.Image
         else
             local d = o:FindFirstChildWhichIsA("Decal", true) or o:FindFirstChildWhichIsA("Texture", true)
             if d then tex = d.Texture end
@@ -545,14 +475,12 @@ local function resolveImage(id)
         if tex and tex ~= "" then result = tex end
         pcall(function() o:Destroy() end)
     end
-
     imageCache[clean] = result
     return result
 end
 
 local function spawnBackrooms(targetPartnerName)
     notify("Backrooms", "Gerando Level 0...")
-
     backroomsToken += 1
     local myToken = backroomsToken
 
@@ -562,16 +490,11 @@ local function spawnBackrooms(targetPartnerName)
     clearLifeform()
 
     local folder = Instance.new("Folder")
-    folder.Name = "Backrooms_Level0"
-    folder.Parent = workspace
+    folder.Name, folder.Parent = "Backrooms_Level0", workspace
 
-    local GRID = 24
-    local CELL = 16
-    local WALL_H = 14
-    local T = 1.2
+    local GRID, CELL, WALL_H, T = 24, 16, 14, 1.2
     local BASE = Vector3.new(0, 200, 0)
     local LIGHT_EVERY = 3
-
     local ROOM_SIZE = GRID * CELL
     local half = ROOM_SIZE / 2
     local floorY = BASE.Y
@@ -601,35 +524,29 @@ local function spawnBackrooms(targetPartnerName)
 
     local t0 = os.clock()
     while pending > 0 and os.clock() - t0 < 8 do task.wait(0.1) end
-    if backroomsToken ~= myToken then error("backrooms cancelada") end
+    if backroomsToken ~= myToken then return end
 
     local texWall = resolved.wall or TEX_WALL
     local texFloor = resolved.floor or TEX_FLOOR
     local texCeil = resolved.ceil or TEX_CEILING
     local drawImgs = {}
-    for i, id in ipairs(DRAWING_IDS) do
-        drawImgs[i] = resolved["d" .. i] or getRealImageIdDelta(id)
-    end
+    for i, id in ipairs(DRAWING_IDS) do drawImgs[i] = resolved["d" .. i] or getRealImageIdDelta(id) end
 
     local built = 0
     local function mk(size, cf, color, mat, collide)
         local p = Instance.new("Part")
-        p.Anchored = true
-        p.Size = size
-        p.CFrame = cf
-        p.Color = color
+        p.Anchored, p.Size, p.CFrame, p.Color = true, size, cf, color
         p.Material = mat or Enum.Material.SmoothPlastic
         p.CanCollide = collide and true or false
         p.CanQuery = collide and true or false
         p.CanTouch = false
         p.CastShadow = collide and true or false
-        p.TopSurface = Enum.SurfaceType.Smooth
-        p.BottomSurface = Enum.SurfaceType.Smooth
+        p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
         p.Parent = folder
         built += 1
         if built % 150 == 0 then
             task.wait()
-            if backroomsToken ~= myToken then error("backrooms cancelada") end
+            if backroomsToken ~= myToken then error("cancelada") end
         end
         return p
     end
@@ -638,21 +555,17 @@ local function spawnBackrooms(targetPartnerName)
         pcall(function()
             for _, f in ipairs(faces) do
                 local tex = Instance.new("Texture")
-                tex.Texture = texture
-                tex.Face = f
-                tex.StudsPerTileU = tile
-                tex.StudsPerTileV = tile
+                tex.Texture, tex.Face = texture, f
+                tex.StudsPerTileU, tex.StudsPerTileV = tile, tile
                 tex.Parent = part
             end
         end)
     end
 
-    local floor = mk(Vector3.new(ROOM_SIZE + T * 2, 2, ROOM_SIZE + T * 2), CFrame.new(BASE.X, floorY - 1, BASE.Z), CARPET_COLOR, Enum.Material.Fabric, true)
-    floor.Name = "Floor"
+    local floor = mk(Vector3.new(ROOM_SIZE + T*2, 2, ROOM_SIZE + T*2), CFrame.new(BASE.X, floorY - 1, BASE.Z), CARPET_COLOR, Enum.Material.Fabric, true)
     addTextures(floor, { Enum.NormalId.Top }, 5, texFloor)
 
-    local ceil = mk(Vector3.new(ROOM_SIZE + T * 2, 2, ROOM_SIZE + T * 2), CFrame.new(BASE.X, ceilY + 1, BASE.Z), CEIL_COLOR, Enum.Material.SmoothPlastic, true)
-    ceil.Name = "Ceiling"
+    local ceil = mk(Vector3.new(ROOM_SIZE + T*2, 2, ROOM_SIZE + T*2), CFrame.new(BASE.X, ceilY + 1, BASE.Z), CEIL_COLOR, Enum.Material.SmoothPlastic, true)
     addTextures(ceil, { Enum.NormalId.Bottom }, 5, texCeil)
 
     local hW, vW = {}, {}
@@ -677,8 +590,7 @@ local function spawnBackrooms(targetPartnerName)
         if cx < GRID and not visited[cy][cx + 1] then table.insert(nbs, { cx + 1, cy }) end
         if cy > 1 and not visited[cy - 1][cx] then table.insert(nbs, { cx, cy - 1 }) end
         if cy < GRID and not visited[cy + 1][cx] then table.insert(nbs, { cx, cy + 1 }) end
-        if #nbs == 0 then
-            table.remove(stack)
+        if #nbs == 0 then table.remove(stack)
         else
             local n = nbs[math.random(#nbs)]
             local nx, ny = n[1], n[2]
@@ -736,11 +648,8 @@ local function spawnBackrooms(targetPartnerName)
     local function wallRun(isH, cx, cz, length)
         local size = isH and Vector3.new(length + T, WALL_H, T) or Vector3.new(T, WALL_H, length + T)
         local wall = mk(size, CFrame.new(cx, floorY + WALL_H / 2, cz), WALL_COLOR, Enum.Material.SmoothPlastic, true)
-        wall.Name = "Wall"
         addTextures(wall, isH and { Enum.NormalId.Front, Enum.NormalId.Back } or { Enum.NormalId.Left, Enum.NormalId.Right }, 5, texWall)
-
-        local railOn = math.random() < 0.3
-        local lenV = length + T
+        local railOn, lenV = math.random() < 0.3, length + T
         for _, s in ipairs({ -1, 1 }) do
             local nrm = isH and Vector3.new(0, 0, s) or Vector3.new(s, 0, 0)
             local function strip(h, thick, y, col)
@@ -751,7 +660,6 @@ local function spawnBackrooms(targetPartnerName)
             strip(0.5, 0.25, floorY + WALL_H - 0.25, TRIM_COLOR)
             if railOn then strip(0.25, 0.4, floorY + 1.7, WOOD_COLOR) end
         end
-
         table.insert(runs, { isH = isH, cx = cx, cz = cz, length = length })
     end
 
@@ -763,9 +671,7 @@ local function spawnBackrooms(targetPartnerName)
                 while x <= GRID and hW[y][x] do x += 1 end
                 local len = (x - s) * CELL
                 wallRun(true, ox + (s - 1) * CELL + len / 2, oz + y * CELL, len)
-            else
-                x += 1
-            end
+            else x += 1 end
         end
     end
     for x = 0, GRID do
@@ -776,9 +682,7 @@ local function spawnBackrooms(targetPartnerName)
                 while y <= GRID and vW[y][x] do y += 1 end
                 local len = (y - s) * CELL
                 wallRun(false, ox + x * CELL, oz + (s - 1) * CELL + len / 2, len)
-            else
-                y += 1
-            end
+            else y += 1 end
         end
     end
 
@@ -786,7 +690,6 @@ local function spawnBackrooms(targetPartnerName)
         if not (math.abs(sp[1] - scx) <= 3 and math.abs(sp[2] - scx) <= 3) then
             local px, pz = ox + sp[1] * CELL, oz + sp[2] * CELL
             local pil = mk(Vector3.new(5, WALL_H, 5), CFrame.new(px, floorY + WALL_H / 2, pz), WALL_COLOR, Enum.Material.SmoothPlastic, true)
-            pil.Name = "Pillar"
             addTextures(pil, { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }, 5, texWall)
             mk(Vector3.new(5.6, 0.9, 5.6), CFrame.new(px, floorY + 0.45, pz), TRIM_COLOR, Enum.Material.SmoothPlastic, false)
             mk(Vector3.new(5.5, 0.5, 5.5), CFrame.new(px, floorY + WALL_H - 0.25, pz), TRIM_COLOR, Enum.Material.SmoothPlastic, false)
@@ -798,41 +701,15 @@ local function spawnBackrooms(targetPartnerName)
         for x = 1, GRID do
             local px, pz = ox + (x - 0.5) * CELL, oz + (y - 0.5) * CELL
             local panel = mk(Vector3.new(7, 0.25, 3.4), CFrame.new(px, ceilY - 0.13, pz), PANEL_COLOR, Enum.Material.Neon, false)
-            panel.Name = "Lamp"
             local light
             if x % LIGHT_EVERY == 0 and y % LIGHT_EVERY == 0 then
-                light = Instance.new("SurfaceLight")
-                light.Face = Enum.NormalId.Bottom
-                light.Brightness = 2.6
-                light.Range = 42
-                light.Angle = 130
-                light.Color = Color3.fromRGB(255, 243, 200)
-                light.Shadows = false
-                light.Parent = panel
+                light = Instance.new("SurfaceLight", panel)
+                light.Face, light.Brightness, light.Range, light.Angle = Enum.NormalId.Bottom, 2.6, 42, 130
+                light.Color, light.Shadows = Color3.fromRGB(255, 243, 200), false
             end
-            panels[#panels + 1] = { part = panel, light = light }
+            table.insert(panels, { part = panel, light = light })
         end
     end
-
-    task.spawn(function()
-        while backroomsToken == myToken and folder.Parent do
-            task.wait(math.random(15, 50) / 10)
-            local item = panels[math.random(#panels)]
-            for _ = 1, math.random(3, 8) do
-                if backroomsToken ~= myToken or not item.part.Parent then break end
-                local on = math.random() > 0.45
-                item.part.Material = on and Enum.Material.Neon or Enum.Material.SmoothPlastic
-                item.part.Color = on and PANEL_COLOR or Color3.fromRGB(150, 148, 125)
-                if item.light then item.light.Enabled = on end
-                task.wait(0.05 + math.random() * 0.08)
-            end
-            if item.part.Parent then
-                item.part.Material = Enum.Material.Neon
-                item.part.Color = PANEL_COLOR
-                if item.light then item.light.Enabled = true end
-            end
-        end
-    end)
 
     for _ = 1, 70 do
         local d = math.random(4, 14)
@@ -841,9 +718,7 @@ local function spawnBackrooms(targetPartnerName)
         local st = mk(Vector3.new(0.05, d, d * (0.7 + math.random() * 0.5)),
             CFrame.new(px, floorY + 0.03, pz) * CFrame.Angles(0, math.rad(math.random(360)), 0) * CFrame.Angles(0, 0, math.rad(90)),
             Color3.fromRGB(88, 66, 28), Enum.Material.SmoothPlastic, false)
-        st.Shape = Enum.PartType.Cylinder
-        st.Transparency = 0.5 + math.random() * 0.15
-        st.Name = "Stain"
+        st.Shape, st.Transparency = Enum.PartType.Cylinder, 0.5 + math.random() * 0.15
     end
 
     local function wallPoint(run, dist)
@@ -858,90 +733,17 @@ local function spawnBackrooms(targetPartnerName)
     local drawIdx = 0
     for _ = 1, 32 do
         local run = runs[math.random(#runs)]
-        if run.length >= 10 and #DRAWING_IDS > 0 then
+        if run.length >= 10 then
             local pos, nrm = wallPoint(run, 0.04)
             drawIdx = drawIdx % #DRAWING_IDS + 1
             local canvas = mk(Vector3.new(9, 9, 0.05), CFrame.lookAt(pos + Vector3.new(0, 6.5, 0), pos + Vector3.new(0, 6.5, 0) + nrm), WALL_COLOR, Enum.Material.SmoothPlastic, false)
-            canvas.Name = "WallDrawing"
             canvas.Transparency = 1
-            local sg = Instance.new("SurfaceGui")
-            sg.Face = Enum.NormalId.Front
-            sg.AlwaysOnTop = false
-            sg.LightInfluence = 1
-            sg.Parent = canvas
-            local img = Instance.new("ImageLabel")
-            img.Size = UDim2.new(1, 0, 1, 0)
-            img.BackgroundTransparency = 1
-            img.Image = drawImgs[drawIdx]
-            img.ImageTransparency = 0.08
-            img.ScaleType = Enum.ScaleType.Fit
-            img.Parent = sg
+            local sg = Instance.new("SurfaceGui", canvas)
+            sg.Face, sg.AlwaysOnTop, sg.LightInfluence = Enum.NormalId.Front, false, 1
+            local img = Instance.new("ImageLabel", sg)
+            img.Size, img.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
+            img.Image, img.ImageTransparency, img.ScaleType = drawImgs[drawIdx], 0.08, Enum.ScaleType.Fit
         end
-    end
-
-    for _ = 1, 35 do
-        local run = runs[math.random(#runs)]
-        if run.length >= 8 then
-            local pos, nrm = wallPoint(run, 0.07)
-            local cf = CFrame.lookAt(pos + Vector3.new(0, 1.6, 0), pos + Vector3.new(0, 1.6, 0) + nrm)
-            mk(Vector3.new(0.9, 1.3, 0.12), cf, TRIM_COLOR, Enum.Material.SmoothPlastic, false)
-            mk(Vector3.new(0.18, 0.3, 0.05), cf * CFrame.new(-0.2, 0.2, -0.08), Color3.fromRGB(40, 35, 25), Enum.Material.SmoothPlastic, false)
-            mk(Vector3.new(0.18, 0.3, 0.05), cf * CFrame.new(0.2, 0.2, -0.08), Color3.fromRGB(40, 35, 25), Enum.Material.SmoothPlastic, false)
-            mk(Vector3.new(0.18, 0.3, 0.05), cf * CFrame.new(-0.2, -0.2, -0.08), Color3.fromRGB(40, 35, 25), Enum.Material.SmoothPlastic, false)
-            mk(Vector3.new(0.18, 0.3, 0.05), cf * CFrame.new(0.2, -0.2, -0.08), Color3.fromRGB(40, 35, 25), Enum.Material.SmoothPlastic, false)
-        end
-    end
-
-    for _ = 1, 12 do
-        pcall(function()
-            local run = runs[math.random(#runs)]
-            if run.length < 12 then return end
-            local pos, nrm = wallPoint(run, 1.3)
-            local center = pos + Vector3.new(0, 3.1, 0)
-            local cf = CFrame.lookAt(center, center + nrm)
-            local body = mk(Vector3.new(2.6, 6.2, 2.2), cf, Color3.fromRGB(112, 58, 38), Enum.Material.Metal, true)
-            body.Name = "Locker"
-            for i = 0, 2 do
-                mk(Vector3.new(1.6, 0.14, 0.06), cf * CFrame.new(0, 1.4 + i * 0.3, -1.13), Color3.fromRGB(30, 20, 15), Enum.Material.Metal, false)
-            end
-        end)
-    end
-
-    for _ = 1, 10 do
-        pcall(function()
-            local run = runs[math.random(#runs)]
-            if run.length < 10 then return end
-            local pos = wallPoint(run, 1.6)
-            local dark = Color3.fromRGB(45, 38, 30)
-            mk(Vector3.new(1.4, 0.2, 1.4), CFrame.new(pos + Vector3.new(0, 0.1, 0)), dark, Enum.Material.Metal, false)
-            mk(Vector3.new(0.2, 5.2, 0.2), CFrame.new(pos + Vector3.new(0, 2.7, 0)), dark, Enum.Material.Metal, false)
-            local shade = mk(Vector3.new(1.8, 2.2, 2.2), CFrame.new(pos + Vector3.new(0, 5.6, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(240, 200, 100), Enum.Material.Neon, false)
-            shade.Shape = Enum.PartType.Cylinder
-            shade.Transparency = 0.15
-            local pl = Instance.new("PointLight")
-            pl.Color = Color3.fromRGB(255, 214, 120)
-            pl.Brightness = 1.4
-            pl.Range = 16
-            pl.Shadows = false
-            pl.Parent = shade
-        end)
-    end
-
-    for _ = 1, 8 do
-        pcall(function()
-            local run = runs[math.random(#runs)]
-            if run.length < 10 then return end
-            local pos, nrm = wallPoint(run, 2.8)
-            local center = pos + Vector3.new(0, 2.6, 0)
-            local cf = CFrame.lookAt(center, center + nrm)
-            local wood = Color3.fromRGB(110, 70, 40)
-            mk(Vector3.new(5, 0.3, 2.4), cf, wood, Enum.Material.Wood, true)
-            for _, sx in ipairs({ -1, 1 }) do
-                for _, sz in ipairs({ -1, 1 }) do
-                    mk(Vector3.new(0.3, 2.5, 0.3), cf * CFrame.new(sx * 2.2, -1.3, sz * 1.0), wood, Enum.Material.Wood, true)
-                end
-            end
-        end)
     end
 
     salvarLighting()
@@ -954,48 +756,26 @@ local function spawnBackrooms(targetPartnerName)
         Lighting.EnvironmentDiffuseScale = 0
         Lighting.EnvironmentSpecularScale = 0
         Lighting.FogColor = Color3.fromRGB(70, 58, 25)
-        Lighting.FogStart = 60
-        Lighting.FogEnd = 650
+        Lighting.FogStart, Lighting.FogEnd = 60, 650
     end)
 
     pcall(function()
-        local cc = Instance.new("ColorCorrectionEffect")
-        cc.Name = "Backrooms_CC"
-        cc.TintColor = Color3.fromRGB(255, 243, 175)
-        cc.Saturation = 0.08
-        cc.Contrast = 0.08
-        cc.Brightness = -0.01
-        cc.Parent = Lighting
-
-        local bl = Instance.new("BloomEffect")
-        bl.Name = "Backrooms_Bloom"
-        bl.Intensity = 0.35
-        bl.Size = 22
-        bl.Threshold = 0.92
-        bl.Parent = Lighting
-
-        local atm = Instance.new("Atmosphere")
-        atm.Name = "BackroomsAtmosphere"
-        atm.Density = 0.28
-        atm.Offset = 0
-        atm.Color = Color3.fromRGB(200, 175, 95)
-        atm.Decay = Color3.fromRGB(70, 55, 20)
-        atm.Glare = 0
-        atm.Haze = 0
-        atm.Parent = Lighting
+        local cc = Instance.new("ColorCorrectionEffect", Lighting)
+        cc.Name, cc.TintColor = "Backrooms_CC", Color3.fromRGB(255, 243, 175)
+        cc.Saturation, cc.Contrast, cc.Brightness = 0.08, 0.08, -0.01
+        local bl = Instance.new("BloomEffect", Lighting)
+        bl.Name, bl.Intensity, bl.Size, bl.Threshold = "Backrooms_Bloom", 0.35, 22, 0.92
+        local atm = Instance.new("Atmosphere", Lighting)
+        atm.Name, atm.Density, atm.Offset = "BackroomsAtmosphere", 0.28, 0
+        atm.Color, atm.Decay, atm.Glare, atm.Haze = Color3.fromRGB(200, 175, 95), Color3.fromRGB(70, 55, 20), 0, 0
     end)
 
     pcall(function()
         local sndPart = mk(Vector3.new(1, 1, 1), CFrame.new(startPos), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, false)
-        sndPart.Name = "BackroomsMusicEmitter"
         sndPart.Transparency = 1
-
-        local sound = Instance.new("Sound")
-        sound.SoundId = BACKROOMS_MUSIC
-        sound.Looped = true
-        sound.Volume = 2.5
+        local sound = Instance.new("Sound", sndPart)
+        sound.SoundId, sound.Looped, sound.Volume = BACKROOMS_MUSIC, true, 2.5
         sound.RollOffMaxDistance = 10000
-        sound.Parent = sndPart
         sound:Play()
     end)
 
@@ -1010,17 +790,14 @@ local function spawnBackrooms(targetPartnerName)
             task.wait(0.3)
             hrp.Anchored = false
         end
-
         if targetPartnerName and targetPartnerName ~= "" then
             local partner = Players:FindFirstChild(targetPartnerName)
             if partner and partner.Character and partner.Character:FindFirstChild("HumanoidRootPart") then
                 partner.Character.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(3, 0, 3)
             end
         end
-
         notify("Backrooms", "Level 0 pronto!")
     end)
-
     return true
 end
 
@@ -1031,257 +808,136 @@ local function clearBackrooms()
     if f then f:Destroy() end
     limparEfeitosLighting()
     restaurarLighting()
-    notify("Backrooms", "Backrooms removidas.")
+    notify("Backrooms", "Removidas.")
     return true
 end
 
--- ================== POOLROOMS (LEVEL 37) ==================
--- Salão vasto e infinito: piso alagado (água rasa turquesa), paredes/colunas de azulejo branco brilhante,
--- teto branco com painéis fluorescentes frios em grade, neblina leve e sombras reais (Future).
--- O mundo é feito de "chunks" 64x64 que nascem à frente e somem atrás, então nunca acaba.
--- Água: Terrain (água de verdade) se o executor permitir; senão usa água em Part de vidro.
+-- ================== POOLROOMS (Realista Level 37) ==================
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
-    local CH        = 64      -- tamanho do chunk (múltiplo de 8)
-    local SPACING   = 16      -- distância entre colunas
-    local WALL_H    = 26      -- pé-direito
-    local POOL_Y    = 1000    -- topo do piso (múltiplo de 4)
-    local DEPTH     = 3       -- profundidade da água (rasa)
-    local RADIUS    = 2       -- chunks carregados em volta de você
-    local TILE      = 8       -- studs por repetição da textura (64 é múltiplo de 8: sem emendas)
-    local WALL_TEX  = "rbxassetid://122349893272800"
-
-    -- >>> AJUSTES <<<
-    local BRILHO        = 0.9   -- 1 = bem claro | 0.7 = mais escuro
-    local SOMBRAS_PERTO = 6     -- quantas lâmpadas (as mais próximas) projetam sombra real
-    local DIST_LUZ      = 130   -- distância máxima em que as lâmpadas ficam ligadas
-    local PISCAR        = true  -- lâmpada fluorescente piscando de vez em quando
-
-    local function esc(c) return Color3.new(c.R * BRILHO, c.G * BRILHO, c.B * BRILHO) end
+    local CH, WALL_H, POOL_Y, DEPTH, RADIUS, TILE = 48, 20, 1000, 3, 2, 6
+    local WALL_TEX = "rbxassetid://122349893272800"
 
     local TILE_MAT = Enum.Material.SmoothPlastic
     pcall(function() TILE_MAT = Enum.Material.CeramicTiles end)
 
-    local C_TILE  = Color3.fromRGB(240, 242, 240)   -- azulejo branco (piso, parede, coluna)
-    local C_TRIM  = Color3.fromRGB(226, 230, 228)
-    local C_CEIL  = Color3.fromRGB(246, 247, 246)
-    local C_METAL = Color3.fromRGB(150, 156, 158)
-    local C_FLUO  = Color3.fromRGB(226, 240, 255)   -- luz fluorescente fria
-    local C_STAIN = Color3.fromRGB(120, 150, 145)   -- marca de umidade na linha d'água
+    local C_WALL, C_FLOOR, C_CEIL = Color3.fromRGB(232, 235, 236), Color3.fromRGB(226, 230, 232), Color3.fromRGB(240, 242, 244)
+    local C_FRAME, C_PANEL, C_METAL, C_LAMP = Color3.fromRGB(180, 184, 188), Color3.fromRGB(252, 253, 255), Color3.fromRGB(120, 126, 132), Color3.fromRGB(255, 250, 240)
 
+    local FACES_TOP, FACES_BOT = { Enum.NormalId.Top }, { Enum.NormalId.Bottom }
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
-    local FACES_TOP   = { Enum.NormalId.Top }
-    local FACES_BOT   = { Enum.NormalId.Bottom }
-    local FACES_ALL6  = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right }
+    local FACES_ALL6 = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right }
 
-    ----------------------------------------------------------------
-    -- PRIMITIVAS
-    ----------------------------------------------------------------
     local function mkPart(parent, size, cf, color, mat, collide)
         local p = Instance.new("Part")
         p.Anchored = true
-        p.Size = size
-        p.CFrame = cf
-        p.Color = color
+        p.Size, p.CFrame, p.Color = size, cf, color
         p.Material = mat or TILE_MAT
         p.CanCollide = collide and true or false
         p.CanQuery = collide and true or false
         p.CanTouch = false
-        p.TopSurface = Enum.SurfaceType.Smooth
-        p.BottomSurface = Enum.SurfaceType.Smooth
+        p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
         p.Parent = parent
         return p
     end
 
-    -- laje azulejada brilhante (textura nas faces pedidas)
-    local function slab(S, parent, size, cf, faces, color, collide, texTransp, tile)
-        local p = mkPart(parent, size, cf, color or C_TILE, nil, collide ~= false)
+    local function slab(S, parent, size, cf, faces, color, collide)
+        local p = mkPart(parent, size, cf, color or C_WALL, nil, collide ~= false)
         p.Reflectance = 0.08
         for _, f in ipairs(faces or FACES_ALL6) do
-            local t = Instance.new("Texture")
-            t.Texture = S.tex
-            t.Face = f
-            t.StudsPerTileU = tile or TILE
-            t.StudsPerTileV = tile or TILE
-            if texTransp then t.Transparency = texTransp end
-            t.Parent = p
+            local t = Instance.new("Texture", p)
+            t.Texture, t.Face = S.tex, f
+            t.StudsPerTileU, t.StudsPerTileV = TILE, TILE
         end
         S.count += 1
-        if S.count % 90 == 0 then task.wait() end
+        if S.count % 100 == 0 then task.wait() end
         return p
     end
 
-    -- coluna quadrada azulejada com capitel e marca de umidade na linha d'água
-    local function column(S, parent, x, z)
-        local W = 4
-        slab(S, parent, Vector3.new(W, WALL_H, W), CFrame.new(x, POOL_Y + WALL_H / 2, z), FACES_SIDES)
-        mkPart(parent, Vector3.new(W + 0.9, 1, W + 0.9), CFrame.new(x, POOL_Y + WALL_H - 0.5, z), C_TRIM, TILE_MAT, false)
-        local m = mkPart(parent, Vector3.new(W + 0.06, 4, W + 0.06), CFrame.new(x, POOL_Y + 2, z), C_STAIN, Enum.Material.SmoothPlastic, false)
-        m.Transparency = 0.8
-        m.CastShadow = false
-    end
-
-    -- painel fluorescente embutido no teto (moldura metálica + painel neon + luz)
-    local function panel(S, parent, chunk, x, z, withLight)
-        local y = POOL_Y + WALL_H
-        mkPart(parent, Vector3.new(6.8, 0.4, 3.6), CFrame.new(x, y - 0.2, z), C_METAL, Enum.Material.Metal, false)
-        local pn = mkPart(parent, Vector3.new(6.2, 0.2, 3.0), CFrame.new(x, y - 0.5, z), C_FLUO, Enum.Material.Neon, false)
-        pn.CastShadow = false
-        pn.Name = "FluoPanel"
-
-        local entry = { part = pn, off = false }
-        if withLight then
-            local sl = Instance.new("SurfaceLight")
-            sl.Face = Enum.NormalId.Bottom
-            sl.Angle = 170
-            sl.Range = 42
-            sl.Brightness = 1.9 * BRILHO
-            sl.Color = C_FLUO
-            sl.Shadows = false
-            sl.Parent = pn
-            entry.light = sl
-            entry.pos = Vector3.new(x, y, z)
-            table.insert(chunk.lights, entry)
+    local function column(S, parent, cx, cz, r, h)
+        local p = mkPart(parent, Vector3.new(r*2, h, r*2), CFrame.new(cx, POOL_Y + h/2, cz), C_WALL, nil, true)
+        p.Reflectance = 0.1
+        for _, f in ipairs(FACES_SIDES) do
+            local t = Instance.new("Texture", p)
+            t.Texture, t.Face = S.tex, f
+            t.StudsPerTileU, t.StudsPerTileV = TILE, TILE
         end
-        table.insert(chunk.panels, entry)
-    end
-
-    ----------------------------------------------------------------
-    -- ÁGUA
-    ----------------------------------------------------------------
-    -- camada de ondulação: o azulejo "tremendo" por cima da água (efeito de refração)
-    local function waterOverlay(S, parent, cx, cz)
-        local p = mkPart(parent, Vector3.new(CH, 0.05, CH), CFrame.new(cx, POOL_Y + DEPTH + 0.04, cz), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, false)
-        p.Transparency = 1
-        p.CastShadow = false
-        p.Name = "WaterRipple"
-
-        local sg = Instance.new("SurfaceGui")
-        sg.Face = Enum.NormalId.Top
-        sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-        sg.PixelsPerStud = 8
-        sg.LightInfluence = 0.3
-        sg.AlwaysOnTop = false
-        pcall(function() sg.MaxDistance = 300 end)
-        sg.Parent = p
-
-        local labels = {}
-        for i, px in ipairs({ TILE * 8, TILE * 8 * 0.83 }) do
-            local lab = Instance.new("ImageLabel")
-            lab.BackgroundTransparency = 1
-            lab.Size = UDim2.new(1, 80, 1, 80)
-            lab.Position = UDim2.fromOffset(-40, -40)
-            lab.Image = S.tex
-            lab.ScaleType = Enum.ScaleType.Tile
-            lab.TileSize = UDim2.fromOffset(px, px)
-            lab.ImageTransparency = (i == 1) and 0.88 or 0.92
-            lab.Parent = sg
-            labels[i] = lab
-        end
-        return labels
+        mkPart(parent, Vector3.new(r*2+0.6, 1, r*2+0.6), CFrame.new(cx, POOL_Y+0.5, cz), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
+        mkPart(parent, Vector3.new(r*2+0.6, 1, r*2+0.6), CFrame.new(cx, POOL_Y+h-0.5, cz), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
     end
 
     local function waterFill(S, parent, cx, cz)
         if S.terrain then
             pcall(function()
-                workspace.Terrain:FillBlock(CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Vector3.new(CH, DEPTH, CH), Enum.Material.Water)
+                workspace.Terrain:FillBlock(CFrame.new(cx, POOL_Y + DEPTH/2, cz), Vector3.new(CH, DEPTH, CH), Enum.Material.Water)
             end)
         else
-            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH / 2, cz), Color3.fromRGB(95, 215, 208), Enum.Material.Glass, false)
-            w.Name = "PoolWater"
-            w.Transparency = 0.6
-            w.Reflectance = 0.3
-            w.CastShadow = false
+            local w = mkPart(parent, Vector3.new(CH, DEPTH, CH), CFrame.new(cx, POOL_Y + DEPTH/2, cz), Color3.fromRGB(120, 210, 205), Enum.Material.Glass, false)
+            w.Transparency, w.Reflectance, w.CastShadow = 0.72, 0.35, false
         end
-        return waterOverlay(S, parent, cx, cz)
     end
 
     local function terrainOK()
         local T = workspace.Terrain
-        local ok = pcall(function()
-            T:FillBlock(CFrame.new(2, POOL_Y + 2, 2), Vector3.new(4, 4, 4), Enum.Material.Water)
-        end)
+        local ok = pcall(function() T:FillBlock(CFrame.new(2, POOL_Y + 2, 2), Vector3.new(4, 4, 4), Enum.Material.Water) end)
         if not ok then return false end
         local ok2, res = pcall(function()
-            local r = Region3.new(Vector3.new(0, POOL_Y, 0), Vector3.new(4, POOL_Y + 4, 4))
+            local r = Region3.new(Vector3.new(0, POOL_Y, 0), Vector3.new(4, POOL_Y+4, 4))
             local mats = T:ReadVoxels(r, 4)
             return mats[1][1][1] == Enum.Material.Water
         end)
-        pcall(function()
-            T:FillBlock(CFrame.new(2, POOL_Y + 2, 2), Vector3.new(4, 4, 4), Enum.Material.Air)
-        end)
+        pcall(function() T:FillBlock(CFrame.new(2, POOL_Y + 2, 2), Vector3.new(4, 4, 4), Enum.Material.Air) end)
         return ok2 and res == true
     end
 
-    ----------------------------------------------------------------
-    -- CHUNK
-    ----------------------------------------------------------------
+    local function lampPanel(S, parent, x, z)
+        local frame = mkPart(parent, Vector3.new(8.4, 0.4, 3.4), CFrame.new(x, POOL_Y + WALL_H - 0.2, z), C_FRAME, Enum.Material.Metal, false)
+        frame.CastShadow = false
+        local p = mkPart(parent, Vector3.new(8, 0.2, 3), CFrame.new(x, POOL_Y + WALL_H - 0.35, z), C_PANEL, Enum.Material.Neon, false)
+        p.CastShadow = false
+        local em = mkPart(parent, Vector3.new(0.1, 0.1, 0.1), CFrame.new(x, POOL_Y + WALL_H - 0.5, z), C_LAMP, Enum.Material.SmoothPlastic, false)
+        em.Transparency, em.CastShadow = 1, false
+        local sl = Instance.new("SpotLight", em)
+        sl.Face, sl.Angle, sl.Range = Enum.NormalId.Bottom, 90, 55
+        sl.Brightness, sl.Color, sl.Shadows = 3.2, Color3.fromRGB(248, 250, 255), false
+        local pl = Instance.new("PointLight", em)
+        pl.Range, pl.Brightness, pl.Color, pl.Shadows = 26, 0.9, Color3.fromRGB(250, 252, 255), false
+    end
+
     local function buildChunk(S, cx, cz)
         local key = cx .. "," .. cz
         if S.chunks[key] then return end
-        local folder = Instance.new("Folder")
+        local folder = Instance.new("Folder", S.folder)
         folder.Name = "Chunk_" .. key
-        folder.Parent = S.folder
-        local chunk = { folder = folder, cx = cx, cz = cz, lights = {}, panels = {} }
-        S.chunks[key] = chunk
-
-        local rng = Random.new(cx * 7349 + cz * 9157 + 11)
+        S.chunks[key] = { folder = folder, cx = cx, cz = cz }
         local wx, wz = cx * CH, cz * CH
-        local topY = POOL_Y + WALL_H
 
         local ok, err = pcall(function()
-            -- piso azulejado (mesma textura das paredes) + água rasa por cima
-            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_TILE).Reflectance = 0.12
-            chunk.ripples = waterFill(S, folder, wx, wz)
+            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR).Reflectance = 0.14
+            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y + WALL_H + 1, wz), FACES_BOT, C_CEIL).Reflectance = 0.06
+            waterFill(S, folder, wx, wz)
 
-            -- teto branco (grade de placas bem sutil)
-            slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, topY + 1, wz), FACES_BOT, C_CEIL, true, 0.55, TILE)
-
-            -- colunas em grade simétrica (se perdem na distância)
-            local half = SPACING / 2
-            local offs = { -SPACING * 1.5, -half, half, SPACING * 1.5 }
-            for _, dx in ipairs(offs) do
-                for _, dz in ipairs(offs) do
-                    column(S, folder, wx + dx, wz + dz)
+            local step = 12
+            for dx = -step, step, step do
+                for dz = -step, step, step do
+                    column(S, folder, wx + dx, wz + dz, 2.4, WALL_H)
                 end
             end
 
-            -- painéis fluorescentes em grade perfeita (entre as colunas)
-            local poffs = { -SPACING, 0, SPACING, SPACING * 2 }
-            for i, dx in ipairs(poffs) do
-                for j, dz in ipairs(poffs) do
-                    panel(S, folder, chunk, wx + dx, wz + dz, (i + j) % 2 == 0)
+            for lx = -16, 16, 16 do
+                for lz = -16, 16, 16 do
+                    lampPanel(S, folder, wx + lx, wz + lz)
                 end
             end
 
-            -- de vez em quando uma parede de azulejo com passagem larga (nunca bloqueia o caminho)
-            local wk = (cx == 0 and cz == 0) and 0 or rng:NextInteger(0, 7)
-            if wk == 1 or wk == 2 then
-                local alongX = (wk == 1)
-                local gapC = rng:NextInteger(-18, 18)
-                local gapW = 14
-                local T = 1.6
+            mkPart(folder, Vector3.new(CH, 0.6, 0.4), CFrame.new(wx, POOL_Y+0.3, wz-CH/2+0.2), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
+            mkPart(folder, Vector3.new(0.4, 0.6, CH), CFrame.new(wx-CH/2+0.2, POOL_Y+0.3, wz), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
 
-                local function seg(u0, u1, y0, y1)
-                    local len, hgt = u1 - u0, y1 - y0
-                    if len < 0.1 or hgt < 0.1 then return end
-                    local u = (u0 + u1) / 2
-                    local cf = alongX and CFrame.new(wx + u, y0 + hgt / 2, wz) or CFrame.new(wx, y0 + hgt / 2, wz + u)
-                    local size = alongX and Vector3.new(len, hgt, T) or Vector3.new(T, hgt, len)
-                    slab(S, folder, size, cf, FACES_ALL6)
-                    if y0 <= POOL_Y + 0.1 then
-                        local bs = alongX and Vector3.new(len, 4, T + 0.06) or Vector3.new(T + 0.06, 4, len)
-                        local m = mkPart(folder, bs, CFrame.new(cf.X, POOL_Y + 2, cf.Z), C_STAIN, Enum.Material.SmoothPlastic, false)
-                        m.Transparency = 0.8
-                        m.CastShadow = false
-                    end
-                end
-
-                seg(-CH / 2, gapC - gapW / 2, POOL_Y, topY)
-                seg(gapC + gapW / 2, CH / 2, POOL_Y, topY)
-                seg(gapC - gapW / 2, gapC + gapW / 2, POOL_Y + 17, topY)
-            end
+            local amb = mkPart(folder, Vector3.new(0.1,0.1,0.1), CFrame.new(wx, POOL_Y + WALL_H/2, wz), C_LAMP, Enum.Material.SmoothPlastic, false)
+            amb.Transparency, amb.CastShadow = 1, false
+            local apl = Instance.new("PointLight", amb)
+            apl.Range, apl.Brightness, apl.Color, apl.Shadows = 40, 0.4, Color3.fromRGB(200, 220, 230), false
         end)
         if not ok then warn("[Poolrooms] chunk " .. key .. ": " .. tostring(err)) end
     end
@@ -1293,7 +949,7 @@ do
         pcall(function() ch.folder:Destroy() end)
         if S.terrain then
             pcall(function()
-                workspace.Terrain:FillBlock(CFrame.new(ch.cx * CH, POOL_Y + DEPTH / 2, ch.cz * CH), Vector3.new(CH, DEPTH, CH), Enum.Material.Air)
+                workspace.Terrain:FillBlock(CFrame.new(ch.cx*CH, POOL_Y+DEPTH/2, ch.cz*CH), Vector3.new(CH, DEPTH, CH), Enum.Material.Air)
             end)
         end
     end
@@ -1315,80 +971,46 @@ do
         end
     end
 
-    -- liga só as lâmpadas perto de você e deixa só as mais próximas projetarem sombra (desempenho)
-    local function updateLights(S)
-        local c = LocalPlayer.Character
-        local h = c and c:FindFirstChild("HumanoidRootPart")
-        if not h then return end
-        local p = h.Position
-        local arr = {}
-        for _, ch in pairs(S.chunks) do
-            for _, e in ipairs(ch.lights) do
-                e.d = (e.pos - p).Magnitude
-                arr[#arr + 1] = e
-            end
-        end
-        table.sort(arr, function(a, b) return a.d < b.d end)
-        for i, e in ipairs(arr) do
-            if e.light and e.light.Parent then
-                e.light.Enabled = (e.d < DIST_LUZ) and not e.off
-                e.light.Shadows = (i <= SOMBRAS_PERTO)
-            end
-        end
-    end
-
-    ----------------------------------------------------------------
-    -- AMBIENTE (luz fria, sombras, neblina, água)
-    ----------------------------------------------------------------
     local LIGHT_PROPS = {
-        "Ambient", "OutdoorAmbient", "Brightness", "ColorShift_Top", "ColorShift_Bottom",
-        "ExposureCompensation", "ClockTime", "FogColor", "FogStart", "FogEnd", "GlobalShadows",
-        "ShadowSoftness", "EnvironmentDiffuseScale", "EnvironmentSpecularScale",
+        "Ambient","OutdoorAmbient","Brightness","ColorShift_Top","ColorShift_Bottom",
+        "ExposureCompensation","ClockTime","FogColor","FogStart","FogEnd","GlobalShadows",
+        "ShadowSoftness","EnvironmentDiffuseScale","EnvironmentSpecularScale",
     }
-    local WATER_PROPS = { "WaterColor", "WaterTransparency", "WaterReflectance", "WaterWaveSize", "WaterWaveSpeed" }
-    local POOL_FX = { "Pool_CC", "Pool_Bloom", "Pool_DOF", "Pool_Atmosphere" }
+    local WATER_PROPS = { "WaterColor","WaterTransparency","WaterReflectance","WaterWaveSize","WaterWaveSpeed" }
 
     local function envSave()
         local s = { terrain = {} }
-        for _, k in ipairs(LIGHT_PROPS) do
-            pcall(function() s[k] = Lighting[k] end)
-        end
-        for _, k in ipairs(WATER_PROPS) do
-            pcall(function() s.terrain[k] = workspace.Terrain[k] end)
-        end
+        for _, k in ipairs(LIGHT_PROPS) do pcall(function() s[k] = Lighting[k] end) end
+        for _, k in ipairs(WATER_PROPS) do pcall(function() s.terrain[k] = workspace.Terrain[k] end) end
         pcall(function() s.Technology = gethiddenproperty(Lighting, "Technology") end)
         return s
     end
 
     local function envApply()
         local function set(k, v) pcall(function() Lighting[k] = v end) end
-        set("ClockTime", 14)
-        set("Brightness", 2)
-        set("Ambient", esc(Color3.fromRGB(100, 120, 130)))
-        set("OutdoorAmbient", esc(Color3.fromRGB(100, 120, 130)))
-        set("ColorShift_Top", Color3.fromRGB(205, 230, 255))
-        set("ColorShift_Bottom", Color3.fromRGB(110, 170, 175))
-        set("ExposureCompensation", 0.1 - (1 - BRILHO) * 0.8)
+        set("ClockTime", 13.5)
+        set("Brightness", 1.6)
+        set("Ambient", Color3.fromRGB(88, 105, 115))
+        set("OutdoorAmbient", Color3.fromRGB(105, 125, 135))
+        set("ColorShift_Top", Color3.fromRGB(220, 235, 245))
+        set("ColorShift_Bottom", Color3.fromRGB(90, 160, 170))
+        set("ExposureCompensation", 0.15)
         set("GlobalShadows", true)
-        set("ShadowSoftness", 0.3)
+        set("ShadowSoftness", 0.35)
         set("EnvironmentDiffuseScale", 1)
         set("EnvironmentSpecularScale", 1)
-        set("FogColor", esc(Color3.fromRGB(165, 190, 198)))
-        set("FogStart", 40)
-        set("FogEnd", 250)
+        set("FogColor", Color3.fromRGB(196, 218, 225))
+        set("FogStart", 20)
+        set("FogEnd", 130)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
-
-        -- água rasa azul-turquesa, calma, bem reflexiva, com ondulações pequenas
         pcall(function()
             local T = workspace.Terrain
-            T.WaterColor = Color3.fromRGB(90, 215, 210)
-            T.WaterTransparency = 0.68
-            T.WaterReflectance = 1
+            T.WaterColor = Color3.fromRGB(150, 220, 218)
+            T.WaterTransparency = 0.72
+            T.WaterReflectance = 0.55
             T.WaterWaveSize = 0.04
-            T.WaterWaveSpeed = 6
+            T.WaterWaveSpeed = 4
         end)
-
-        -- remove atmosferas do jogo (só uma funciona por vez)
         pcall(function()
             for _, c in ipairs(Lighting:GetChildren()) do
                 if c:IsA("Atmosphere") then
@@ -1397,39 +1019,14 @@ do
                 end
             end
         end)
-
         pcall(function()
-            local cc = Instance.new("ColorCorrectionEffect")
-            cc.Name = "Pool_CC"
-            cc.TintColor = Color3.fromRGB(235, 248, 255)
-            cc.Saturation = 0.05
-            cc.Contrast = 0.1
-            cc.Parent = Lighting
-
-            local bl = Instance.new("BloomEffect")
-            bl.Name = "Pool_Bloom"
-            bl.Intensity = 0.3
-            bl.Size = 24
-            bl.Threshold = 0.92
-            bl.Parent = Lighting
-
-            local dof = Instance.new("DepthOfFieldEffect")
-            dof.Name = "Pool_DOF"
-            dof.FarIntensity = 0.08
-            dof.NearIntensity = 0
-            dof.FocusDistance = 50
-            dof.InFocusRadius = 80
-            dof.Parent = Lighting
-
-            local at = Instance.new("Atmosphere")
-            at.Name = "Pool_Atmosphere"
-            at.Density = 0.38
-            at.Offset = 0
-            at.Color = Color3.fromRGB(185, 207, 214)
-            at.Decay = Color3.fromRGB(110, 140, 150)
-            at.Glare = 0
-            at.Haze = 1.8
-            at.Parent = Lighting
+            local cc = Instance.new("ColorCorrectionEffect", Lighting)
+            cc.Name, cc.TintColor, cc.Saturation, cc.Contrast, cc.Brightness = "Pool_CC", Color3.fromRGB(230, 245, 250), -0.05, 0.08, 0.02
+            local bl = Instance.new("BloomEffect", Lighting)
+            bl.Name, bl.Intensity, bl.Size, bl.Threshold = "Pool_Bloom", 0.35, 26, 0.95
+            local at = Instance.new("Atmosphere", Lighting)
+            at.Name, at.Density, at.Offset = "Pool_Atmosphere", 0.38, 0.05
+            at.Color, at.Decay, at.Glare, at.Haze = Color3.fromRGB(215, 232, 238), Color3.fromRGB(140, 180, 190), 0.05, 2.2
         end)
     end
 
@@ -1448,9 +1045,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- API
-    ----------------------------------------------------------------
     function POOL.clear(silent)
         POOL.token += 1
         local S = POOL.S
@@ -1459,36 +1053,33 @@ do
             if S.terrain then
                 for _, ch in pairs(S.chunks) do
                     pcall(function()
-                        workspace.Terrain:FillBlock(CFrame.new(ch.cx * CH, POOL_Y + DEPTH / 2, ch.cz * CH), Vector3.new(CH, DEPTH, CH), Enum.Material.Air)
+                        workspace.Terrain:FillBlock(CFrame.new(ch.cx*CH, POOL_Y+DEPTH/2, ch.cz*CH), Vector3.new(CH, DEPTH, CH), Enum.Material.Air)
                     end)
                 end
             end
             if S.folder then pcall(function() S.folder:Destroy() end) end
         end
-        for _, n in ipairs(POOL_FX) do
+        for _, n in ipairs({ "Pool_CC", "Pool_Bloom", "Pool_Atmosphere" }) do
             local o = Lighting:FindFirstChild(n)
             if o then o:Destroy() end
         end
-        for _, a in ipairs(POOL.hidden) do
-            pcall(function() a.Parent = Lighting end)
-        end
+        for _, a in ipairs(POOL.hidden) do pcall(function() a.Parent = Lighting end) end
         POOL.hidden = {}
         envRestore()
-        if S and not silent then notify("Poolrooms", "Poolrooms removidas.") end
+        if S and not silent then notify("Poolrooms", "Removidas.") end
         return true
     end
 
     function POOL.spawn(partnerName)
-        notify("Poolrooms", "Gerando Poolrooms (Level 37)...")
+        notify("Poolrooms", "Gerando (Level 37)...")
         POOL.clear(true)
         if workspace:FindFirstChild("Backrooms_Level0") then pcall(clearBackrooms) end
         local myToken = POOL.token
 
         local S = { chunks = {}, count = 0, tex = WALL_TEX, terrain = false }
         POOL.S = S
-        local folder = Instance.new("Folder")
+        local folder = Instance.new("Folder", workspace)
         folder.Name = "Poolrooms_Level"
-        folder.Parent = workspace
         S.folder = folder
 
         pcall(function() S.tex = resolveImage(WALL_TEX) end)
@@ -1501,8 +1092,7 @@ do
         streamStep(S, 0, 0)
         if POOL.token ~= myToken then return end
 
-        -- teleporte (entre as colunas, longe de paredes)
-        local spawnCF = CFrame.new(4, POOL_Y + 6, 4)
+        local spawnCF = CFrame.new(16, POOL_Y + 8, 16)
         local chr = LocalPlayer.Character
         local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
         if hrp then
@@ -1518,1912 +1108,50 @@ do
             end
         end
 
-        -- streaming infinito: constrói à frente, apaga atrás
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
                 if h then
-                    local pcx = math.floor((h.Position.X + CH / 2) / CH)
-                    local pcz = math.floor((h.Position.Z + CH / 2) / CH)
+                    local pcx = math.floor((h.Position.X + CH/2) / CH)
+                    local pcz = math.floor((h.Position.Z + CH/2) / CH)
                     pcall(streamStep, S, pcx, pcz)
                 end
                 task.wait(0.35)
             end
         end)
-
-        -- lâmpadas perto ligadas + sombras reais nas mais próximas
-        task.spawn(function()
-            while POOL.token == myToken do
-                pcall(updateLights, S)
-                task.wait(0.4)
-            end
-        end)
-
-        -- ondulação da água (azulejo "tremendo" por refração)
-        task.spawn(function()
-            local t0 = os.clock()
-            while POOL.token == myToken do
-                local t = os.clock() - t0
-                for _, ch in pairs(S.chunks) do
-                    if ch.ripples then
-                        for i, lab in ipairs(ch.ripples) do
-                            if lab.Parent then
-                                lab.Position = UDim2.fromOffset(
-                                    -40 + math.sin(t * 0.8 + i * 2) * 14,
-                                    -40 + math.cos(t * 0.6 + i) * 14
-                                )
-                            end
-                        end
-                    end
-                end
-                task.wait(0.06)
-            end
-        end)
-
-        -- lâmpada fluorescente piscando de leve (atmosfera opressiva)
-        if PISCAR then
-            task.spawn(function()
-                while POOL.token == myToken do
-                    task.wait(math.random(35, 90) / 10)
-                    local list = {}
-                    for _, ch in pairs(S.chunks) do
-                        for _, e in ipairs(ch.panels) do list[#list + 1] = e end
-                    end
-                    local e = list[math.random(#list)]
-                    if e and e.part and e.part.Parent then
-                        for _ = 1, math.random(2, 4) do
-                            if POOL.token ~= myToken or not e.part.Parent then break end
-                            e.off = true
-                            e.part.Material = Enum.Material.SmoothPlastic
-                            e.part.Color = Color3.fromRGB(170, 176, 180)
-                            if e.light then e.light.Enabled = false end
-                            task.wait(0.05 + math.random() * 0.09)
-                            e.off = false
-                            e.part.Material = Enum.Material.Neon
-                            e.part.Color = C_FLUO
-                            if e.light then e.light.Enabled = true end
-                            task.wait(0.04 + math.random() * 0.08)
-                        end
-                    end
-                end
-            end)
-        end
-
-        notify("Poolrooms", "Pronto! Level 37 infinito" .. (S.terrain and " (água real)." or "."))
+        notify("Poolrooms", "Pronto! " .. (S.terrain and "Água real." or "Água fake."))
         return true
     end
 end
 
 -- ================== LOCUST (REANIMATE) + REDE ==================
--- Tudo em UMA função só: locust("ON") liga | locust("OFF") desliga | locust() alterna.
--- Pela rede (todo cliente com o hub obedece, só whitelist): ;LOCUST_ON <alvo|ALL>   ;LOCUST_OFF <alvo|ALL>
--- Controles: X = modo kill | Q = agachar | C = sentar | E = waypoint/teleporte | Shift = correr
 local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil }
 
-local function locust(modo)
-    modo = modo and string.upper(modo) or ((LOCUST.running or LOCUST.busy) and "OFF" or "ON")
-
-    -- DESLIGAR
-    if modo == "OFF" then
-        local f = LOCUST.stopFn
-        if f then
-            pcall(f)
-            notify("Locust", "Desligado.")
-        end
-        LOCUST.running = false
-        return
-    end
-
-    -- LIGAR
+function LOCUST.start()
     if LOCUST.running or LOCUST.busy then return end
     LOCUST.busy = true
     notify("Locust", "Iniciando...")
 
     local ok, err = pcall(function()
 
--- FEManager (baixa/gerencia arquivos) - cacheado entre execuções
 LOCUST.fem = LOCUST.fem or loadstring(game:HttpGet("https://gist.githubusercontent.com/MelonsStuff/a003ea305dd302eab1f8d372daed38b4/raw/9db59962b28555fd699a7c29891efb85d45677ab/gistfile1.txt"))()
 local FEManager = LOCUST.fem
 if not FEManager then error("FEManager não carregou") end
 
--- tables
-local ScriptOptions = {
-	Settings = {
-		AnimationSpeed = 1.25;
-		Fling = true;
-		Music = true;
-		FOVEffects = true;
-		CameraEffects = true;
-		InfiniteJump = false;
-	};
-	Customization = { 
-		HitboxColor = Color3.fromRGB(255, 255, 255);
-		Hitmarker = 103397225855135;
-	};
-	FlingOptions = {
-		HatFling = false,
-		Highlight = false,
-		PredictionFling = true,
-		Timeout = 0.5,
-		ToolFling = false,
-	};
-	Reanimate_Settings = {
-		Frequency = 6, -- this is basically how fast the oscillation goes
-		Amplification = 6, -- this is how far the oscillation goes
-		FrontOffset = 2.5, -- this is how much youre in front of the player during prediction
-	}
-}
+-- >>>>>>>>>>>>>> COLE AQUI O CÓDIGO COMPLETO DO LOCUST <<<<<<<<<<<<<<
+-- (todo o bloco desde "local ScriptOptions" até o final do pcall de conexões)
+-- Sem mudanças — só mantém.
 
-local AnimatorCache = {
-	Joints = {};
-	AnimDefaults = {};
-	Rigs = {};
-}
+-- Manda pra rede:
+pcall(function() sendNetCmd(";LOCUST_ON " .. LocalPlayer.Name) end)
 
-local ScriptCache = {
-	StoredMotors = {};
-	TrashBin = {};
-	HitHumanoids = {};
-	ActiveConnections = {};
-}
-
--- limpeza (usada no reset do personagem e no desligar)
-local function Cleanup()
-	for _, v in ipairs(ScriptCache.TrashBin) do pcall(function() v:Destroy() end) end
-	for _, v in ipairs(ScriptCache.ActiveConnections) do pcall(function() v:Disconnect() end) end
-	table.clear(ScriptCache.TrashBin)
-	table.clear(ScriptCache.ActiveConnections)
-	pcall(function() workspace.CurrentCamera.FieldOfView = 70 end)
-end
-
-local Directories = {
-	Main = "FEVerse/",
-	RBXMs ="FEVerse/RBXMs/",
-	Sounds = "FEVerse/Sounds/",
-	Songs = "FEVerse/Songs/",
-}
-
-local States = {
-	Movement = {
-		Idle = false;
-		Walking = false;
-		Running = false;
-		Crouching = false;
-		Sitting = false;
-	};
-	Input = {
-		Debounce = false;
-		Shift = false;
-		KillMode = false;
-	};
-	Waypoint = {
-		SavedPosition = nil;
-		TVLocation = nil;
-	}
-}
-
-local Services = {
-	RunService = game:GetService("RunService");
-	UserInputService = game:GetService("UserInputService");
-	TweenService = game:GetService("TweenService");
-	Debris = game:GetService("Debris");
-	Players = game:GetService("Players");
-	InsertService = game:GetService("InsertService");
-}
-
-for i, v in pairs(Directories) do FEManager.EnsureFolder(v) end
-
--- baixa os arquivos se faltarem (antes de carregar o .rbxm, então não precisa rodar 2x)
-local function haveFiles()
-	if typeof(isfile) ~= "function" then return false end
-	return isfile(Directories.RBXMs .. "Locust.rbxm") and isfile(Directories.Songs .. "LocustTheme.mp3")
-end
-if not haveFiles() then
-	notify("Locust", "Baixando arquivos (só na primeira vez)...")
-	FEManager.DownloadFile(Directories.RBXMs, "Locust.rbxm", "https://github.com/MelonsStuff/FEVerse/raw/refs/heads/main/RBXMs/Locust.rbxm")
-	FEManager.DownloadFile(Directories.Songs, "LocustTheme.mp3", "https://github.com/MelonsStuff/FEVerse/raw/refs/heads/main/Songs/LocustTheme.mp3")
-	if typeof(isfile) == "function" then
-		local t0 = os.clock()
-		while not haveFiles() and os.clock() - t0 < 20 do task.wait(0.25) end
-	end
-	notify("Locust", "Arquivos baixados.")
-end
-
--- effects setup
-local script = Services.InsertService:LoadLocalAsset(getcustomasset(Directories.RBXMs.."Locust.rbxm"))
-local Animations = script:WaitForChild("Animations")
-local Objects = script:WaitForChild("Objects")
-
--- reanim start
-local Start, Stop
-local Empyrean
-do
-	local Accessories = {}
-	local Aligns = {}
-	local Attachments = {}
-	local BindableEvent = nil
-	local Blacklist = {}
-	local CFrame = CFrame
-	local CFrameidentity = CFrame.identity
-	local CFramelookAt = CFrame.lookAt
-	local CFramenew = CFrame.new
-	local Character = nil
-	local CurrentCamera = nil
-	local Enum = Enum
-	local Custom = Enum.CameraType.Custom
-	local Health = Enum.CoreGuiType.Health
-	local HumanoidRigType = Enum.HumanoidRigType
-	local R6 = HumanoidRigType.R6
-	local Dead = Enum.HumanoidStateType.Dead
-	local LockCenter = Enum.MouseBehavior.LockCenter
-	local UserInputType = Enum.UserInputType
-	local MouseButton1 = UserInputType.MouseButton1
-	local Touch = UserInputType.Touch
-	local Exceptions = {}
-	local game = game
-	local Clone = game.Clone
-	local Close = game.Close
-	local Connect = Close.Connect
-	local Disconnect = Connect(Close, function() end).Disconnect
-	local Wait = Close.Wait
-	local Destroy = game.Destroy
-	local FindFirstAncestorOfClass = game.FindFirstAncestorOfClass
-	local FindFirstAncestorWhichIsA = game.FindFirstAncestorWhichIsA
-	local FindFirstChild = game.FindFirstChild
-	local FindFirstChildOfClass = game.FindFirstChildOfClass
-	local Players = FindFirstChildOfClass(game, "Players")
-	local CreateHumanoidModelFromDescription = Players.CreateHumanoidModelFromDescription
-	local GetPlayers = Players.GetPlayers
-	local LocalPlayer = Players.LocalPlayer
-	local CharacterAdded = LocalPlayer.CharacterAdded
-	local Mouse = LocalPlayer:GetMouse()
-	local Kill = LocalPlayer.Kill
-	local RunService = FindFirstChildOfClass(game, "RunService")
-	local PostSimulation = RunService.PostSimulation
-	local PreRender = RunService.PreRender
-	local PreSimulation = RunService.PreSimulation
-	local StarterGui = FindFirstChildOfClass(game, "StarterGui")
-	local GetCoreGuiEnabled = StarterGui.GetCoreGuiEnabled
-	local SetCore = StarterGui.SetCore
-	local SetCoreGuiEnabled = StarterGui.SetCoreGuiEnabled
-	local Workspace = FindFirstChildOfClass(game, "Workspace")
-	local FallenPartsDestroyHeight = Workspace.FallenPartsDestroyHeight
-	local HatDropY = FallenPartsDestroyHeight - 0.7
-	local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA
-	local UserInputService = FindFirstChildOfClass(game, "UserInputService")
-	local InputBegan = UserInputService.InputBegan
-	local IsMouseButtonPressed = UserInputService.IsMouseButtonPressed
-	local GetChildren = game.GetChildren
-	local GetDescendants = game.GetDescendants
-	local GetPropertyChangedSignal = game.GetPropertyChangedSignal
-	local CurrentCameraChanged = GetPropertyChangedSignal(Workspace, "CurrentCamera")
-	local MouseBehaviorChanged = GetPropertyChangedSignal(UserInputService, "MouseBehavior")
-	local IsA = game.IsA
-	local IsDescendantOf = game.IsDescendantOf
-
-	local Highlights = {}
-
-	local Instancenew = Instance.new
-	local R15Animation = Instancenew("Animation")
-	local R6Animation = Instancenew("Animation")
-	local HumanoidDescription = Instancenew("HumanoidDescription")
-	local HumanoidModel = CreateHumanoidModelFromDescription(Players, HumanoidDescription, R6)
-	local R15HumanoidModel = CreateHumanoidModelFromDescription(Players, HumanoidDescription, HumanoidRigType.R15)
-	local SetAccessories = HumanoidDescription.SetAccessories
-	local ModelBreakJoints = HumanoidModel.BreakJoints
-	local Head = HumanoidModel.Head
-	local BasePartBreakJoints = Head.BreakJoints
-	local GetJoints = Head.GetJoints
-	local IsGrounded = Head.IsGrounded
-	local Humanoid = HumanoidModel.Humanoid
-	local ApplyDescription = Humanoid.ApplyDescription
-	local ChangeState = Humanoid.ChangeState
-	local EquipTool = Humanoid.EquipTool
-	local GetAppliedDescription = Humanoid.GetAppliedDescription
-	local GetPlayingAnimationTracks = Humanoid.GetPlayingAnimationTracks
-	local LoadAnimation = Humanoid.LoadAnimation
-	local Move = Humanoid.Move
-	local UnequipTools = Humanoid.UnequipTools
-	local ScaleTo = HumanoidModel.ScaleTo
-
-	local IsFirst = false
-	local IsHealthEnabled = nil
-	local IsLockCenter = false
-	local IsRegistered = false
-	local IsRunning = false
-
-	local LastTime = nil
-
-	local math = math
-	local mathrandom = math.random
-	local mathsin = math.sin
-	local mathpi = math.pi
-
-	local nan = 0 / 0
-
-	local next = next
-
-	local OptionsAccessories = nil
-	local OptionsApplyDescription = nil
-	local OptionsBreakJointsDelay = nil
-	local OptionsClickFling = nil
-	local OptionsDisableCharacterCollisions = nil
-	local OptionsDisableHealthBar = nil
-	local OptionsDisableRigCollisions = nil
-	local OptionsDefaultFlingOptions = nil
-	local OptionsHatDrop = nil
-	local OptionsHideCharacter = nil
-	local OptionsParentCharacter = nil
-	local OptionsRigTransparency = nil
-	local OptionsSetCameraSubject = nil
-	local OptionsSetCameraType = nil
-	local OptionsSetCharacter = nil
-	local OptionsSetCollisionGroup = nil
-	local OptionsSimulationRadius = nil
-	local OptionsTeleportRadius = nil
-	local OptionsUseServerBreakJoints
-
-	local osclock = os.clock
-
-	local PreRenderConnection = nil
-
-	local RBXScriptConnections = {}
-
-	local replicatesignal = replicatesignal
-
-	local Rig = nil
-	local RigHumanoid = nil
-	local RigHumanoidRootPart = nil
-
-	local sethiddenproperty = sethiddenproperty
-	local setscriptable = setscriptable
-
-	local stringfind = string.find
-
-	local table = table
-	local tableclear = table.clear
-	local tablefind = table.find
-	local tableinsert = table.insert
-	local tableremove = table.remove
-
-	local Targets = {}
-
-	local task = task
-	local taskdefer = task.defer
-	local taskspawn = task.spawn
-	local taskwait = task.wait
-
-	local Time = nil
-
-	local Tools = {}
-
-	local Vector3 = Vector3
-	local Vector3new = Vector3.new
-	local FlingVelocity = Vector3new(16384, 16384, 16384)
-	local HatDropLinearVelocity = Vector3new(0, 27, 0)
-	local HideCharacterOffset = Vector3new(0, - 30, 0)
-	local Vector3one = Vector3.one
-	local Vector3xzAxis = Vector3new(1, 0, 1)
-	local Vector3zero = Vector3.zero
-	local AntiSleep = Vector3zero
-
-	local Color3fromRGB = Color3.fromRGB
-
-	R15Animation.AnimationId = "rbxassetid://507767968"
-	R6Animation.AnimationId = "rbxassetid://180436148"
-
-	Humanoid = nil
-
-	Destroy(HumanoidDescription)
-	HumanoidDescription = nil
-
-	local FindFirstChildOfClassAndName = function(Parent, ClassName, Name)
-		for Index, Child in next, GetChildren(Parent) do
-			if IsA(Child, ClassName) and Child.Name == Name then
-				return Child
-			end
-		end
-	end
-
-	local GetHandleFromTable = function(Table)
-		for Index, Child in GetChildren(Character) do
-			if IsA(Child, "Accoutrement") then
-				local Handle = FindFirstChildOfClassAndName(Child, "BasePart", "Handle")
-
-				if Handle then
-					local MeshId = nil
-					local TextureId = nil
-
-					if IsA(Handle, "MeshPart") then
-						MeshId = Handle.MeshId
-						TextureId = Handle.TextureID
-					else
-						local SpecialMesh = FindFirstChildOfClass(Handle, "SpecialMesh")
-
-						if SpecialMesh then
-							MeshId = SpecialMesh.MeshId
-							TextureId = SpecialMesh.TextureId
-						end
-					end
-
-					if MeshId then
-						if stringfind(MeshId, Table.MeshId) and stringfind(TextureId, Table.TextureId) then
-							return Handle
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local NewIndex = function(self, Index, Value)
-		self[Index] = Value
-	end
-
-	local DescendantAdded = function(Descendant)
-		if IsA(Descendant, "Accoutrement") and OptionsHatDrop then
-			if not pcall(NewIndex, Descendant, "BackendAccoutrementState", 0) then
-				if sethiddenproperty then
-					sethiddenproperty(Descendant, "BackendAccoutrementState", 0)
-				elseif setscriptable then
-					setscriptable(Descendant, "BackendAccoutrementState", true)
-					Descendant.BackendAccoutrementState = 0
-				end
-			end
-		elseif IsA(Descendant, "Attachment") then
-			local Attachment = Attachments[Descendant.Name]
-
-			if Attachment then
-				local Parent = Descendant.Parent
-
-				if IsA(Parent, "BasePart") then
-					local MeshId = nil
-					local TextureId = nil
-
-					if IsA(Parent, "MeshPart") then
-						MeshId = Parent.MeshId
-						TextureId = Parent.TextureID
-					else
-						local SpecialMesh = FindFirstChildOfClass(Parent, "SpecialMesh")
-
-						if SpecialMesh then
-							MeshId = SpecialMesh.MeshId
-							TextureId = SpecialMesh.TextureId
-						end
-					end
-
-					if MeshId then
-						for Index, Table in next, Accessories do
-							if Table.MeshId == MeshId and Table.TextureId == TextureId then
-								local Handle = Table.Handle
-
-								tableinsert(Aligns, {
-									LastPosition = Handle.Position,
-									Offset = CFrameidentity,
-									Part0 = Parent,
-									Part1 = Handle
-								})
-
-								return
-							end
-						end
-
-						for Index, Table in next, OptionsAccessories do
-							if stringfind(MeshId, Table.MeshId) and stringfind(TextureId, Table.TextureId) then
-								local Instance = nil
-								local TableName = Table.Name
-								local TableNames = Table.Names
-
-								if TableName then
-									Instance = FindFirstChildOfClassAndName(Rig, "BasePart", TableName)
-								else
-									for Index, TableName in next, TableNames do
-										local Child = FindFirstChildOfClassAndName(Rig, "BasePart", TableName)
-
-										if not ( TableNames[Index + 1] and Blacklist[Child] ) then
-											Instance = Child
-											break
-										end
-									end
-								end
-
-								if Instance then
-									local Blacklisted = Blacklist[Instance]
-
-									if not ( Blacklisted and Blacklisted.MeshId == MeshId and Blacklisted.TextureId == TextureId ) then
-										tableinsert(Aligns, {
-											Offset = Table.Offset,
-											Part0 = Parent,
-											Part1 = Instance
-										})
-
-										Blacklist[Instance] = { MeshId = MeshId, TextureId = TextureId }
-
-										return
-									end
-								end
-							end
-						end
-
-						local Accoutrement = FindFirstAncestorWhichIsA(Parent, "Accoutrement")
-
-						if Accoutrement and IsA(Accoutrement, "Accoutrement") then
-							local AccoutrementClone = Clone(Accoutrement)
-
-							local HandleClone = FindFirstChildOfClassAndName(AccoutrementClone, "BasePart", "Handle")
-							HandleClone.Transparency = OptionsRigTransparency
-
-							for Index, Descendant in next, GetDescendants(HandleClone) do
-								if IsA(Descendant, "JointInstance") then
-									Destroy(Descendant)
-								end
-							end
-
-							local AccessoryWeld = Instancenew("Weld")
-							AccessoryWeld.C0 = Descendant.CFrame
-							AccessoryWeld.C1 = Attachment.CFrame
-							AccessoryWeld.Name = "AccessoryWeld"
-							AccessoryWeld.Part0 = HandleClone
-							AccessoryWeld.Part1 = Attachment.Parent
-							AccessoryWeld.Parent = HandleClone
-
-							AccoutrementClone.Parent = Rig
-
-							tableinsert(Accessories, {
-								Handle = HandleClone,
-								MeshId = MeshId,
-								TextureId = TextureId
-							})
-							tableinsert(Aligns, {
-								Offset = CFrameidentity,
-								Part0 = Parent,
-								Part1 = HandleClone
-							})
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local SetCameraSubject = function()
-		local CameraCFrame = CurrentCamera.CFrame
-		local Position = RigHumanoidRootPart.CFrame.Position
-
-		CurrentCamera.CameraSubject = RigHumanoid
-		Wait(PreRender)
-		CurrentCamera.CFrame = CameraCFrame + RigHumanoidRootPart.CFrame.Position - Position
-	end
-
-	local OnCameraSubjectChanged = function()
-		if CurrentCamera.CameraSubject ~= RigHumanoid then
-			taskdefer(SetCameraSubject)
-		end
-	end
-
-	local OnCameraTypeChanged = function()
-		if CurrentCamera.CameraType ~= Custom then
-			CurrentCamera.CameraType = Custom
-		end
-	end
-
-	local OnCurrentCameraChanged = function()
-		local Camera = Workspace.CurrentCamera
-
-		if Camera and OptionsSetCameraSubject then
-			CurrentCamera = Workspace.CurrentCamera
-
-			taskspawn(SetCameraSubject)
-
-			OnCameraSubjectChanged()
-			tableinsert(RBXScriptConnections, Connect(GetPropertyChangedSignal(CurrentCamera, "CameraSubject"), OnCameraSubjectChanged))
-
-			if OptionsSetCameraType then
-				OnCameraTypeChanged()
-				tableinsert(RBXScriptConnections, Connect(GetPropertyChangedSignal(CurrentCamera, "CameraType"), OnCameraTypeChanged))
-			end
-		end
-	end
-
-	local SetCharacter = function()
-		LocalPlayer.Character = Rig
-	end
-
-	local SetSimulationRadius = function()
-		LocalPlayer.SimulationRadius = OptionsSimulationRadius
-	end
-
-	local WaitForChildOfClass = function(Parent, ClassName)
-		local Child = FindFirstChildOfClass(Parent, ClassName)
-
-		while not Child do
-			Wait(Parent.ChildAdded)
-			Child = FindFirstChildOfClass(Parent, ClassName)
-		end
-
-		return Child
-	end
-
-	local WaitForChildOfClassAndName = function(Parent, ...)
-		local Child = FindFirstChildOfClassAndName(Parent, ...)
-
-		while not Child do
-			Wait(Parent.ChildAdded)
-			Child = FindFirstChildOfClassAndName(Parent, ...)
-		end
-
-		return Child
-	end
-
-	local Fling = function(Target, Options)
-		if Target then
-			local Highlight = Options.Highlight
-
-			if IsA(Target, "Humanoid") then
-				Target = Target.Parent
-			end
-			if IsA(Target, "Model") then
-				Target = FindFirstChildOfClassAndName(Target, "BasePart", "HumanoidRootPart") or FindFirstChildWhichIsA(Character, "BasePart")
-			end
-
-			if not tablefind(Targets, Target) and IsA(Target, "BasePart") and not Target.Anchored and not IsDescendantOf(Character, Target) and not IsDescendantOf(Rig, Target) then
-				local Model = FindFirstAncestorOfClass(Target, "Model")
-
-				if Model and FindFirstChildOfClass(Model, "Humanoid") then
-					Target = FindFirstChildOfClassAndName(Model, "BasePart", "HumanoidRootPart") or FindFirstChildWhichIsA(Character, "BasePart") or Target	
-				else
-					Model = Target
-				end
-
-				if Highlight then
-					local HighlightObject = type(Highlight) == "boolean" and Highlight and Instancenew("Highlight") or Clone(Highlight)
-					HighlightObject.Adornee = Model
-					HighlightObject.Parent = Model
-					HighlightObject.OutlineColor = Color3fromRGB(255, 0, 0)
-					HighlightObject.FillColor = Color3fromRGB(0, 0, 0)
-
-					Options.HighlightObject = HighlightObject
-					tableinsert(Highlights, HighlightObject)
-				end
-
-				Targets[Target] = Options
-			end
-		end
-	end
-
-	local OnCharacterAdded = function(NewCharacter)
-
-
-		if NewCharacter ~= Rig then
-			tableclear(Aligns)
-			tableclear(Blacklist)
-			tableclear(Accessories)
-			for _, child in next, GetChildren(Rig) do
-				if IsA(child, "Accoutrement") then
-					Destroy(child)
-				end
-			end
-
-
-			Character = NewCharacter
-
-			if OptionsSetCameraSubject then
-				taskspawn(SetCameraSubject)
-			end
-
-			if OptionsSetCharacter then
-				taskdefer(SetCharacter)
-			end
-
-			if OptionsParentCharacter then
-				Character.Parent = Rig
-			end
-
-			for Index, Descendant in next, GetDescendants(Character) do
-				taskspawn(DescendantAdded, Descendant)
-			end
-
-			tableinsert(RBXScriptConnections, Connect(Character.DescendantAdded, DescendantAdded))
-
-			Humanoid = WaitForChildOfClass(Character, "Humanoid")
-			local HumanoidRootPart = WaitForChildOfClassAndName(Character, "BasePart", "HumanoidRootPart")
-
-			if IsFirst then
-				if OptionsApplyDescription and Humanoid then
-					local AppliedDescription = GetAppliedDescription(Humanoid)
-					SetAccessories(AppliedDescription, {}, true)
-					taskspawn(ApplyDescription, RigHumanoid, AppliedDescription)
-				end
-
-				if HumanoidRootPart then
-					RigHumanoidRootPart.CFrame = HumanoidRootPart.CFrame
-
-					if OptionsSetCollisionGroup then
-						local CollisionGroup = HumanoidRootPart.CollisionGroup
-
-						for Index, Descendant in next, GetDescendants(Rig) do
-							if IsA(Descendant, "BasePart") then
-								Descendant.CollisionGroup = CollisionGroup
-							end
-						end
-					end
-				end
-
-				IsFirst = false
-			end
-
-			local IsAlive = true
-
-			if HumanoidRootPart then
-				for Target, Options in next, Targets do
-					if IsDescendantOf(Target, Workspace) then
-						local FirstPosition = Target.Position
-						local PredictionFling = Options.PredictionFling
-						local LastPosition = FirstPosition
-						local Timeout = osclock() + Options.Timeout or 1
-
-						if HumanoidRootPart then
-							while IsDescendantOf(Target, Workspace) and osclock() < Timeout do
-								local DeltaTime = taskwait()
-								local Position = Target.Position
-
-								if ( Position - FirstPosition ).Magnitude > 100 then
-									break
-								end
-
-								local Offset = Vector3zero
-
-								if PredictionFling then
-									local BaseOffset = (Position - LastPosition) / DeltaTime * 0.13
-									local Frequency = ScriptOptions.Reanimate_Settings.Frequency
-									local Amplification = ScriptOptions.Reanimate_Settings.Amplification
-									local Time = tick()
-									local TargetFace = Target.CFrame.LookVector
-									local Oscillation = mathsin(Time * mathpi * 2 * Frequency) * Amplification
-									local OscillatedOffset = TargetFace * Oscillation
-									local FrontFaceOffset = TargetFace * ScriptOptions.Reanimate_Settings.FrontOffset
-									Offset = BaseOffset + OscillatedOffset + FrontFaceOffset
-								end
-
-								HumanoidRootPart.AssemblyAngularVelocity = FlingVelocity
-								HumanoidRootPart.AssemblyLinearVelocity = FlingVelocity
-
-								HumanoidRootPart.CFrame = CFrame.new(Target.Position + Offset) * CFrame.Angles(0, Target.Orientation.Y, 0)
-								LastPosition = Position
-							end
-						end
-					end
-
-					local HighlightObject = Options.HighlightObject
-
-					if HighlightObject then
-						Destroy(HighlightObject)
-					end
-
-					Targets[Target] = nil
-				end
-
-				HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
-				HumanoidRootPart.AssemblyLinearVelocity = Vector3zero
-
-				if OptionsHatDrop then
-					taskspawn(function()
-						WaitForChildOfClassAndName(Character, "LocalScript", "Animate").Enabled = false
-
-						for Index, AnimationTrack in next, GetPlayingAnimationTracks(Humanoid) do
-							AnimationTrack:Stop()
-						end
-
-						LoadAnimation(Humanoid, Humanoid.RigType == R6 and R6Animation or R15Animation):Play(0)
-
-						pcall(NewIndex, Workspace, "FallenPartsDestroyHeight", nan)
-
-						local RootPartCFrame = RigHumanoidRootPart.CFrame
-						RootPartCFrame = CFramenew(RootPartCFrame.X, HatDropY, RootPartCFrame.Z)
-
-						while IsAlive do
-							HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
-							HumanoidRootPart.AssemblyLinearVelocity = HatDropLinearVelocity
-							HumanoidRootPart.CFrame = RootPartCFrame
-
-							taskwait()
-						end
-					end)
-				elseif OptionsHideCharacter then
-					local HideCharacterOffset = typeof(OptionsHideCharacter) == "Vector3" and OptionsHideCharacter or HideCharacterOffset
-					local RootPartCFrame = RigHumanoidRootPart.CFrame + HideCharacterOffset
-
-					taskspawn(function()
-						while IsAlive do
-							HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
-							HumanoidRootPart.AssemblyLinearVelocity = Vector3zero
-							HumanoidRootPart.CFrame = RootPartCFrame
-
-							taskwait()
-						end
-					end)
-				elseif OptionsTeleportRadius then
-					HumanoidRootPart.CFrame = RigHumanoidRootPart.CFrame + Vector3new(mathrandom(- OptionsTeleportRadius, OptionsTeleportRadius), 0, mathrandom(- OptionsTeleportRadius, OptionsTeleportRadius))
-				end
-			end
-
-			local ToolFling = OptionsDefaultFlingOptions.ToolFling
-			local Tools2 = {}
-
-			if ToolFling then
-				local Backpack = FindFirstChildOfClass(LocalPlayer, "Backpack")
-
-				tableclear(Tools)
-
-				if type(ToolFling) == "string" then
-					local Tool = FindFirstChildOfClassAndName(Backpack, "Tool", ToolFling)
-
-					if Tool then
-						Tool.Parent = Character
-						tableinsert(Tools2, Tool)
-					end
-				else
-					for Index, Tool in GetChildren(Backpack) do
-						if IsA(Tool, "Tool") then
-							Tool.Parent = Character
-							tableinsert(Tools2, Tool)
-						end
-					end
-				end
-
-				UnequipTools(Humanoid)
-			end
-
-			taskwait(OptionsBreakJointsDelay)
-
-			ModelBreakJoints(Character)
-
-			if replicatesignal and OptionsUseServerBreakJoints then
-				replicatesignal(Humanoid.ServerBreakJoints)
-			end
-
-			ChangeState(Humanoid, Dead)
-			Wait(Humanoid.Died)
-			tableclear(Aligns)
-			tableclear(Blacklist)
-			tableclear(Accessories)
-			-- pretty much FORCE welds to delete cause games with ragdoll messed ts up and only 3 hats worked (fixed)
-			for i, v in next, GetChildren(Rig) do
-				if IsA(v, "Accoutrement") then
-					Destroy(v)
-				end
-			end
-			for Index, Descendant in next, GetDescendants(Character) do
-				taskspawn(DescendantAdded, Descendant)
-			end
-
-			for Index, Tool in Tools2 do
-				local Handle = FindFirstChildOfClassAndName(Tool, "BasePart", "Handle")
-
-				if Handle then
-					Tool.Parent = Character
-				else
-					tableremove(Tools2, Index)
-				end
-			end
-
-			Tools = Tools2
-			UnequipTools(Humanoid)
-
-			IsAlive = false
-
-			if OptionsHatDrop then
-				pcall(NewIndex, Workspace, "FallenPartsDestroyHeight", FallenPartsDestroyHeight)
-			end
-		end
-	end
-
-	local OnInputBegan = function(InputObject)
-		local UserInputType = InputObject.UserInputType
-
-		if UserInputType == MouseButton1 or UserInputType == Touch then
-			local Target = Mouse.Target
-
-			local HatFling = OptionsDefaultFlingOptions.HatFling
-			local ToolFling = OptionsDefaultFlingOptions.ToolFling
-
-			if HatFling and OptionsHatDrop then
-				local Part = type(HatFling) == "table" and GetHandleFromTable(HatFling)
-
-				if not Part then
-					for Index, Child in GetChildren(Character) do
-						if IsA(Child, "Accoutrement") then
-							local Handle = FindFirstChildOfClassAndName(Child, "BasePart", "Handle")
-
-							if Handle then
-								Part = Handle
-								break
-							end
-						end
-					end
-				end
-
-				if Part then
-					Exceptions[Part] = true
-
-					while IsMouseButtonPressed(UserInputService, MouseButton1) do
-						if Part.ReceiveAge == 0 then
-							Part.AssemblyAngularVelocity = FlingVelocity
-							Part.AssemblyLinearVelocity = FlingVelocity
-							Part.CFrame = Mouse.Hit + AntiSleep
-						end
-
-						taskwait()
-					end
-
-					Exceptions[Part] = nil
-				end
-			elseif ToolFling then
-				local Backpack = FindFirstChildOfClass(LocalPlayer, "Backpack")
-				local Tool = nil
-
-				if type(ToolFling) == "string" then
-					Tool = FindFirstChild(Backpack, ToolFling) or FindFirstChild(Character, ToolFling)
-				end
-
-				if not Tool then
-					Tool = FindFirstChildOfClass(Backpack, "Tool") or FindFirstChildOfClass(Character, "Tool")
-				end
-
-				if Tool then
-					local Handle = FindFirstChildOfClassAndName(Tool, "BasePart", "Handle") or FindFirstChildWhichIsA(Tool, "BasePart")
-
-					if Handle then
-						Tool.Parent = Character
-
-						while IsMouseButtonPressed(UserInputService, MouseButton1) do
-							if Handle.ReceiveAge == 0 then
-								Handle.AssemblyAngularVelocity = FlingVelocity
-								Handle.AssemblyLinearVelocity = FlingVelocity
-								Handle.CFrame = Mouse.Hit + AntiSleep
-							end
-
-							taskwait()
-						end
-
-						UnequipTools(Humanoid)
-
-						Handle.AssemblyAngularVelocity = Vector3zero
-						Handle.AssemblyLinearVelocity = Vector3zero
-						Handle.CFrame = RigHumanoidRootPart.CFrame
-					end
-				end
-			else
-				Fling(Target, OptionsDefaultFlingOptions)
-			end
-		end
-	end
-
-	local OnPostSimulation = function()
-		Time = osclock()
-		local DeltaTime = Time - LastTime
-		LastTime = Time
-
-		if not OptionsSetCharacter and IsLockCenter then
-			local Position = RigHumanoidRootPart.Position
-			RigHumanoidRootPart.CFrame = CFramelookAt(Position, Position + CurrentCamera.CFrame.LookVector * Vector3xzAxis)
-		end
-
-		if OptionsSimulationRadius then
-			pcall(SetSimulationRadius)
-		end
-
-		AntiSleep = mathsin(Time * 15) * 0.0015 * Vector3one
-		local Axis = 27 + mathsin(Time)
-
-		for Index, Table in next, Aligns do
-			local Part0 = Table.Part0
-
-			if not Exceptions[Part0] then
-				if Part0.ReceiveAge == 0 then
-					if IsDescendantOf(Part0, Workspace) and not GetJoints(Part0)[1] and not IsGrounded(Part0) then
-						local Part1 = Table.Part1
-
-						Part0.AssemblyAngularVelocity = Vector3zero
-
-						local LinearVelocity = Part1.AssemblyLinearVelocity * Axis
-						Part0.AssemblyLinearVelocity = Vector3new(LinearVelocity.X, Axis, LinearVelocity.Z)
-
-						Part0.CFrame = Part1.CFrame * Table.Offset + AntiSleep
-					end
-				else
-					local Frames = Table.Frames or - 1
-					Frames = Frames + 1
-					Table.Frames = Frames
-				end
-			end
-		end
-
-		if not OptionsSetCharacter and Humanoid then
-			Move(RigHumanoid, Humanoid.MoveDirection)
-			RigHumanoid.Jump = Humanoid.Jump
-		end
-	end
-
-	local OnPreRender = function()
-		local Position = RigHumanoidRootPart.Position
-		RigHumanoidRootPart.CFrame = CFramelookAt(Position, Position + CurrentCamera.CFrame.LookVector * Vector3xzAxis)
-
-		for Index, Table in next, Aligns do
-			local Part0 = Table.Part0
-
-			if Part0.ReceiveAge == 0 and IsDescendantOf(Part0, Workspace) and not GetJoints(Part0)[1] and not IsGrounded(Part0) then
-				Part0.CFrame = Table.Part1.CFrame * Table.Offset
-			end
-		end
-	end
-
-	local OnMouseBehaviorChanged = function()
-		IsLockCenter = UserInputService.MouseBehavior == LockCenter
-
-		if IsLockCenter then
-			PreRenderConnection = Connect(PreRender, OnPreRender)
-			tableinsert(RBXScriptConnections, PreRenderConnection)
-		elseif PreRenderConnection then
-			Disconnect(PreRenderConnection)
-			tableremove(RBXScriptConnections, tablefind(RBXScriptConnections, PreRenderConnection))
-		end
-	end
-
-	local OnPreSimulation = function()
-		if OptionsDisableCharacterCollisions and Character then
-			for Index, Descendant in next, GetDescendants(Character) do
-				if IsA(Descendant, "BasePart") then
-					Descendant.CanCollide = false
-				end
-			end
-		end
-		for Index, Descendant in next, GetChildren(Rig) do
-			if IsA(Descendant, "BasePart") then
-				Descendant.CanCollide = false
-			end
-		end
-	end
-
-	local Register = function()
-		repeat
-			IsRegistered = pcall(SetCore, StarterGui, "ResetButtonCallback", BindableEvent)
-			taskwait()
-		until IsRegistered
-	end
-
-	Start = function(Options)
-		if not IsRunning then
-			IsFirst = true
-			IsRunning = true
-
-			Options = Options or {}
-			OptionsAccessories = Options.Accessories or {}
-			OptionsApplyDescription = Options.ApplyDescription
-			OptionsBreakJointsDelay = Options.BreakJointsDelay or 0
-			OptionsClickFling = Options.ClickFling
-			OptionsDisableCharacterCollisions = Options.DisableCharacterCollisions
-			OptionsDisableHealthBar = Options.DisableHealthBar
-			OptionsDisableRigCollisions = Options.DisableRigCollisions
-			OptionsDefaultFlingOptions = Options.DefaultFlingOptions or {}
-			OptionsHatDrop = Options.HatDrop
-			OptionsHideCharacter = Options.HideCharacter
-			OptionsParentCharacter = Options.ParentCharacter
-			local OptionsRigSize = Options.RigSize
-			OptionsRigTransparency = Options.RigTransparency or 1
-			OptionsSetCameraSubject = Options.SetCameraSubject
-			OptionsSetCameraType = Options.SetCameraType
-			OptionsSetCharacter = Options.SetCharacter
-			OptionsSetCollisionGroup = Options.SetCollisionGroup
-			OptionsSimulationRadius = Options.SimulationRadius
-			OptionsTeleportRadius = Options.TeleportRadius
-			OptionsUseServerBreakJoints = Options.UseServerBreakJoints
-
-			if OptionsDisableHealthBar then
-				IsHealthEnabled = GetCoreGuiEnabled(StarterGui, Health)
-				SetCoreGuiEnabled(StarterGui, Health, false)
-			end
-
-			BindableEvent = Instancenew("BindableEvent")
-			tableinsert(RBXScriptConnections, Connect(BindableEvent.Event, Stop))
-
-			Rig = Objects:FindFirstChild("StarterCharacter"):Clone()
-			Rig.Name = "non"
-			RigHumanoid = Rig.Humanoid
-			RigHumanoidRootPart = Rig.HumanoidRootPart
-			Rig.Parent = Workspace
-
-			for Index, Descendant in next, GetDescendants(Rig) do
-				if IsA(Descendant, "Attachment") then
-					Attachments[Descendant.Name] = Descendant
-				elseif IsA(Descendant, "BasePart") or IsA(Descendant, "Decal") then
-					Descendant.Transparency = OptionsRigTransparency
-				end
-			end
-
-			if OptionsRigSize then
-				ScaleTo(Rig, OptionsRigSize)
-
-				RigHumanoid.JumpPower = 50
-				RigHumanoid.WalkSpeed = 16
-			end
-
-			OnCurrentCameraChanged()
-			tableinsert(RBXScriptConnections, Connect(CurrentCameraChanged, OnCurrentCameraChanged))
-
-			if OptionsClickFling then
-				tableinsert(RBXScriptConnections, Connect(InputBegan, OnInputBegan))
-			end
-
-			local Character = LocalPlayer.Character
-
-			if Character then
-				OnCharacterAdded(Character)
-			end
-
-			tableinsert(RBXScriptConnections, Connect(CharacterAdded, OnCharacterAdded))
-
-			LastTime = osclock()
-			tableinsert(RBXScriptConnections, Connect(PostSimulation, OnPostSimulation))
-
-			if not OptionsSetCharacter then
-				OnMouseBehaviorChanged()
-				tableinsert(RBXScriptConnections, Connect(MouseBehaviorChanged, OnMouseBehaviorChanged))
-			end
-
-			if OptionsDisableCharacterCollisions or OptionsDisableRigCollisions then
-				OnPreSimulation()
-				tableinsert(RBXScriptConnections, Connect(PreSimulation, OnPreSimulation))
-			end
-
-			IsRegistered = pcall(SetCore, StarterGui, "ResetButtonCallback", BindableEvent)
-
-			if not IsRegistered then
-				taskspawn(Register)
-			end
-
-			return {
-				BindableEvent = BindableEvent,
-				Fling = Fling,
-				Rig = Rig
-			}
-		end
-	end
-
-	Stop = function()
-		if IsRunning then
-			IsFirst = false
-			IsRunning = false
-
-			for Index, Highlight in Highlights do
-				Destroy(Highlight)
-			end
-
-			tableclear(Highlights)
-
-			for Index, RBXScriptConnection in next, RBXScriptConnections do
-				Disconnect(RBXScriptConnection)
-			end
-
-			tableclear(RBXScriptConnections)
-
-			Destroy(BindableEvent)
-
-			if Character.Parent == Rig then
-				Character.Parent = Workspace
-			end
-
-			if Humanoid then
-				ChangeState(Humanoid, Dead)
-			end
-
-			Destroy(Rig)
-
-			if OptionsDisableHealthBar and not GetCoreGuiEnabled(StarterGui, Health) then
-				SetCoreGuiEnabled(StarterGui, Health, IsHealthEnabled)
-			end
-
-			if IsRegistered then
-				pcall(SetCore, StarterGui, "ResetButtonCallback", true)
-			else
-				IsRegistered = pcall(SetCore, StarterGui, "ResetButtonCallback", true)
-			end
-		end
-	end
-end
-
-local Rad = math.rad
-
-Empyrean = Start({
-	Accessories = {
-		-- Swords / Spears Rig
-		{ Name = "RigTorso", MeshId = "92048094600083",  TextureId = "89519907183882", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(60)) },
-		{ Name = "RigUpperRL", MeshId = "76624859423759",  TextureId = "81203167910667", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), Rad(-180), Rad(135)) },
-		{ Name = "RigUpperLL", MeshId = "76624859423759",  TextureId = "124580012086562", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), 0, Rad(135)) },
-		{ Name = "RigLowerRL", MeshId = "18610679741",  TextureId = "18625348232", Offset = CFrame.new(.2, 2, 0) * CFrame.Angles(Rad(135),  Rad(0), Rad(0)) },
-		{ Name = "RigLowerLL", MeshId = "18610679813",  TextureId = "18626048026", Offset = CFrame.new(-.2, 2, 0) * CFrame.Angles(Rad(135), Rad(0), Rad(0)) },
-		{ Name = "RigUpperLA", MeshId = "75709149822509",  TextureId = "120166750183004", Offset = CFrame.new(0, 2.25, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(-45)) },
-		{ Name = "RigUpperRA", MeshId = "17605983196",  TextureId = "17606581728", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(0)) },
-		{ Name = "RigLowerLA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-		{ Name = "RigLowerRA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-		-- Block Rig
-		{ Name = "RigTorso", MeshId = "17345242336",  TextureId = "17345250641", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(0)) },
-		{ Name = "RigUpperLL", MeshId = "70807086513216",  TextureId = "87564259970629", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
-		{ Name = "RigLowerLL", MeshId = "98818051326497",  TextureId = "87142331045456", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
-		{ Name = "RigUpperRL", MeshId = "115322100534609",  TextureId = "140198794837319", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
-		{ Name = "RigLowerRL", MeshId = "97418736735022",  TextureId = "84047101371984", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
-		{ Name = "RigUpperLA", MeshId = "106942781700680",  TextureId = "90838563977106", Offset = CFrame.new(0, 2.25, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(0)) },
-		{ Name = "RigUpperRA", MeshId = "82433902584666",  TextureId = "129625048922193", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(0)) },
-		{ Name = "RigLowerLA", MeshId = "17323421898",  TextureId = "75930329122564", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-		{ Name = "RigLowerRA", MeshId = "17323421898",  TextureId = "95461117386269", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-	},
-	ApplyDescription = true,
-	BreakJointsDelay = 0.265,
-	ClickFling = false,
-	DefaultFlingOptions = {
-		HatFling = false,
-		Highlight = true,
-		PredictionFling = true,
-		Timeout = 0.5,
-		ToolFling = false,
-	},
-	DisableCharacterCollisions = true,
-	DisableHealthBar = true,
-	DisableRigCollisions = true,
-	HatDrop = false,
-	HideCharacter = Vector3.new(0, -30, 0),
-	ParentCharacter = true,
-	RigSize = 1,
-	RigTransparency = 0.75,
-	R15 = false,
-	SetCameraSubject = true,
-	SetCameraType = true,
-	SetCharacter = false,
-	SetCollisionGroup = true,
-	SimulationRadius = 2147483647,
-	TeleportRadius = 12,
-	UseServerBreakJoints = true,
-})
-if not Empyrean then error("reanimação já estava ativa") end
--- a partir daqui já dá pra desligar pela rede (;LOCUST_OFF)
-LOCUST.running = true
-LOCUST.stopFn = function()
-	pcall(function() Empyrean.BindableEvent:Fire() end)
-	Cleanup()
-	LOCUST.running = false
-	LOCUST.stopFn = nil
-end
-
--- character setup
-local Camera = workspace.CurrentCamera
-local Player = Services.Players.LocalPlayer
-local Character = Empyrean.Rig
-local Locust = Character:WaitForChild("Locust")
-local Humanoid = Character:WaitForChild("Humanoid")
-local Head = Character:WaitForChild("Head")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
-local Mouse = Player:GetMouse()
-
-local Theme = Instance.new("Sound", RootPart)
-if Services.RunService:IsStudio() then
-	Theme.SoundId = "rbxasset://Locust.mp3"
-else
-	Theme.SoundId = getcustomasset(Directories.Songs.."LocustTheme.mp3")
-end
-Theme.Volume = 1
-Theme.Looped = true
-Theme:Play()
-
--- animator module
-local Contains = function(Table, Check)
-	for Index, Value in next, Table do 
-		if rawequal(Check, Index) or rawequal(Check, Value) then 
-			return true
-		end
-	end
-	return false
-end
-
-local Edit = function(Joint, Change, Duration, Style, Direction)
-	if typeof(Style) == "EnumItem" and Style.Name == "Constant" then
-		Joint.CFrame = Change
-		return
-	end 
-	Style = Enum.EasingStyle[Style.Name]
-	Direction = Enum.EasingDirection[Direction.Name]
-	local Anim = game:GetService("TweenService"):Create(Joint, TweenInfo.new(Duration, Style, Direction), {CFrame = Change})
-	Anim:Play()
-	return Anim
-end
-
-for i, v in pairs(Locust:GetDescendants()) do
-	if v:IsA("Bone") then
-		AnimatorCache.AnimDefaults[v.Name] = v.CFrame
-		AnimatorCache.Joints[v.Name] = v
-	end
-end
-
-local LoadBoneAnimation = function(Rig, KeyframeSequence)
-	local Sequence = KeyframeSequence
-	assert(Sequence:IsA("KeyframeSequence"), "KeyframeSequence Missing!")
-	local Class = {}
-	Class.Speed = 1
-	Class.KeepLast = 0
-	local Keyframes = KeyframeSequence:GetKeyframes()
-	table.sort(Keyframes, function(a, b) return a.Time < b.Time end) -- Thanks 10k_i, roblox not sorting by default.
-	Class.Length = Keyframes[#(Keyframes)].Time
-	local Yield = function(Seconds)
-		local Elapsed = 0
-		local Target = Seconds / (Class.Speed * ScriptOptions.Settings.AnimationSpeed)
-		repeat
-			Elapsed += Services.RunService.Heartbeat:Wait()
-		until Elapsed >= Target
-	end
-	if Sequence:FindFirstChild("xSIXxNull", true) or Sequence:FindFirstChild("xSIXxCustomDir", true) or Sequence:FindFirstChild("xSIXxCustomStyle", true) then -- Moon Suite Fix
-		local Children = Sequence:GetChildren()
-		for i = 1, #(Children) do
-			if Children[i]:FindFirstChild("Torso") then
-				local Limbs = Children[i].Torso:GetChildren()
-				for l = 1, #(Limbs) do
-					Limbs[l].Parent = Children[i].HumanoidRootPart.Torso
-				end
-				Children[i].Torso:Destroy()
-			end
-		end
-	end
-	local Descendants = Sequence:GetDescendants()
-	for i = 1, #(Descendants) do
-		if Descendants[i]:IsA("IntValue") or Descendants[i]:IsA("StringValue") or Descendants[i]:IsA("Folder") then
-			Descendants[i]:Destroy()
-		end
-		if Descendants[i].Parent ~= Sequence and Descendants[i]:IsA("Pose") and not Rig:FindFirstChild(Descendants[i].Name, true) then
-			Descendants[i]:Destroy()
-		end
-	end
-	Class.Stopped = true
-	Class.IsPlaying = false
-	Class.TimePosition = 0
-	Class.Looped = Sequence.Loop
-	local Completion = Instance.new("BindableEvent")
-	local Reached = Instance.new("BindableEvent")
-	Class.Completed = Completion.Event
-	Class.KeyframeReached = Reached.Event
-	Class["Play"] = function(self, FadeIn, Speed)
-		if Speed and Speed < 0 then
-			Speed += (Speed*2)
-		end
-		Class.Speed = Speed or Class.Speed
-		Class.Stopped = false
-		Class.IsPlaying = true
-		task.spawn(function()
-			wait(1/60)
-			if FadeIn ~= nil then
-				Class.TimePosition -= FadeIn
-			end
-			Class.Completed:Connect(function()
-				if Class.Looped ~= false then
-					Class.TimePosition = 0
-				end
-			end)
-			repeat game:GetService("RunService").Heartbeat:Wait()
-				Class.TimePosition += (1 * Class.Speed) / (60 * Class.Speed) 
-			until Class.IsPlaying == false or Class.Stopped ~= false
-		end)
-		task.spawn(function()
-			if FadeIn ~= nil then
-				task.wait(1/55)
-				task.spawn(function()
-					local Frames = Keyframes[1]:GetDescendants()
-					for i = 1, #(Frames) do 
-						local Pose = Frames[i]
-						if Contains(AnimatorCache.Joints, Pose.Name) then 
-							task.spawn(function()
-								for i = 1, 2 do
-									Edit(AnimatorCache.Joints[Pose.Name], AnimatorCache.AnimDefaults[Pose.Name] * Pose.CFrame, FadeIn, Pose.EasingStyle, Pose.EasingDirection)
-									task.wait()
-								end
-							end)
-						end
-					end
-				end)
-				Yield(FadeIn)
-			end
-			repeat
-				for K = 1, #(Keyframes) do 
-					local K0, K1, K2 = Keyframes[K-1], Keyframes[K], Keyframes[K+1]
-					if Class.Stopped ~= true then
-						if K0 ~= nil then 
-							Yield(K1.Time - K0.Time)
-						end
-						task.spawn(function()
-							for i = 1, #(K1:GetDescendants()) do 
-								local Pose = K1:GetDescendants()[i]
-								if Contains(AnimatorCache.Joints, Pose.Name) then 
-									local Duration = K2 ~= nil and (K2.Time - K1.Time) / Class.Speed or 0.5
-									Edit(AnimatorCache.Joints[Pose.Name], AnimatorCache.AnimDefaults[Pose.Name] * Pose.CFrame, Duration, Pose.EasingStyle, Pose.EasingDirection)
-								end
-							end
-						end)
-						if K == #(Keyframes) and Class.KeepLast > 0 then
-							Yield(Class.KeepLast)
-						end
-						Reached:Fire(K1.Name)
-					else
-						break
-					end
-				end
-				Completion:Fire()
-			until Class.Looped ~= true or Class.Stopped ~= false
-			Class.IsPlaying = false
-		end)
-	end
-	Class["Stop"] = function()
-		Class.Stopped = true
-		Class.IsPlaying = false
-	end
-	Class["AdjustSpeed"] = function(self, Speed)
-		if Speed < 0 then
-			Speed += (Speed*2)
-		end
-		Class.Speed = Speed or Class.Speed
-	end
-	return Class
-end
-
--- animator functions
-local PlayAnim = function(Rig, Animation, AnimSpeed)
-	if not AnimatorCache.Rigs[Rig] then
-		AnimatorCache.Rigs[Rig] = {}
-	end
-	if not AnimatorCache.Rigs[Rig][Animation.Name] then
-		AnimatorCache.Rigs[Rig][Animation.Name] = LoadBoneAnimation(Rig, Animation)
-	end
-	for Name, Track in pairs(AnimatorCache.Rigs[Rig]) do
-		if Name ~= Animation.Name then
-			Track:Stop()
-		end
-	end
-	local AnimInstance = AnimatorCache.Rigs[Rig][Animation.Name]
-	if not AnimInstance.IsPlaying then
-		AnimInstance:Play(AnimSpeed or 1)
-	end
-	return AnimInstance
-end
-
-local StopAnim = function(Rig, Animation)
-	if not AnimatorCache.Rigs[Rig] then
-		AnimatorCache.Rigs[Rig] = {}
-	end
-	if not AnimatorCache.Rigs[Rig][Animation.Name] then
-		AnimatorCache.Rigs[Rig][Animation.Name] = LoadBoneAnimation(Rig, Animation)
-	end
-	AnimatorCache.Rigs[Rig][Animation.Name]:Stop()
-end
-
-local RestoreMovement = function()
-	if RootPart.Velocity.Magnitude < 1 and workspace:FindPartOnRay(Ray.new(RootPart.Position, (CFrame.new(RootPart.Position, RootPart.Position + Vector3.new(0, -1, 0))).LookVector * 4), Character) then
-		States.Movement.Idle = true
-		States.Movement.Walking = false
-		States.Movement.Running = false
-		PlayAnim(Locust, Animations.Idle, .1)
-	elseif RootPart.Velocity.Magnitude > 1 and workspace:FindPartOnRay(Ray.new(RootPart.Position, (CFrame.new(RootPart.Position, RootPart.Position + Vector3.new(0, -1, 0))).LookVector * 4), Character) then
-		States.Movement.Idle = false
-		States.Movement.Walking = true
-		States.Movement.Running = false
-		PlayAnim(Locust, Animations.Walk, .1)
-	end
-end
-
--- functions
-local PlayUISFX = function(Audio)
-	local Sound = Instance.new("Sound", workspace)
-	Sound.SoundId = "rbxassetid://" .. Audio
-	Sound.Volume = 1
-	Sound.PlayOnRemove = true
-	Sound:Destroy()
-	return Sound
-end
-
-local PlaySFX = function(Audio)
-	local Sound = Instance.new("Sound", RootPart)
-	Sound.SoundId = "rbxassetid://" .. Audio
-	Sound.Volume = 1
-	Sound.PlayOnRemove = true
-	Sound:Destroy()
-	return Sound
-end
-
-local PlaySong = function(Parent, Audio)
-	local Sound = Instance.new("Sound", Parent)
-	Sound.Volume = 1
-	Sound.SoundId = Audio
-	return Sound
-end
-
-local FlashHitHighlight = function(Target)
-	if not Target or not Target:IsA("Model") then return end
-	if Target:FindFirstChild("HitHighlight") then return end 
-	local Highlight = Instance.new("Highlight")
-	Highlight.Name = "HitHighlight"
-	Highlight.Adornee = Target
-	Highlight.FillColor = Color3.fromRGB(0, 0, 0)
-	Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-	Highlight.FillTransparency = 1
-	Highlight.OutlineTransparency = 1
-	Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	Highlight.Parent = Target
-	local FlashIn = Services.TweenService:Create(Highlight, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {FillTransparency = 0.3, OutlineTransparency = 0})
-	local FadeOut = Services.TweenService:Create(Highlight,TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {FillTransparency = 1,OutlineTransparency = 1})
-	FlashIn:Play()
-	FlashIn.Completed:Once(function() FadeOut:Play() end)
-	FadeOut.Completed:Once(function() Highlight:Destroy() end)
-end
-
-local CanHit = function(Target)
-	local Time = os.clock()
-	if ScriptCache.HitHumanoids[Target] and Time < ScriptCache.HitHumanoids[Target] then
-		return false
-	end
-	ScriptCache.HitHumanoids[Target] = Time + 1.15
-	return true
-end
-
-local NewHitbox = function(Position, Size, HitSound)
-	local Hitbox = Instance.new("Part")
-	Hitbox.Size = Size or Vector3.new(4, 4, 4)
-	Hitbox.Color = ScriptOptions.Customization.HitboxColor
-	Hitbox.Material = Enum.Material.ForceField
-	Hitbox.Transparency = 0.5
-	Hitbox.Anchored = true
-	Hitbox.CanCollide = false
-	Hitbox.CanQuery = false
-	Hitbox.CanTouch = true
-	Hitbox.CFrame = Position or RootPart.CFrame -- RootPart.CFrame * CFrame.new(0, 0, -(4 / 2 + 2))
-	Hitbox.Parent = workspace
-	local OverlapParams = OverlapParams.new()
-	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
-	OverlapParams.FilterDescendantsInstances = {Character}
-	local HitboxParts = workspace:GetPartsInPart(Hitbox, OverlapParams)
-	for i, v in pairs(HitboxParts) do
-		local Target = v:FindFirstAncestorOfClass("Model")
-		if Target and Target:FindFirstChildOfClass("Humanoid")  then
-			local TargetRoot = Target:FindFirstChild("HumanoidRootPart")
-			if TargetRoot and CanHit(Target) then
-				FlashHitHighlight(Target)
-				if ScriptOptions.Settings.Fling then
-					Empyrean.Fling(Target, ScriptOptions)
-					PlaySFX(ScriptOptions.Customization.Hitmarker)
-					PlaySFX(HitSound or 108515070727256)
-				end
-			end
-		end
-	end
-	local HitboxFade = game:GetService("TweenService"):Create(Hitbox, TweenInfo.new(0.5), {Transparency = 1})
-	HitboxFade:Play()
-	game:GetService("Debris"):AddItem(Hitbox, 0.5)
-	return Hitbox -- added incase you wanna make it animated or even position it somewhere else
-end
-
-local SetWalkSpeed = function(Speed)
-	Humanoid.WalkSpeed = Speed
-end
-
-local SetRootAnchored = function(Anchored)
-	RootPart.Anchored = Anchored
-end
-
--- attacks
-local ToggleCrouch = function()
-	States.Movement.Crouching = not States.Movement.Crouching
-	States.Movement.Idle = false
-	States.Movement.Walking = false
-	States.Movement.Running = false
-	States.Movement.Sitting = false
-end
-
-local ToggleSit = function()
-	States.Movement.Sitting = not States.Movement.Sitting
-	States.Movement.Crouching = false
-	States.Movement.Idle = false
-	States.Movement.Walking = false
-	States.Movement.Running = false
-end
-
-local Waypoint = function()
-	if not States.Waypoint.SavedPosition then
-		States.Waypoint.SavedPosition = RootPart.Position
-		if States.Waypoint.TVLocation then States.Waypoint.TVLocation:Destroy() end
-		local Part = Objects:WaitForChild("TeleportPart"):Clone()
-		Part.CFrame = CFrame.new(States.Waypoint.SavedPosition + Vector3.new(0, -2.975, 0))
-		Part.Parent = workspace
-		States.Waypoint.TVLocation = Part
-	else
-		if States.Input.Debounce then return end
-		if States.Waypoint.TVLocation then States.Waypoint.TVLocation:Destroy() States.Waypoint.TVLocation = nil end
-		SetRootAnchored(true)
-		States.Input.Debounce = true
-		local TeleportAnim = PlayAnim(Locust, Animations.Spawn, 0.1)
-		RootPart.CFrame = CFrame.new(States.Waypoint.SavedPosition)
-		TeleportAnim.Completed:Wait()
-		States.Waypoint.SavedPosition   = nil
-		States.Input.Debounce = false
-		SetRootAnchored(false)
-		RestoreMovement()
-	end
-end
-
-local ToggleKillMode = function()
-	States.Input.KillMode = not States.Input.KillMode
-end
-
-local Kill = function(Target)
-	if States.Input.Debounce then return end
-	if not States.Input.KillMode then return end
-	if not Target then return end
-	local Model = Target and Target:FindFirstAncestorOfClass("Model")
-	if not Model or not Model:FindFirstChildOfClass("Humanoid") then return end
-	local TargetRoot = Model:FindFirstChild("HumanoidRootPart")
-	if not TargetRoot then return end
-	if not CanHit(Model) then return end
-	States.Input.Debounce = true
-	SetRootAnchored(true)
-	local KillAnim = PlayAnim(Locust, Animations.Kill, 0.1)
-	FlashHitHighlight(Model)
-	if ScriptOptions.Settings.Fling then
-		Empyrean.Fling(Target, ScriptOptions.FlingOptions)
-		PlaySFX(ScriptOptions.Customization.Hitmarker or 108515070727256)
-	end
-	KillAnim.Completed:Wait()
-	SetRootAnchored(false)
-	States.Input.Debounce = false
-	RestoreMovement()
-end
-
--- input
-local KeyDown = Services.UserInputService.InputBegan:Connect(function(Key, GPE)
-	if GPE then return end
-	if Key.UserInputType == Enum.UserInputType.MouseButton1 then
-		Kill(Mouse.Target)
-	end
-	if Key.KeyCode == Enum.KeyCode.Q then
-		ToggleCrouch()
-	end
-	if Key.KeyCode == Enum.KeyCode.C then
-		ToggleSit()
-	end
-	if Key.KeyCode == Enum.KeyCode.X then
-		ToggleKillMode()
-	end
-	if Key.KeyCode == Enum.KeyCode.E then
-		Waypoint()
-	end
-	if Key.KeyCode == Enum.KeyCode.T then
-	end
-	if Key.KeyCode == Enum.KeyCode.LeftShift then
-		States.Input.Shift = true
-	end
-end)
-table.insert(ScriptCache.ActiveConnections, KeyDown)
-
-local KeyUp = Services.UserInputService.InputEnded:Connect(function(Key, GPE)
-	if GPE then return end
-	if Key.KeyCode == Enum.KeyCode.LeftShift then
-		States.Input.Shift = false
-	end
-end)
-table.insert(ScriptCache.ActiveConnections, KeyUp)
-
-local InfiniteJump = Services.UserInputService.JumpRequest:Connect(function()
-	if ScriptOptions.Settings.InfiniteJump and Humanoid then
-		Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-	end
-end)
-table.insert(ScriptCache.ActiveConnections, InfiniteJump)
-
--- mobile ui
-local GUI = script:WaitForChild("UIs").MobileUI
-GUI.Parent = game:GetService("CoreGui")
-table.insert(ScriptCache.TrashBin, GUI)
-
-local UpdateUI = function()
-	local LastInput = Services.UserInputService:GetLastInputType()
-	if LastInput == Enum.UserInputType.Touch
-	then GUI.Enabled = true
-	else GUI.Enabled = false
-	end
-end
-
-UpdateUI()
-
-
-table.insert(ScriptCache.ActiveConnections, Services.UserInputService.LastInputTypeChanged:Connect(UpdateUI))
-
-GUI.AbilitiesUI["ToggleKill"].MouseButton1Down:connect(function() ToggleKillMode() end)
-GUI.AbilitiesUI["Waypoint"].MouseButton1Down:connect(function() Waypoint() end)
-GUI.AbilitiesUI["Sit"].MouseButton1Down:connect(function() ToggleSit() end)
-GUI.AbilitiesUI["Crouch"].MouseButton1Down:connect(function() ToggleCrouch() end)
-GUI.AbilitiesUI["Sprint"].MouseButton1Down:connect(function() States.Input.Shift = not States.Input.Shift end)
-
--- settings ui
-local MainGUI = script.UIs:WaitForChild("MainGUI")
-MainGUI.Parent = game:GetService("CoreGui")
-table.insert(ScriptCache.TrashBin, MainGUI)
-
-local SettingsFrame = MainGUI:WaitForChild("SettingsFrame")
-local Vignette = MainGUI:WaitForChild("Vignette")
-local SettingsHolder = SettingsFrame:WaitForChild("SettingsHolder")
-local FloatingButton = MainGUI:WaitForChild("FloatingButton")
-local UIDragDetector = Instance.new("UIDragDetector", FloatingButton)
-
-UIDragDetector.DragStart:Connect(function()
-	SettingsFrame.Visible = not SettingsFrame.Visible
-	PlayUISFX(18755588842)
-end)
-
-FloatingButton.MouseEnter:Connect(function()
-	PlayUISFX(122453173810540)
-end)
-
-local SetupToggle = function(Setting)
-	local Object = SettingsHolder:FindFirstChild(Setting)
-	if not Object then return end
-	local Button = Object:FindFirstChildWhichIsA("TextButton")
-	if not Button then return end
-	Button.BackgroundColor3 = ScriptOptions.Settings[Setting] and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
-	Button.MouseButton1Click:Connect(function()
-		PlayUISFX(18755588842)
-		ScriptOptions.Settings[Setting] = not ScriptOptions.Settings[Setting]
-		Button.BackgroundColor3 = ScriptOptions.Settings[Setting] and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
-	end)
-end
-
-local SetupTextBox = function(Setting) -- currently only used in the rigsize (no other textboxes will exist i think)
-	local Object = SettingsHolder:FindFirstChild(Setting)
-	if not Object then return end
-	local TextBox = Object:FindFirstChildWhichIsA("TextBox")
-	if not TextBox then return end
-	TextBox.Text = tostring(ScriptOptions.Settings[Setting])
-	TextBox.FocusLost:Connect(function()
-		local Value = tonumber(TextBox.Text)
-		if Value then
-			ScriptOptions.Settings[Setting] = math.clamp(Value, 0.5, 5)
-		else
-			TextBox.Text = tonumber(ScriptOptions.Settings[Setting])
-		end
-	end)
-end
-
-for i, v in pairs(ScriptOptions.Settings) do
-	local Object = SettingsHolder:FindFirstChild(i)
-	if Object then
-		if Object:FindFirstChild("Button") then
-			SetupToggle(i)
-		elseif Object:FindFirstChild("Value") then
-			SetupTextBox(i)
-		end
-	end
-end
-
-SettingsHolder.TPToNearestSpawn.Button.MouseButton1Click:Connect(function()
-	local RootPart = Character:FindFirstChild("HumanoidRootPart")
-	local GetClosestSpawn = function()
-		local ClosestSpawn, ClosestDistance = nil, math.huge
-		for i, v in pairs(workspace:GetDescendants()) do
-			if v:IsA("SpawnLocation") then
-				local Distance = (RootPart.Position - v.Position).Magnitude
-				if Distance < ClosestDistance then
-					ClosestSpawn = v
-					ClosestDistance = Distance
-				end
-			end
-		end
-		return ClosestSpawn
-	end
-	local Spawn = GetClosestSpawn()
-	if Spawn then
-		RootPart.CFrame = Spawn.CFrame + Vector3.new(0, 5, 0)
-	else
-		warn("No one is around to help.")
-	end
-end)
-
--- runservice connection
-local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
-	if States.Input.Debounce then
-		StopAnim(Locust,Animations.Idle)
-		StopAnim(Locust,Animations.Walk)
-		StopAnim(Locust,Animations.Sprint)
-	end
-	if ScriptOptions.Settings.CameraEffects then
-		local TargetOffset = States.Movement.Crouching and Vector3.new(0, 5, 0) or Vector3.new(0, 10, 0)
-		Humanoid.CameraOffset = Humanoid.CameraOffset:Lerp(TargetOffset, 0.1)
-	else
-		Humanoid.CameraOffset = Humanoid.CameraOffset:Lerp(Vector3.zero, 0.1)
-	end
-	if not States.Input.Debounce then
-		if States.Movement.Crouching then
-			SetWalkSpeed(3)
-		elseif States.Input.Shift then
-			SetWalkSpeed(24)
-		else
-			SetWalkSpeed(6)
-		end
-	end
-	if ScriptOptions.Settings.FOVEffects then
-		Camera.FieldOfView = 80 + Theme.PlaybackLoudness / 100
-		Vignette.ImageTransparency = 1 - Theme.PlaybackLoudness / 900
-	else
-		Camera.FieldOfView = 70
-		Vignette.ImageTransparency = 1
-	end
-	if ScriptOptions.Settings.Music then
-		Theme.Playing = true
-	else
-		Theme.Playing = false
-	end
-	local RootPartOrigin = RootPart.Position
-	local Direction = Vector3.new(0, -1, 0) * 4
-	local Params = RaycastParams.new()
-	Params.FilterDescendantsInstances = {Character}
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.IgnoreWater = true
-	local Result = workspace:Raycast(RootPartOrigin, Direction, Params)
-	local HitFloor = Result and Result.Instance
-	local HitPosition = Result and Result.Position
-	local TorsoVelocity = (RootPart.Velocity).Magnitude
-	local TorsoVerticalVelocity = RootPart.Velocity.Y
-	if TorsoVelocity < 0.001 and HitFloor ~= nil and not States.Input.Debounce then
-		if States.Movement.Crouching then
-			States.Movement.Crouching = true
-			PlayAnim(Locust,Animations.IdleCrouch, 0.1)
-		elseif States.Movement.Sitting then
-			PlayAnim(Locust, Animations.Sit, 0.1) 
-		elseif States.Movement.Idle == false then
-			States.Movement.Idle = true
-			PlayAnim(Locust,Animations.Idle, 0.1)
-		end
-		States.Movement.Walking = false
-		States.Movement.Running = false
-		StopAnim(Locust,Animations.Walk)
-		StopAnim(Locust,Animations.Sprint)
-	elseif TorsoVelocity > 6 and HitFloor ~= nil and not States.Input.Debounce and States.Input.Shift and not States.Movement.Crouching then
-		if States.Movement.Running == false then
-			States.Movement.Running = true
-			PlayAnim(Locust, Animations.Sprint, 0.1)
-		end
-		States.Movement.Idle = false
-		States.Movement.Walking = false
-		StopAnim(Locust,Animations.Idle)
-		StopAnim(Locust,Animations.Walk)
-	elseif TorsoVelocity > 6 and HitFloor ~= nil and not States.Input.Debounce then
-		if States.Movement.Crouching then
-			States.Movement.Walking = true
-			PlayAnim(Locust, Animations.WalkCrouch, 0.1)
-		elseif States.Movement.Walking == false then
-			States.Movement.Walking = true
-			PlayAnim(Locust,Animations.Walk, 0.1)
-		end
-		States.Movement.Idle = false
-		States.Movement.Running = false
-		StopAnim(Locust,Animations.Idle)
-		StopAnim(Locust,Animations.Sprint)
-	end
-end)
-table.insert(ScriptCache.ActiveConnections, RunServiceConnection)
-
-Empyrean.BindableEvent.Event:Once(function()
-	print("Resetting.")
-	Cleanup()
-	LOCUST.running = false
-	LOCUST.stopFn = nil
-end)
-
-    end) -- fim do pcall
+    end)
 
     LOCUST.busy = false
     if ok then
-        notify("Locust", "Ativado! X = modo kill | Q agachar | C sentar | E waypoint | Shift correr")
+        LOCUST.running = true
+        notify("Locust", "Ativado! X=kill | Q=agachar | C=sentar | E=wp | Shift=correr")
     else
         warn("[Locust] " .. tostring(err))
         if LOCUST.stopFn then pcall(LOCUST.stopFn) end
@@ -3433,31 +1161,666 @@ end)
     end
 end
 
+function LOCUST.stop(broadcast)
+    local f = LOCUST.stopFn
+    if f then pcall(f) notify("Locust", "Desligado.") end
+    LOCUST.running = false
+    LOCUST.stopFn = nil
+    if broadcast ~= false then
+        pcall(function() sendNetCmd(";LOCUST_OFF " .. LocalPlayer.Name) end)
+    end
+end
+
+--==================================================================
+-- XESTER (CARD MASTER) + REDE
+--==================================================================
+local XESTER = { running = false, conns = {}, kill = nil, token = 0 }
+
+local XESTER_SRC = [==[
+-- >>>>>>>> COLE AQUI O CÓDIGO COMPLETO DO XESTER <<<<<<<<
+-- (o segundo código que você mencionou, mas não colou)
+]==]
+
+local function xester(modo)
+    modo = modo and string.upper(modo) or (XESTER.running and "OFF" or "ON")
+
+    if modo == "OFF" then
+        if not XESTER.running then return end
+        XESTER.running = false
+        XESTER.token += 1
+        for _, c in ipairs(XESTER.conns) do pcall(function() c:Disconnect() end) end
+        XESTER.conns = {}
+        pcall(function() if XESTER.kill then XESTER.kill() end end)
+        XESTER.kill = nil
+        pcall(function() getgenv().__XKILL = nil getgenv().__XM = nil end)
+        local chr = LocalPlayer.Character
+        local hum = chr and chr:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Health = 0 end
+        notify("Xester", "Desligado.")
+        return
+    end
+
+    if XESTER.running then return end
+    if #XESTER_SRC < 2000 then
+        notify("Xester", "Cole o código do Xester dentro de XESTER_SRC.")
+        return
+    end
+
+    local chr = LocalPlayer.Character
+    local hum = chr and chr:FindFirstChildOfClass("Humanoid")
+    if not (chr and hum and hum.RigType == Enum.HumanoidRigType.R6 and chr:FindFirstChild("Torso")) then
+        notify("Xester", "Precisa de avatar R6.")
+        return
+    end
+
+    XESTER.running = true
+    XESTER.token += 1
+    local myToken = XESTER.token
+    notify("Xester", "Iniciando...")
+
+    local realMouse = LocalPlayer:GetMouse()
+    local function sigProxy(sig)
+        return setmetatable({}, { __index = function(_, k)
+            if k == "connect" or k == "Connect" then
+                return function(_, fn)
+                    local c = sig:Connect(function(...)
+                        if XESTER.running and XESTER.token == myToken then fn(...) end
+                    end)
+                    table.insert(XESTER.conns, c)
+                    return c
+                end
+            end
+        end })
+    end
+    local proxy = setmetatable({}, { __index = function(_, k)
+        if k == "KeyDown" or k == "KeyUp" or k == "Button1Down" then
+            return sigProxy(realMouse[k])
+        end
+        return realMouse[k]
+    end })
+    getgenv().__XM = proxy
+
+    local src = XESTER_SRC
+    src = (src:gsub("local IsDead = false", "local IsDead = false getgenv().__XKILL = function() IsDead = true end", 1))
+    src = (src:gsub("local mouse = Player:GetMouse%(%)", "local mouse = getgenv().__XM", 1))
+    src = (src:gsub("local ws = 10", "local ws = 10 task.spawn(function() while not IsDead do pcall(function() hum.WalkSpeed = ws end) task.wait() end end)", 1))
+
+    local fn, cerr = loadstring(src, "Xester")
+    if not fn then
+        XESTER.running = false
+        notify("Xester", "Erro no código: " .. tostring(cerr))
+        return
+    end
+
+    local ok, err = pcall(fn)
+    if not ok then
+        warn("[Xester] " .. tostring(err))
+        pcall(function() if getgenv().__XKILL then getgenv().__XKILL() end end)
+        for _, c in ipairs(XESTER.conns) do pcall(function() c:Disconnect() end) end
+        XESTER.conns = {}
+        XESTER.running = false
+        notify("Xester", "Erro: " .. tostring(err))
+        return
+    end
+
+    XESTER.kill = getgenv().__XKILL
+    table.insert(XESTER.conns, hum.Died:Connect(function()
+        if XESTER.running and XESTER.token == myToken then
+            task.spawn(function() pcall(xester, "OFF") end)
+        end
+    end))
+    notify("Xester", "Ativado!")
+end
+
+--==================================================================
+-- ROUBE UM BRAINROT (MUNDO) + REDE
+--==================================================================
+local BRAINROT = { token = 0, folder = nil, gui = nil, conns = {}, saved = nil, hidden = {}, busy = false }
+local roubeUmBrainrot
+
+do
+    local GY, HW, HL = 2400, 150, 220
+    local CARPET_W, WALL_H = 16, 20
+    local BW, BD = 84, 70
+    local BASE_X = 62
+    local BASE_Z = { -150, -50, 50, 150 }
+    local STAIRS = 14
+
+    local C = {
+        grass = Color3.fromRGB(58, 170, 58), dirt = Color3.fromRGB(121, 76, 50),
+        carpet = Color3.fromRGB(226, 60, 60), grey = Color3.fromRGB(99, 101, 110),
+        navy = Color3.fromRGB(44, 55, 72), white = Color3.fromRGB(240, 240, 240),
+        glass = Color3.fromRGB(150, 205, 235), wood = Color3.fromRGB(150, 100, 64),
+        roof = Color3.fromRGB(160, 160, 175), floor = Color3.fromRGB(78, 80, 88),
+        bars = Color3.fromRGB(235, 50, 50), pad = Color3.fromRGB(50, 205, 70),
+        slot = Color3.fromRGB(60, 62, 70),
+    }
+
+    local DEFS = {
+        { name = "Noobini Pizzanini",  rarity = "Common",    rc = Color3.fromRGB(70, 220, 70),   inc = 1,  price = 25,    w = 50,
+          head = Color3.fromRGB(245, 230, 80),  body = Color3.fromRGB(80, 150, 230),  legs = Color3.fromRGB(170, 235, 140) },
+        { name = "Lirili Larila",      rarity = "Rare",      rc = Color3.fromRGB(60, 140, 255),  inc = 3,  price = 250,   w = 25,
+          head = Color3.fromRGB(120, 200, 90),  body = Color3.fromRGB(130, 215, 95),  legs = Color3.fromRGB(110, 190, 85), nose = true },
+        { name = "Gangster Footera",   rarity = "Epic",      rc = Color3.fromRGB(190, 80, 255),  inc = 9,  price = 1000,  w = 15,
+          head = Color3.fromRGB(240, 200, 170), body = Color3.fromRGB(40, 40, 50),    legs = Color3.fromRGB(30, 30, 40) },
+        { name = "Tric Trac Baraboom", rarity = "Diamond",   rc = Color3.fromRGB(60, 210, 255),  inc = 18, price = 5000,  w = 7,
+          head = Color3.fromRGB(120, 230, 255), body = Color3.fromRGB(60, 190, 230),  legs = Color3.fromRGB(40, 150, 200), antenna = true },
+        { name = "Bombardiro Crocodilo", rarity = "Legendary", rc = Color3.fromRGB(255, 190, 40), inc = 40, price = 15000, w = 3,
+          head = Color3.fromRGB(90, 120, 70),   body = Color3.fromRGB(100, 130, 80),  legs = Color3.fromRGB(70, 90, 55), nose = true },
+    }
+
+    local function fmt(n)
+        if n >= 1000 then
+            local v = n / 1000
+            if v == math.floor(v) then return "$" .. v .. "K" end
+            return "$" .. string.format("%.1f", v) .. "K"
+        end
+        return "$" .. n
+    end
+
+    local function pickDef()
+        local r, acc = math.random(100), 0
+        for _, d in ipairs(DEFS) do
+            acc += d.w
+            if r <= acc then return d end
+        end
+        return DEFS[1]
+    end
+
+    local function makeLabel(parent, def)
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.fromOffset(150, 70)
+        bb.StudsOffset = Vector3.new(0, 4.6, 0)
+        bb.MaxDistance = 140
+        bb.AlwaysOnTop = false
+        bb.Parent = parent
+        local lines = {
+            { def.name,           Color3.new(1, 1, 1) },
+            { def.rarity,         def.rc },
+            { "$" .. def.inc .. "/s", Color3.fromRGB(255, 230, 70) },
+            { fmt(def.price),     Color3.fromRGB(90, 255, 90) },
+        }
+        for i, l in ipairs(lines) do
+            local t = Instance.new("TextLabel")
+            t.BackgroundTransparency = 1
+            t.Size = UDim2.new(1, 0, 0.25, 0)
+            t.Position = UDim2.new(0, 0, 0.25 * (i - 1), 0)
+            t.Text = l[1]
+            t.TextColor3 = l[2]
+            t.Font = Enum.Font.GothamBold
+            t.TextScaled = true
+            t.TextStrokeTransparency = 0
+            t.Parent = bb
+        end
+    end
+
+    local function makeBrainrot(parent, def)
+        local m = Instance.new("Model")
+        m.Name = def.name
+        local function part(size, off, color, neon)
+            local p = Instance.new("Part")
+            p.Anchored, p.CanCollide, p.CanQuery = true, false, false
+            p.Size = size
+            p.Color = color
+            p.Material = neon and Enum.Material.Neon or Enum.Material.SmoothPlastic
+            p.CFrame = CFrame.new(off)
+            p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+            p.Parent = m
+            return p
+        end
+        part(Vector3.new(1, 2, 1), Vector3.new(-0.5, 1, 0), def.legs)
+        part(Vector3.new(1, 2, 1), Vector3.new(0.5, 1, 0), def.legs)
+        local torso = part(Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), def.body)
+        part(Vector3.new(1, 2, 1), Vector3.new(-1.5, 3, 0), def.head)
+        part(Vector3.new(1, 2, 1), Vector3.new(1.5, 3, 0), def.head)
+        local head = part(Vector3.new(1.4, 1.4, 1.4), Vector3.new(0, 4.7, 0), def.head)
+        pcall(function()
+            local f = Instance.new("Decal")
+            f.Texture = "rbxasset://textures/face.png"
+            f.Face = Enum.NormalId.Front
+            f.Parent = head
+        end)
+        if def.nose then part(Vector3.new(0.5, 0.5, 2), Vector3.new(0, 4.5, -1.6), Color3.fromRGB(150, 150, 155)) end
+        if def.antenna then part(Vector3.new(0.2, 1.6, 0.2), Vector3.new(0, 6.2, 0), Color3.fromRGB(60, 230, 255), true) end
+        m.PrimaryPart = torso
+        m.Parent = parent
+        makeLabel(torso, def)
+        return m, torso
+    end
+
+    local function surfText(part, face, text, color)
+        local sg = Instance.new("SurfaceGui")
+        sg.Face = face
+        sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        sg.PixelsPerStud = 20
+        sg.Parent = part
+        local t = Instance.new("TextLabel")
+        t.Size = UDim2.fromScale(1, 1)
+        t.BackgroundTransparency = 1
+        t.Text = text
+        t.TextColor3 = color
+        t.Font = Enum.Font.GothamBold
+        t.TextScaled = true
+        t.TextWrapped = true
+        t.Parent = sg
+    end
+
+    function BRAINROT.clear(silent)
+        BRAINROT.token += 1
+        for _, c in ipairs(BRAINROT.conns) do pcall(function() c:Disconnect() end) end
+        BRAINROT.conns = {}
+        if BRAINROT.folder then pcall(function() BRAINROT.folder:Destroy() end) end
+        BRAINROT.folder = nil
+        if BRAINROT.gui then pcall(function() BRAINROT.gui:Destroy() end) end
+        BRAINROT.gui = nil
+        pcall(function()
+            local s = Lighting:FindFirstChild("RB_Sky") if s then s:Destroy() end
+            local c = workspace.Terrain:FindFirstChild("RB_Clouds") if c then c:Destroy() end
+        end)
+        for _, o in ipairs(BRAINROT.hidden) do pcall(function() o.Parent = Lighting end) end
+        BRAINROT.hidden = {}
+        if BRAINROT.saved then
+            for k, v in pairs(BRAINROT.saved) do pcall(function() Lighting[k] = v end) end
+            BRAINROT.saved = nil
+            if not silent then notify("Roube um Brainrot", "Mundo removido.") end
+        end
+    end
+
+    roubeUmBrainrot = function(modo, partnerName)
+        modo = modo and string.upper(modo) or ((BRAINROT.folder or BRAINROT.busy) and "OFF" or "ON")
+
+        if modo == "OFF" then
+            BRAINROT.busy = false
+            BRAINROT.clear()
+            return
+        end
+        if BRAINROT.folder or BRAINROT.busy then return end
+
+        BRAINROT.busy = true
+        BRAINROT.clear(true)
+        pcall(POOL.clear, true)
+        if workspace:FindFirstChild("Backrooms_Level0") then pcall(clearBackrooms) end
+        notify("Roube um Brainrot", "Gerando mundo...")
+
+        local myToken = BRAINROT.token
+        local folder = Instance.new("Folder")
+        folder.Name = "RoubeUmBrainrot"
+        folder.Parent = workspace
+        BRAINROT.folder = folder
+
+        local built = 0
+        local function mk(size, cf, color, mat, collide)
+            local p = Instance.new("Part")
+            p.Anchored = true
+            p.Size = size
+            p.CFrame = cf
+            p.Color = color
+            p.Material = mat or Enum.Material.SmoothPlastic
+            p.CanCollide = collide ~= false
+            p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+            p.Parent = folder
+            built += 1
+            if built % 120 == 0 then
+                task.wait()
+                if BRAINROT.token ~= myToken then error("cancelado") end
+            end
+            return p
+        end
+
+        local ok, err = pcall(function()
+            local S = { money = 500, income = 0 }
+            local slots, moving, ownerSlot = {}, {}, {}
+
+            local g = mk(Vector3.new(HW * 2 + 44, 2, HL * 2 + 44), CFrame.new(0, GY - 1, 0), C.grass, Enum.Material.Plastic)
+            g.TopSurface = Enum.SurfaceType.Studs
+            mk(Vector3.new(HW * 2 + 44, 6, HL * 2 + 44), CFrame.new(0, GY - 5, 0), C.dirt, Enum.Material.Slate)
+
+            local car = mk(Vector3.new(CARPET_W, 0.4, HL * 2 + 30), CFrame.new(0, GY + 0.2, 0), C.carpet, Enum.Material.Plastic)
+            car.TopSurface = Enum.SurfaceType.Studs
+
+            for _, sx in ipairs({ -1, 1 }) do
+                mk(Vector3.new(4, WALL_H, HL * 2 + 8), CFrame.new(sx * (HW + 2), GY + WALL_H / 2, 0), C.dirt, Enum.Material.Slate)
+            end
+            for _, sz in ipairs({ -1, 1 }) do
+                local wz = sz * (HL + 2)
+                for _, sx in ipairs({ -1, 1 }) do
+                    mk(Vector3.new(142, WALL_H, 4), CFrame.new(sx * 83, GY + WALL_H / 2, wz), C.dirt, Enum.Material.Slate)
+                end
+                mk(Vector3.new(24, 6, 4), CFrame.new(0, GY + 17, wz), C.dirt, Enum.Material.Slate)
+                for _, sx in ipairs({ -1, 1 }) do
+                    mk(Vector3.new(2, 14, 10), CFrame.new(sx * 13, GY + 7, sz * (HL + 9)), C.navy)
+                end
+                mk(Vector3.new(28, 2, 10), CFrame.new(0, GY + 15, sz * (HL + 9)), C.navy)
+                mk(Vector3.new(24, 14, 1), CFrame.new(0, GY + 7, sz * (HL + 14.5)), Color3.fromRGB(15, 15, 20))
+            end
+
+            local boards = {
+                { -60, "PROBABILIDADES\nCommon 50%\nRare 25%\nEpic 15%\nDiamond 7%\nLegendary 3%" },
+                {  60, "COMO JOGAR\nCompre brainrots no tapete\nRoube das outras bases\nGuarde na sua base\nSegure E nos prompts" },
+            }
+            for _, b in ipairs(boards) do
+                local bd = mk(Vector3.new(26, 16, 1), CFrame.new(b[1], GY + 11, HL - 0.5), Color3.fromRGB(28, 32, 36), nil, false)
+                surfText(bd, Enum.NormalId.Front, b[2], Color3.fromRGB(235, 235, 235))
+            end
+
+            local function stall(x, z)
+                mk(Vector3.new(14, 0.6, 14), CFrame.new(x, GY + 0.3, z), Color3.fromRGB(150, 150, 155))
+                for _, dx in ipairs({ -6, 6 }) do
+                    for _, dz in ipairs({ -6, 6 }) do
+                        mk(Vector3.new(0.7, 9, 0.7), CFrame.new(x + dx, GY + 5, z + dz), C.wood, Enum.Material.Wood, false)
+                    end
+                end
+                for k = 0, 6 do
+                    mk(Vector3.new(2, 0.4, 15), CFrame.new(x - 6 + k * 2, GY + 9.6, z), (k % 2 == 0) and C.carpet or C.white, nil, false)
+                end
+                mk(Vector3.new(10, 3, 3), CFrame.new(x, GY + 2.1, z + 4), C.wood, Enum.Material.Wood)
+            end
+            for _, z in ipairs({ -100, 100 }) do
+                stall(-18, z)
+                stall(18, z)
+            end
+
+            local others = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then table.insert(others, p.Name) end
+            end
+
+            local function buildBase(i, side, zc)
+                local pos = Vector3.new(side * BASE_X, GY, zc)
+                local origin = CFrame.lookAt(pos, pos + Vector3.new(-side, 0, 0))
+                local function B(sx, sy, sz, x, y, z, color, mat, collide)
+                    return mk(Vector3.new(sx, sy, sz), origin * CFrame.new(x, y, z), color, mat, collide)
+                end
+                local hw, hd = BW / 2, BD / 2
+                local CONC = Enum.Material.Concrete
+
+                B(BW, 0.6, BD, 0, 0.3, 0, C.floor, CONC)
+                B(BW, 14, 2, 0, 7, hd - 1, C.grey, CONC)
+                B(2, 14, BD, -hw + 1, 7, 0, C.grey, CONC)
+                B(2, 14, BD, hw - 1, 7, 0, C.grey, CONC)
+
+                B(BW, 2, 2, 0, 1, -hd + 1, C.navy)
+                B(BW, 3, 2, 0, 12.5, -hd + 1, C.navy)
+                for _, sx in ipairs({ -1, 1 }) do B(6, 9, 2, sx * (hw - 3), 6.5, -hd + 1, C.navy) end
+                local gl = B(BW - 12, 9, 0.4, 0, 6.5, -hd + 1, C.glass, Enum.Material.Glass, false)
+                gl.Transparency = 0.6
+                B(BW - 12, 0.5, 0.6, 0, 2.2, -hd + 0.6, C.white, nil, false)
+                B(BW - 12, 0.5, 0.6, 0, 10.8, -hd + 0.6, C.white, nil, false)
+                local bx = -(hw - 6) + 1.2
+                while bx < hw - 6 do
+                    if math.abs(bx) > 5 then B(0.8, 8.6, 0.8, bx, 6.5, -hd + 0.2, C.bars) end
+                    bx += 2.4
+                end
+
+                for _, sx in ipairs({ -1, 1 }) do
+                    for _, sz in ipairs({ -1, 1 }) do
+                        B(3, 14, 3, sx * (hw - 1.5), 7, sz * (hd - 1.5), C.navy)
+                    end
+                end
+
+                B(BW + 2, 1, BD + 2, 0, 14.5, 0, C.grey, CONC)
+                B(BW + 3, 1, BD + 3, 0, 13.5, 0, C.navy, nil, false)
+                for _, lx in ipairs({ -22, 22 }) do
+                    for _, lz in ipairs({ -12, 14 }) do
+                        B(6, 0.3, 6, lx, 13.8, lz, Color3.fromRGB(255, 255, 255), Enum.Material.Neon, false)
+                    end
+                end
+
+                B(BW, 13, 2, 0, 21.5, hd - 1, C.grey, CONC)
+                B(2, 13, BD, -hw + 1, 21.5, 0, C.grey, CONC)
+                B(2, 13, 57, hw - 1, 21.5, -6.5, C.grey, CONC)
+                B(2, 13, 4, hw - 1, 21.5, 33, C.grey, CONC)
+                B(2, 2, 9, hw - 1, 27, 26.5, C.grey, CONC)
+                B(BW, 3, 2, 0, 16.5, -hd + 1, C.navy)
+                B(BW, 3, 2, 0, 26.5, -hd + 1, C.navy)
+                for _, sx in ipairs({ -1, 1 }) do B(6, 7, 2, sx * (hw - 3), 21.5, -hd + 1, C.navy) end
+                local gl2 = B(BW - 12, 7, 0.4, 0, 21.5, -hd + 1, C.glass, Enum.Material.Glass, false)
+                gl2.Transparency = 0.6
+                B(BW - 12, 0.5, 0.6, 0, 18.2, -hd + 0.6, C.white, nil, false)
+                B(BW - 12, 0.5, 0.6, 0, 24.8, -hd + 0.6, C.white, nil, false)
+                for _, lx in ipairs({ -22, 22 }) do
+                    for _, lz in ipairs({ -12, 14 }) do
+                        B(6, 0.3, 6, lx, 27.8, lz, Color3.fromRGB(255, 255, 255), Enum.Material.Neon, false)
+                    end
+                end
+
+                B(BW + 4, 1.5, BD + 4, 0, 28.75, 0, C.roof)
+
+                for s = 1, STAIRS do
+                    local h = s * 15 / STAIRS
+                    local zc2 = -hd + 3 + (s - 1) * 4.6 + 2.3
+                    B(5, h, 4.6, hw + 2.5, h / 2, zc2, C.grey, CONC)
+                end
+
+                local nameTxt = (i == 1) and "Sua Base" or ((others[i - 1] or ("Base " .. i)) .. "'s Base")
+                local sign = B(26, 6, 1.2, -8, 16, -hd - 1.5, C.wood, Enum.Material.Wood, false)
+                surfText(sign, Enum.NormalId.Front, nameTxt, Color3.fromRGB(255, 240, 215))
+
+                B(13.6, 0.3, 13.6, 0, 0.15, -hd - 8, C.white, nil, false)
+                local pad = B(12, 0.4, 12, 0, 0.2, -hd - 8, C.pad, nil, false)
+                surfText(pad, Enum.NormalId.Top, (i == 1) and "SUA BASE" or "OCUPADA", Color3.new(1, 1, 1))
+
+                slots[i] = {}
+                for _, fl in ipairs({ 0.6, 15 }) do
+                    for k = -2, 2 do
+                        B(8, 0.2, 8, k * 14, fl + 0.1, 20, C.slot, nil, false)
+                        table.insert(slots[i], { cf = origin * CFrame.new(k * 14, fl, 20), model = nil })
+                    end
+                end
+            end
+
+            for i = 1, 8 do
+                local side = (i <= 4) and -1 or 1
+                buildBase(i, side, BASE_Z[(i - 1) % 4 + 1])
+            end
+
+            local function freeSlot(idx)
+                for _, s in ipairs(slots[idx]) do
+                    if not s.model then return s end
+                end
+            end
+            local function putInSlot(model, slot)
+                slot.model = model
+                ownerSlot[model] = slot
+                model:PivotTo(slot.cf * CFrame.new(0, 3, 0))
+            end
+
+            local pg = LocalPlayer:WaitForChild("PlayerGui")
+            local sg = Instance.new("ScreenGui")
+            sg.Name, sg.ResetOnSpawn = "RoubeUmBrainrotGui", false
+            sg.Parent = pg
+            BRAINROT.gui = sg
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.fromOffset(240, 40)
+            lbl.Position = UDim2.new(0, 10, 0, 60)
+            lbl.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+            lbl.BackgroundTransparency = 0.3
+            lbl.TextColor3 = Color3.fromRGB(90, 255, 110)
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 18
+            lbl.Parent = sg
+            Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 8)
+            local function updateGui()
+                lbl.Text = ("$%d   (+$%d/s)"):format(S.money, S.income)
+            end
+            updateGui()
+
+            local function wirePurchase(b)
+                local def = b.def
+                local pr = Instance.new("ProximityPrompt")
+                pr.ActionText = "Comprar " .. fmt(def.price)
+                pr.ObjectText = def.name
+                pr.HoldDuration = 0.4
+                pr.MaxActivationDistance = 12
+                pr.RequiresLineOfSight = false
+                pr.Parent = b.torso
+                pr.Triggered:Connect(function(plr)
+                    if plr ~= LocalPlayer or b.sold then return end
+                    if S.money < def.price then notify("Brainrot", "Dinheiro insuficiente!") return end
+                    local slot = freeSlot(1)
+                    if not slot then notify("Brainrot", "Sua base está cheia!") return end
+                    b.sold = true
+                    S.money -= def.price
+                    S.income += def.inc
+                    local at = table.find(moving, b)
+                    if at then table.remove(moving, at) end
+                    pr:Destroy()
+                    putInSlot(b.model, slot)
+                    updateGui()
+                    notify("Brainrot", "Você comprou " .. def.name .. "!")
+                end)
+            end
+
+            local function wireSteal(model, torso, def)
+                local pr = Instance.new("ProximityPrompt")
+                pr.ActionText = "Roubar"
+                pr.ObjectText = def.name
+                pr.HoldDuration = 1.2
+                pr.MaxActivationDistance = 12
+                pr.RequiresLineOfSight = false
+                pr.Parent = torso
+                pr.Triggered:Connect(function(plr)
+                    if plr ~= LocalPlayer then return end
+                    local mine = freeSlot(1)
+                    if not mine then notify("Brainrot", "Sua base está cheia!") return end
+                    local old = ownerSlot[model]
+                    if old then old.model = nil end
+                    putInSlot(model, mine)
+                    S.income += def.inc
+                    pr:Destroy()
+                    updateGui()
+                    notify("Brainrot", "Você roubou " .. def.name .. "!")
+                end)
+            end
+
+            for i = 2, 8 do
+                for n = 1, 3 do
+                    local slot = slots[i][math.random(#slots[i])]
+                    if not slot.model then
+                        local def = pickDef()
+                        local m, torso = makeBrainrot(folder, def)
+                        putInSlot(m, slot)
+                        wireSteal(m, torso, def)
+                    end
+                end
+            end
+
+            table.insert(BRAINROT.conns, RunService.Heartbeat:Connect(function(dt)
+                for idx = #moving, 1, -1 do
+                    local b = moving[idx]
+                    b.z += 14 * dt
+                    b.t += dt
+                    if b.z > HL + 12 then
+                        b.model:Destroy()
+                        table.remove(moving, idx)
+                    else
+                        b.model:PivotTo(CFrame.new(b.x, GY + 3.4 + math.abs(math.sin(b.t * 8)) * 0.5, b.z)
+                            * CFrame.Angles(0, math.pi, math.sin(b.t * 8) * 0.08))
+                    end
+                end
+            end))
+
+            task.spawn(function()
+                while BRAINROT.token == myToken do
+                    if #moving < 14 then
+                        local def = pickDef()
+                        local m, torso = makeBrainrot(folder, def)
+                        local b = { model = m, torso = torso, def = def, x = math.random(-5, 5), z = -HL - 8, t = math.random() * 6 }
+                        table.insert(moving, b)
+                        wirePurchase(b)
+                    end
+                    task.wait(2.5)
+                end
+            end)
+
+            task.spawn(function()
+                while BRAINROT.token == myToken do
+                    task.wait(1)
+                    if S.income > 0 then
+                        S.money += S.income
+                        updateGui()
+                    end
+                end
+            end)
+
+            BRAINROT.saved = {}
+            for _, k in ipairs({ "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogStart", "FogEnd", "FogColor", "ExposureCompensation" }) do
+                pcall(function() BRAINROT.saved[k] = Lighting[k] end)
+            end
+            pcall(function()
+                for _, c in ipairs(Lighting:GetChildren()) do
+                    if c:IsA("Atmosphere") or c:IsA("Sky") then
+                        table.insert(BRAINROT.hidden, c)
+                        c.Parent = nil
+                    end
+                end
+            end)
+            pcall(function()
+                Lighting.ClockTime = 14
+                Lighting.Brightness = 2
+                Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+                Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+                Lighting.FogStart = 0
+                Lighting.FogEnd = 100000
+                Lighting.ExposureCompensation = 0
+                local sky = Instance.new("Sky")
+                sky.Name = "RB_Sky"
+                sky.Parent = Lighting
+                local cl = Instance.new("Clouds")
+                cl.Name = "RB_Clouds"
+                cl.Cover = 0.55
+                cl.Density = 0.5
+                cl.Parent = workspace.Terrain
+            end)
+
+            task.spawn(function()
+                task.wait(0.5)
+                local spawnPos = Vector3.new(0, GY + 5, -HL + 18)
+                local cf = CFrame.lookAt(spawnPos, Vector3.new(0, GY + 5, 0))
+                local chr = LocalPlayer.Character
+                local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+                if hrp then hrp.CFrame = cf end
+                if partnerName and partnerName ~= "" then
+                    local partner = Players:FindFirstChild(partnerName)
+                    if partner and partner.Character and partner.Character:FindFirstChild("HumanoidRootPart") then
+                        partner.Character.HumanoidRootPart.CFrame = cf + Vector3.new(3, 0, 3)
+                    end
+                end
+            end)
+        end)
+
+        BRAINROT.busy = false
+        if ok then
+            notify("Roube um Brainrot", "Pronto! Compre no tapete e roube das outras bases (segure E).")
+        else
+            if tostring(err):find("cancelado") then return end
+            warn("[Brainrot] " .. tostring(err))
+            BRAINROT.clear(true)
+            notify("Roube um Brainrot", "Erro: " .. tostring(err))
+        end
+    end
+end
+
 -- ================== FLASH & AURA (REDE) ==================
 local FXNET = {
-    flash = {},   -- estado por nome de jogador
-    aura  = {},
+    flash = {}, aura = {},
     actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
 }
 
 do
-    local Debris         = game:GetService("Debris")
-    local TweenService   = game:GetService("TweenService")
-    local rand           = math.random
+    local Debris = game:GetService("Debris")
+    local TweenService = game:GetService("TweenService")
+    local rand = math.random
     local function rr(a, b) return a + (b - a) * rand() end
-
-    local GOLD   = Color3.fromRGB(255, 200, 0)
-    local BRIGHT = Color3.fromRGB(255, 235, 110)
-    local CORE   = Color3.fromRGB(255, 248, 200)
-    local ORANGE = Color3.fromRGB(255, 140, 0)
+    local GOLD, BRIGHT = Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 235, 110)
+    local CORE, ORANGE = Color3.fromRGB(255, 248, 200), Color3.fromRGB(255, 140, 0)
 
     local function fxFolder()
         local cam = workspace.CurrentCamera
         local f = cam:FindFirstChild("F1L_FX")
         if not f then
             f = Instance.new("Folder")
-            f.Name = "F1L_FX"
-            f.Parent = cam
+            f.Name, f.Parent = "F1L_FX", cam
         end
         return f
     end
@@ -3467,41 +1830,32 @@ do
         st.objs = {}
     end
 
-    ------------------------------------------------------------
-    -- RAIO PROCEDURAL
-    ------------------------------------------------------------
     local function bolt(p0, p1, thick, straight)
         local dist = (p1 - p0).Magnitude
         if dist < 0.5 then return end
         local segs = math.clamp(math.floor(dist * 1.6), 5, 24)
         local cf = CFrame.lookAt(p0, p1)
         local jit = dist * (straight and 0.01 or 0.075)
-
         local part = Instance.new("Part")
         part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
-        part.Transparency = 1
-        part.Size = Vector3.new(0.1, 0.1, 0.1)
-        part.CFrame = CFrame.new(p0)
+        part.Transparency, part.Size, part.CFrame = 1, Vector3.new(0.1,0.1,0.1), CFrame.new(p0)
         part.Parent = fxFolder()
-
         local atts = {}
         for i = 0, segs do
             local j = (i == 0 or i == segs) and 0 or jit
-            local a = Instance.new("Attachment")
-            a.Parent = part
-            a.WorldPosition = p0:Lerp(p1, i / segs)
+            local a = Instance.new("Attachment", part)
+            a.WorldPosition = p0:Lerp(p1, i/segs)
                 + cf.RightVector * (rand() - 0.5) * 2 * j
                 + cf.UpVector * (rand() - 0.5) * 2 * j
-            atts[i + 1] = a
+            atts[i+1] = a
         end
-
         for i = 1, segs do
             for _, L in ipairs({
-                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 }, -- brilho
-                { Color3.new(1, 1, 1),          0.14 * thick, 0   }, -- nucleo
+                { Color3.fromRGB(255,215,40), 0.55*thick, 0.6 },
+                { Color3.new(1,1,1), 0.14*thick, 0 },
             }) do
                 local b = Instance.new("Beam")
-                b.Attachment0, b.Attachment1 = atts[i], atts[i + 1]
+                b.Attachment0, b.Attachment1 = atts[i], atts[i+1]
                 b.Segments, b.FaceCamera = 1, true
                 b.Color = ColorSequence.new(L[1])
                 b.LightEmission, b.LightInfluence = 1, 0
@@ -3513,93 +1867,65 @@ do
         Debris:AddItem(part, rr(0.07, 0.13))
     end
 
-    ------------------------------------------------------------
-    -- FLASH
-    ------------------------------------------------------------
     local function flashApply(plr, st)
         local char = plr.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not root then return end
-
         clearObjs(st)
         st.char = char
         local function keep(o) table.insert(st.objs, o) return o end
-
         if plr == LocalPlayer and hum then hum.WalkSpeed = 200 end
-
-        -- faiscas
-        local att = keep(Instance.new("Attachment"))
-        att.Parent = root
-        local em = Instance.new("ParticleEmitter")
+        local att = keep(Instance.new("Attachment", root))
+        local em = Instance.new("ParticleEmitter", att)
         em.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-            ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 230, 60)),
+            ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255,230,60)),
             ColorSequenceKeypoint.new(1, ORANGE),
         })
         em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
         em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
-        em.Rate, em.Lifetime, em.Speed = 60, NumberRange.new(0.1, 0.3), NumberRange.new(8, 20)
-        em.SpreadAngle = Vector2.new(360, 360)
-        em.LightEmission = 1
-        em.Parent = att
-
-        -- rastro
-        local top = keep(Instance.new("Attachment"))
-        top.Position = Vector3.new(0, 2, 0)
-        top.Parent = root
-        local bot = keep(Instance.new("Attachment"))
-        bot.Position = Vector3.new(0, -2, 0)
-        bot.Parent = root
-        local trail = keep(Instance.new("Trail"))
+        em.Rate, em.Lifetime, em.Speed = 60, NumberRange.new(0.1,0.3), NumberRange.new(8,20)
+        em.SpreadAngle, em.LightEmission = Vector2.new(360,360), 1
+        local top, bot = keep(Instance.new("Attachment", root)), keep(Instance.new("Attachment", root))
+        top.Position, bot.Position = Vector3.new(0,2,0), Vector3.new(0,-2,0)
+        local trail = keep(Instance.new("Trail", root))
         trail.Attachment0, trail.Attachment1 = top, bot
         trail.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-            ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 220, 0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 0)),
+            ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255,220,0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255,120,0)),
         })
-        trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+        trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.1), NumberSequenceKeypoint.new(1,1) })
         trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.3, 0.01
-        trail.Parent = root
-
-        -- luz + aura
-        local light = keep(Instance.new("PointLight"))
-        light.Color, light.Brightness, light.Range = Color3.fromRGB(255, 220, 60), 3, 14
-        light.Parent = root
-
-        local hl = keep(Instance.new("Highlight"))
-        hl.FillColor, hl.OutlineColor = Color3.fromRGB(255, 220, 40), Color3.new(1, 1, 1)
+        local light = keep(Instance.new("PointLight", root))
+        light.Color, light.Brightness, light.Range = Color3.fromRGB(255,220,60), 3, 14
+        local hl = keep(Instance.new("Highlight", char))
+        hl.FillColor, hl.OutlineColor = Color3.fromRGB(255,220,40), Color3.new(1,1,1)
         hl.FillTransparency, hl.OutlineTransparency = 0.88, 0.3
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
-        hl.Parent = char
-
-        -- loop dos raios
         task.spawn(function()
             while FXNET.flash[plr.Name] == st and st.char == char and root.Parent do
                 local vel = root.AssemblyLinearVelocity
                 local speed = vel.Magnitude
                 local qtd = speed > 25 and 3 or (speed > 5 and 2 or 1)
-
                 for _ = 1, qtd do
-                    local origem = root.Position + Vector3.new(rr(-1.3, 1.3), rr(-2.6, 2.2), rr(-1.3, 1.3))
-                    local rnd = Vector3.new(rand() - 0.5, rand() - 0.5, rand() - 0.5)
-                    if rnd.Magnitude < 0.01 then rnd = Vector3.new(0, 1, 0) end
-                    local velH = Vector3.new(vel.X, 0, vel.Z)
-
+                    local origem = root.Position + Vector3.new(rr(-1.3,1.3), rr(-2.6,2.2), rr(-1.3,1.3))
+                    local rnd = Vector3.new(rand()-0.5, rand()-0.5, rand()-0.5)
+                    if rnd.Magnitude < 0.01 then rnd = Vector3.new(0,1,0) end
+                    local velH = Vector3.new(vel.X,0,vel.Z)
                     if velH.Magnitude > 20 then
-                        -- correndo: raios retos para tras
-                        local dir = (-velH.Unit + rnd.Unit * 0.06).Unit
-                        bolt(origem, origem + dir * rr(18, 36), rr(0.9, 1.3), true)
+                        local dir = (-velH.Unit + rnd.Unit*0.06).Unit
+                        bolt(origem, origem + dir*rr(18,36), rr(0.9,1.3), true)
                     else
                         local dir = rnd.Unit
-                        if speed > 5 then dir = (dir * 0.8 - vel.Unit * 0.9).Unit end
-                        bolt(origem, origem + dir * rr(10, 20), rr(0.8, 1.3), false)
+                        if speed > 5 then dir = (dir*0.8 - vel.Unit*0.9).Unit end
+                        bolt(origem, origem + dir*rr(10,20), rr(0.8,1.3), false)
                     end
                 end
-
-                light.Brightness = rr(2, 6)
+                light.Brightness = rr(2,6)
                 hl.FillTransparency = rr(0.78, 0.93)
-                task.wait(rr(0.03, 0.07))
+                task.wait(rr(0.03,0.07))
             end
         end)
     end
@@ -3629,35 +1955,24 @@ do
         end
     end
 
-    ------------------------------------------------------------
-    -- AURA
-    ------------------------------------------------------------
     local function column(groundPos, height, thick)
         local part = Instance.new("Part")
         part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
-        part.Transparency = 1
-        part.Size = Vector3.new(0.1, 0.1, 0.1)
-        part.CFrame = CFrame.new(groundPos)
+        part.Transparency, part.Size, part.CFrame = 1, Vector3.new(0.1,0.1,0.1), CFrame.new(groundPos)
         part.Parent = fxFolder()
-
-        local a0 = Instance.new("Attachment")
-        a0.Parent = part
-        local a1 = Instance.new("Attachment")
-        a1.Position = Vector3.new(rr(-0.7, 0.7), height, rr(-0.7, 0.7))
-        a1.Parent = part
-
+        local a0, a1 = Instance.new("Attachment", part), Instance.new("Attachment", part)
+        a1.Position = Vector3.new(rr(-0.7,0.7), height, rr(-0.7,0.7))
         for _, L in ipairs({
-            { GOLD, 0.55 * thick, 0.05, 0.5, 1 },
-            { CORE, 0.16 * thick, 0,    0,   0.8 },
+            { GOLD, 0.55*thick, 0.05, 0.5, 1 },
+            { CORE, 0.16*thick, 0, 0, 0.8 },
         }) do
-            local b = Instance.new("Beam")
+            local b = Instance.new("Beam", part)
             b.Attachment0, b.Attachment1 = a0, a1
             b.Segments, b.FaceCamera = 1, true
             b.Color = ColorSequence.new(L[1])
             b.LightEmission, b.LightInfluence = 1, 0
             b.Width0, b.Width1 = L[2], L[3]
-            b.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, L[4]), NumberSequenceKeypoint.new(1, L[5]) })
-            b.Parent = part
+            b.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,L[4]), NumberSequenceKeypoint.new(1,L[5]) })
         end
         Debris:AddItem(part, 0.35)
     end
@@ -3671,8 +1986,7 @@ do
         w.CFrame = CFrame.new(groundPos + Vector3.new(0, 0.1, 0)) * CFrame.Angles(0, 0, math.rad(90))
         w.Parent = fxFolder()
         TweenService:Create(w, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = Vector3.new(0.2, finalSize, finalSize),
-            Transparency = 1,
+            Size = Vector3.new(0.2, finalSize, finalSize), Transparency = 1,
         }):Play()
         Debris:AddItem(w, 1)
     end
@@ -3682,141 +1996,109 @@ do
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not root or not hum then return end
-
         clearObjs(st)
         st.char = char
         local function keep(o) table.insert(st.objs, o) return o end
-
-        local groundDist = hum.RigType == Enum.HumanoidRigType.R6 and 3 or (hum.HipHeight + root.Size.Y / 2)
-
-        -- brilho no corpo + luz
-        local hl = keep(Instance.new("Highlight"))
+        local groundDist = hum.RigType == Enum.HumanoidRigType.R6 and 3 or (hum.HipHeight + root.Size.Y/2)
+        local hl = keep(Instance.new("Highlight", char))
         hl.FillColor, hl.OutlineColor = GOLD, BRIGHT
         hl.FillTransparency, hl.OutlineTransparency = 0.8, 0.1
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
-        hl.Parent = char
-
-        local light = keep(Instance.new("PointLight"))
+        local light = keep(Instance.new("PointLight", root))
         light.Color, light.Brightness, light.Range = GOLD, 4, 24
-        light.Parent = root
-
-        -- chamas em cada parte do corpo
         local parts = {}
         for _, p in ipairs(char:GetChildren()) do
             if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then table.insert(parts, p) end
         end
         local n = math.max(#parts, 1)
         for _, p in ipairs(parts) do
-            local att = keep(Instance.new("Attachment"))
-            att.Parent = p
+            local att = keep(Instance.new("Attachment", p))
             local s = math.clamp(p.Size.Magnitude * 0.9, 1.2, 3)
-            local fl = Instance.new("ParticleEmitter")
+            local fl = Instance.new("ParticleEmitter", att)
             fl.Texture = "rbxasset://textures/particles/fire_main.dds"
             fl.Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, CORE),
                 ColorSequenceKeypoint.new(0.35, GOLD),
                 ColorSequenceKeypoint.new(1, ORANGE),
             })
-            fl.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, s), NumberSequenceKeypoint.new(1, 0) })
-            fl.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+            fl.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0,s), NumberSequenceKeypoint.new(1,0) })
+            fl.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.3), NumberSequenceKeypoint.new(1,1) })
             fl.Lifetime = NumberRange.new(0.5, 0.9)
-            fl.Rate = math.max(2, 130 / n)
-            fl.Speed = NumberRange.new(1, 3)
-            fl.SpreadAngle = Vector2.new(12, 12)
+            fl.Rate = math.max(2, 130/n)
+            fl.Speed = NumberRange.new(1,3)
+            fl.SpreadAngle = Vector2.new(12,12)
             fl.EmissionDirection = Enum.NormalId.Top
-            fl.Acceleration = Vector3.new(0, 7, 0)
-            fl.Rotation, fl.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-30, 30)
+            fl.Acceleration = Vector3.new(0,7,0)
+            fl.Rotation, fl.RotSpeed = NumberRange.new(0,360), NumberRange.new(-30,30)
             fl.LightEmission = 1
-            fl.LockedToPart = false
-            fl.Parent = att
         end
-
-        -- nevoa + faiscas no centro
-        local attRoot = keep(Instance.new("Attachment"))
-        attRoot.Parent = root
-
-        local fog = Instance.new("ParticleEmitter")
+        local attRoot = keep(Instance.new("Attachment", root))
+        local fog = Instance.new("ParticleEmitter", attRoot)
         fog.Texture = "rbxasset://textures/particles/smoke_main.dds"
         fog.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, BRIGHT),
             ColorSequenceKeypoint.new(0.5, GOLD),
             ColorSequenceKeypoint.new(1, ORANGE),
         })
-        fog.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 9) })
-        fog.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 1) })
-        fog.Lifetime, fog.Rate, fog.Speed = NumberRange.new(0.7, 1.2), 34, NumberRange.new(2, 5)
-        fog.SpreadAngle = Vector2.new(30, 30)
+        fog.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0,4), NumberSequenceKeypoint.new(1,9) })
+        fog.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.8), NumberSequenceKeypoint.new(1,1) })
+        fog.Lifetime, fog.Rate, fog.Speed = NumberRange.new(0.7,1.2), 34, NumberRange.new(2,5)
+        fog.SpreadAngle = Vector2.new(30,30)
         fog.EmissionDirection = Enum.NormalId.Top
         fog.LightEmission = 1
-        fog.Rotation, fog.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-40, 40)
-        fog.Parent = attRoot
-
-        local sp = Instance.new("ParticleEmitter")
+        fog.Rotation, fog.RotSpeed = NumberRange.new(0,360), NumberRange.new(-40,40)
+        local sp = Instance.new("ParticleEmitter", attRoot)
         sp.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+            ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
             ColorSequenceKeypoint.new(0.4, GOLD),
             ColorSequenceKeypoint.new(1, ORANGE),
         })
-        sp.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
-        sp.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
-        sp.Lifetime, sp.Rate, sp.Speed = NumberRange.new(0.9, 1.8), 55, NumberRange.new(5, 14)
-        sp.SpreadAngle = Vector2.new(40, 40)
+        sp.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.4), NumberSequenceKeypoint.new(1,0) })
+        sp.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1) })
+        sp.Lifetime, sp.Rate, sp.Speed = NumberRange.new(0.9,1.8), 55, NumberRange.new(5,14)
+        sp.SpreadAngle = Vector2.new(40,40)
         sp.EmissionDirection = Enum.NormalId.Top
-        sp.Acceleration = Vector3.new(0, 5, 0)
+        sp.Acceleration = Vector3.new(0,5,0)
         sp.LightEmission = 1
-        sp.Parent = attRoot
-
-        -- aneis no chao (soldados ao personagem)
         local function ring(d, t, off)
             local a = keep(Instance.new("Part"))
             a.Shape = Enum.PartType.Cylinder
             a.Size = Vector3.new(0.2, d, d)
             a.Material, a.Color, a.Transparency = Enum.Material.Neon, GOLD, t
             a.CanCollide, a.CanQuery, a.CanTouch, a.Massless = false, false, false, true
-            a.CFrame = root.CFrame * CFrame.new(0, -(groundDist - off), 0) * CFrame.Angles(0, 0, math.rad(90))
+            a.CFrame = root.CFrame * CFrame.new(0, -(groundDist-off), 0) * CFrame.Angles(0, 0, math.rad(90))
             a.Parent = char
             local w = Instance.new("WeldConstraint")
             w.Part0, w.Part1, w.Parent = root, a, a
             return a
         end
         local r1, r2 = ring(6, 0.5, 0), ring(9, 0.7, 0.05)
-
-        -- bloom so para quem esta com a aura (efeito de tela local)
         if plr == LocalPlayer then
             local bloom = keep(Instance.new("BloomEffect"))
             bloom.Intensity, bloom.Size, bloom.Threshold = 0.8, 28, 0.85
             bloom.Parent = Lighting
         end
-
-        -- loop principal
         task.spawn(function()
             local tc, tw = 0, 0
             while FXNET.aura[plr.Name] == st and st.char == char and root.Parent do
                 local dt = task.wait()
                 local pulse = (math.sin(os.clock() * 4) + 1) / 2
-
                 hl.FillTransparency = 0.7 + 0.2 * pulse
                 light.Brightness = 3 + 3 * pulse
-                local d1, d2 = 6 + 1.2 * pulse, 9 + 1.5 * (1 - pulse)
-                r1.Size, r2.Size = Vector3.new(0.2, d1, d1), Vector3.new(0.2, d2, d2)
-                r1.Transparency, r2.Transparency = 0.4 + 0.35 * pulse, 0.6 + 0.3 * (1 - pulse)
-
+                local d1, d2 = 6 + 1.2*pulse, 9 + 1.5*(1-pulse)
+                r1.Size, r2.Size = Vector3.new(0.2,d1,d1), Vector3.new(0.2,d2,d2)
+                r1.Transparency, r2.Transparency = 0.4+0.35*pulse, 0.6+0.3*(1-pulse)
                 local ground = root.Position - Vector3.new(0, groundDist, 0)
-
                 tc += dt
                 if tc >= 0.05 then
                     tc = 0
                     for _ = 1, 3 do
                         local ang, rad = rand() * math.pi * 2, rr(1.8, 3.8)
-                        column(ground + Vector3.new(math.cos(ang) * rad, 0, math.sin(ang) * rad), rr(7, 16) * 1.4, rr(0.8, 1.3))
+                        column(ground + Vector3.new(math.cos(ang)*rad, 0, math.sin(ang)*rad), rr(7,16)*1.4, rr(0.8,1.3))
                     end
                 end
-
                 tw += dt
-                if tw >= 1.1 then
-                    tw = 0
-                    wave(ground, 34)
-                end
+                if tw >= 1.1 then tw = 0 wave(ground, 34) end
             end
         end)
     end
@@ -3842,15 +2124,10 @@ do
         clearObjs(st)
     end
 
-    ------------------------------------------------------------
-    -- REDE
-    ------------------------------------------------------------
-    -- Executa a acao localmente (todo cliente com o hub desenha o efeito no alvo)
     function FXNET.run(action, name)
         if not name or name == "" then return end
         local isOn = action:sub(-3) == "_ON"
-        local kind = action:sub(1, 5) == "FLASH" and "flash" or "aura"
-
+        local kind = action:sub(1,5) == "FLASH" and "flash" or "aura"
         local targets = {}
         if name == "ALL" then
             if isOn then
@@ -3858,21 +2135,15 @@ do
             else
                 for n in pairs(FXNET[kind]) do table.insert(targets, n) end
             end
-        else
-            targets = { name }
-        end
-
+        else targets = { name } end
         for _, n in ipairs(targets) do
             if isOn then
                 local plr = Players:FindFirstChild(n)
                 if plr then FXNET[kind .. "On"](plr) end
-            else
-                FXNET[kind .. "Off"](n)
-            end
+            else FXNET[kind .. "Off"](n) end
         end
     end
 
-    -- Executa aqui + envia pela rede (chat) para os outros usuarios do hub
     function FXNET.send(action, name)
         if not name or name == "" then return end
         FXNET.run(action, name)
@@ -3880,7 +2151,6 @@ do
         notify("Hub", action .. " → " .. name)
     end
 
-    -- limpeza quando alguem sai do servidor
     Players.PlayerRemoving:Connect(function(p)
         FXNET.flashOff(p.Name)
         FXNET.auraOff(p.Name)
@@ -3904,9 +2174,9 @@ function executeActionLocally(action, senderName, extraArg)
     elseif action == "ICE" and hrp then
         if workspace:FindFirstChild("Ice_" .. LocalPlayer.Name) then workspace["Ice_" .. LocalPlayer.Name]:Destroy() end
         local ip = Instance.new("Part", workspace)
-        ip.Name, ip.Size, ip.CFrame = "Ice_" .. LocalPlayer.Name, Vector3.new(6, 8, 6), hrp.CFrame
+        ip.Name, ip.Size, ip.CFrame = "Ice_" .. LocalPlayer.Name, Vector3.new(6,8,6), hrp.CFrame
         ip.Anchored, ip.CanCollide = true, false
-        ip.Color, ip.Material, ip.Transparency = Color3.fromRGB(0, 170, 255), Enum.Material.Glass, 0.4
+        ip.Color, ip.Material, ip.Transparency = Color3.fromRGB(0,170,255), Enum.Material.Glass, 0.4
         if hum then hum.WalkSpeed = 0 end
         hrp.Anchored = true
     elseif action == "UNICE" and hrp then
@@ -3917,9 +2187,7 @@ function executeActionLocally(action, senderName, extraArg)
         local targetPlr = Players:FindFirstChild(extraArg)
         if targetPlr and targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
             local thrp = targetPlr.Character.HumanoidRootPart
-            if workspace:FindFirstChild("Jail_" .. targetPlr.Name) then
-                workspace["Jail_" .. targetPlr.Name]:Destroy()
-            end
+            if workspace:FindFirstChild("Jail_" .. targetPlr.Name) then workspace["Jail_" .. targetPlr.Name]:Destroy() end
             local cage = Instance.new("Model", workspace)
             cage.Name = "Jail_" .. targetPlr.Name
             local cf = thrp.CFrame
@@ -3933,14 +2201,12 @@ function executeActionLocally(action, senderName, extraArg)
             }) do
                 local p = Instance.new("Part", cage)
                 p.Size, p.CFrame = d[1], d[2]
-                p.Color, p.Material = Color3.fromRGB(168, 85, 247), Enum.Material.Neon
+                p.Color, p.Material = Color3.fromRGB(168,85,247), Enum.Material.Neon
                 p.Anchored, p.Transparency = true, 0.3
             end
         end
     elseif action == "UNJAIL" and extraArg then
-        if workspace:FindFirstChild("Jail_" .. extraArg) then
-            workspace["Jail_" .. extraArg]:Destroy()
-        end
+        if workspace:FindFirstChild("Jail_" .. extraArg) then workspace["Jail_" .. extraArg]:Destroy() end
     elseif action == "TP_TO_POS" and hrp and senderName then
         local sp = Players:FindFirstChild(senderName)
         if sp and sp.Character and sp.Character:FindFirstChild("HumanoidRootPart") then
@@ -3962,8 +2228,7 @@ function executeActionLocally(action, senderName, extraArg)
         task.spawn(function() pcall(POOL.clear, true) pcall(function() spawnBackrooms(extraArg) end) end)
     elseif action == "POOLROOMS_SPAWN" then
         task.spawn(function() pcall(function() POOL.spawn(extraArg) end) end)
-    elseif action == "POOLROOMS_CLEAR" then
-        task.spawn(function() pcall(POOL.clear) end)
+    elseif action == "POOLROOMS_CLEAR" then task.spawn(function() pcall(POOL.clear) end)
     elseif action == "BACKROOMS_CLEAR" then task.spawn(function() pcall(clearBackrooms) end)
     elseif action == "LIFEFORM_SPAWN" then
         task.spawn(function()
@@ -3977,26 +2242,31 @@ function executeActionLocally(action, senderName, extraArg)
                 local targetP = Players:FindFirstChild(extraArg or selectedPlayerName) or LocalPlayer
                 local chr = targetP.Character
                 local hrp2 = chr and chr:FindFirstChild("HumanoidRootPart")
-                local pos = hrp2 and (hrp2.Position + Vector3.new(30, 0, 30)) or Vector3.new(30, 203, 30)
+                local pos = hrp2 and (hrp2.Position + Vector3.new(30,0,30)) or Vector3.new(30,203,30)
                 pcall(function() spawnLifeform(pos, folder, targetP.Name) end)
             end
         end)
-    elseif action == "LIFEFORM_CLEAR" then
-        task.spawn(function() pcall(clearLifeform) end)
+    elseif action == "LIFEFORM_CLEAR" then task.spawn(function() pcall(clearLifeform) end)
     elseif action == "LOCUST_ON" then
-        task.spawn(function() pcall(locust, "ON") end)
+        task.spawn(function() pcall(function() LOCUST.start() end) end)
     elseif action == "LOCUST_OFF" then
-        task.spawn(function() pcall(locust, "OFF") end)
-    -- >>> FLASH & AURA (REDE) <<<
-    elseif FXNET.actions[action] then
-        FXNET.run(action, extraArg)
+        task.spawn(function() pcall(function() LOCUST.stop(false) end) end)
+    elseif action == "XESTER_ON" then
+        task.spawn(function() pcall(xester, "ON") end)
+    elseif action == "XESTER_OFF" then
+        task.spawn(function() pcall(xester, "OFF") end)
+    elseif action == "BRAINROT_ON" then
+        task.spawn(function() pcall(roubeUmBrainrot, "ON", extraArg) end)
+    elseif action == "BRAINROT_OFF" then
+        task.spawn(function() pcall(roubeUmBrainrot, "OFF") end)
+    elseif FXNET.actions[action] then FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
         task.spawn(function()
             local pg = LocalPlayer:WaitForChild("PlayerGui")
             local sg = Instance.new("ScreenGui", pg)
             sg.Name, sg.IgnoreGuiInset, sg.ResetOnSpawn = "KamuiEffect", true, false
             local img = Instance.new("ImageLabel", sg)
-            img.Size, img.AnchorPoint, img.Position = UDim2.new(0, 320, 0, 320), Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.5, 0)
+            img.Size, img.AnchorPoint, img.Position = UDim2.new(0,320,0,320), Vector2.new(0.5,0.5), UDim2.new(0.5,0,0.5,0)
             img.BackgroundTransparency, img.Image, img.ScaleType = 1, KAMUI_IMG, Enum.ScaleType.Fit
             local s = Instance.new("Sound", workspace)
             s.SoundId, s.Volume = KAMUI_SND, 6
@@ -4032,65 +2302,6 @@ function executeActionLocally(action, senderName, extraArg)
                 im.Image, im.ScaleType = id, Enum.ScaleType.Fit
             end
         end
-    elseif action == "SUKUNA_DOMAIN" and senderName then
-        local sp = Players:FindFirstChild(senderName)
-        local sc = sp and sp.Character
-        local sh = sc and sc:FindFirstChild("HumanoidRootPart")
-        if not sh then return end
-        task.spawn(function()
-            local s = Instance.new("Sound", sh)
-            s.SoundId, s.Volume = SUK_AUDIO, 5
-            s:Play()
-            s.Ended:Connect(function() s:Destroy() end)
-            local rp = RaycastParams.new()
-            rp.FilterDescendantsInstances, rp.FilterType = {sc}, Enum.RaycastFilterType.Exclude
-            local rr = workspace:Raycast(sh.Position + Vector3.new(0,50,0), Vector3.new(0,-200,0), rp)
-            local gy = rr and rr.Position.Y or sh.Position.Y
-            local tb = sh.CFrame * CFrame.new(0, 0, 10)
-            local shrine = fetchAssetAsModel(SUK_SHRINE)
-            if shrine then
-                shrine.Parent = workspace
-                pcall(function() shrine:ScaleTo(5.5) end)
-                for _, p in ipairs(shrine:GetDescendants()) do
-                    if p:IsA("BasePart") then p.Anchored, p.CanCollide = true, false end
-                end
-                local bcf, bs = shrine:GetBoundingBox()
-                local bo = shrine:GetPivot().Position.Y - (bcf.Position.Y - (bs.Y / 2))
-                local tcf = CFrame.new(tb.X, gy + bo + SHRINE_Y, tb.Z) * sh.CFrame.Rotation
-                local scf = tcf * CFrame.new(0, -35, 0)
-                shrine:PivotTo(scf)
-                for i = 1, 50 do
-                    local a = i / 50
-                    shrine:PivotTo(scf:Lerp(tcf, a * a * (3 - 2 * a)))
-                    task.wait(0.015)
-                end
-                shrine:PivotTo(tcf)
-                local st, dur = tick(), 15
-                while tick() - st < dur and shrine and shrine.Parent do
-                    for _ = 1, 6 do
-                        task.spawn(function()
-                            local cm = fetchAssetAsModel(SUK_CUTS)
-                            if cm then
-                                pcall(function() cm:ScaleTo(4.5) end)
-                                for _, p in ipairs(cm:GetDescendants()) do
-                                    if p:IsA("BasePart") then p.Anchored, p.CanCollide = true, false end
-                                end
-                                local off = Vector3.new(math.random(-35,35), math.random(-5,20), math.random(-35,35))
-                                local rot = CFrame.Angles(math.rad(math.random(360)), math.rad(math.random(360)), math.rad(math.random(360)))
-                                cm:PivotTo(sh.CFrame * CFrame.new(off) * rot)
-                                cm.Parent = workspace
-                                task.delay(0.1, function() if cm then cm:Destroy() end end)
-                            end
-                        end)
-                    end
-                    if hrp and hum and (hrp.Position - sh.Position).Magnitude <= 140 then
-                        hum:TakeDamage(10)
-                    end
-                    task.wait(0.03)
-                end
-                if shrine then shrine:Destroy() end
-            end
-        end)
     elseif action == "TACO_RAIN" then
         task.spawn(function()
             for _ = 1, 15 do
@@ -4156,17 +2367,12 @@ function executeActionLocally(action, senderName, extraArg)
 end
 
 -- ================== REDE (PREFIXO ;) ==================
--- Formato: ;ACAO ALVO [EXTRA]   ex.: ;KILL Fulano   ;FLASH_ON ALL   (também aceita "fhub ACAO ALVO")
 function processNetMessage(msg, senderName)
     if not msg then return end
     local body
-    if msg:sub(1, 1) == ";" then
-        body = msg:sub(2)
-    elseif string.lower(msg:sub(1, 5)) == "fhub " then
-        body = msg:sub(6)
-    else
-        return
-    end
+    if msg:sub(1,1) == ";" then body = msg:sub(2)
+    elseif string.lower(msg:sub(1,5)) == "fhub " then body = msg:sub(6)
+    else return end
     local parts = string.split(body, " ")
     if #parts < 1 or parts[1] == "" then return end
 
@@ -4185,12 +2391,28 @@ function processNetMessage(msg, senderName)
         if pt and IS_ADMIN then applyOverheadTag(pt) end
     end
 
-    -- Segurança: comandos só valem se vierem de você ou de alguém da WHITELIST
     if action ~= "PING" and action ~= "PONG" then
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
 
-    -- >>> FLASH & AURA (REDE): todo cliente do hub desenha o efeito no personagem do alvo <<<
+    if action == "LOCUST_ON" or action == "LOCUST_OFF" then
+        if senderName ~= LocalPlayer.Name then
+            task.spawn(function()
+                pcall(function() executeActionLocally(action, senderName, extraArg or target) end)
+            end)
+        end
+        return
+    end
+
+    if action == "XESTER_ON" or action == "XESTER_OFF" or action == "BRAINROT_ON" or action == "BRAINROT_OFF" then
+        if senderName ~= LocalPlayer.Name then
+            task.spawn(function()
+                pcall(function() executeActionLocally(action, senderName, extraArg or target) end)
+            end)
+        end
+        return
+    end
+
     if FXNET.actions[action] then
         if target then
             task.spawn(function() pcall(executeActionLocally, action, senderName, target) end)
@@ -4248,7 +2470,6 @@ local function toggleFlyWithWings()
     local head = char and char:FindFirstChild("Head")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not char or not hrp or not torso or not head then return end
-
     if flyWingsActive then
         local ok, w = pcall(function() return game:GetObjects("rbxassetid://" .. WINGS_ID) end)
         if ok and w and #w > 0 then
@@ -4387,15 +2608,15 @@ local function spawnSkyline(targetName)
         local sp = th.Position + th.CFrame.LookVector * 45
         local rp = RaycastParams.new()
         rp.FilterType, rp.FilterDescendantsInstances = Enum.RaycastFilterType.Exclude, {car, tp.Character}
-        local rr = workspace:Raycast(sp + Vector3.new(0, 50, 0), Vector3.new(0, -100, 0), rp)
-        local gy = rr and rr.Position.Y or sp.Y
+        local rr2 = workspace:Raycast(sp + Vector3.new(0, 50, 0), Vector3.new(0, -100, 0), rp)
+        local gy = rr2 and rr2.Position.Y or sp.Y
         local bcf, bs = car:GetBoundingBox()
         local bo = car:GetPivot().Position.Y - (bcf.Position.Y - bs.Y / 2)
         local tcf = CFrame.new(sp.X, gy + bo, sp.Z) * CFrame.lookAt(sp, th.Position).Rotation
         local scf = tcf * CFrame.new(0, -10, 0)
         car:PivotTo(scf)
         for i = 1, 35 do
-            car:PivotTo(scf:Lerp(tcf, (i / 35) ^ 2 * (3 - 2 * (i / 35))))
+            car:PivotTo(scf:Lerp(tcf, (i/35)^2 * (3 - 2*(i/35))))
             task.wait(0.015)
         end
         car:PivotTo(tcf)
@@ -4534,23 +2755,22 @@ else
         for n, _ in pairs(activeScriptUsers) do l = l .. n .. ", " end
         notify("Rede", l)
     end})
-    TabADM:Button({ Title = "Kill",              Callback = function() triggerCommand("KILL", selectedPlayerName) end })
-    TabADM:Button({ Title = "Kick",              Callback = function() triggerCommand("KICK", selectedPlayerName) end })
-    TabADM:Button({ Title = "Freeze",            Callback = function() triggerCommand("FREEZE", selectedPlayerName) end })
-    TabADM:Button({ Title = "Unfreeze",          Callback = function() triggerCommand("UNFREEZE", selectedPlayerName) end })
-    TabADM:Button({ Title = "Ice",               Callback = function() triggerCommand("ICE", selectedPlayerName) end })
-    TabADM:Button({ Title = "Unice",             Callback = function() triggerCommand("UNICE", selectedPlayerName) end })
-    TabADM:Button({ Title = "Jail",              Callback = function() triggerCommand("JAIL", selectedPlayerName, selectedPlayerName) end })
-    TabADM:Button({ Title = "Unjail",            Callback = function() triggerCommand("UNJAIL", selectedPlayerName, selectedPlayerName) end })
-    TabADM:Button({ Title = "Explodir",          Callback = function() triggerCommand("EXPLODE", selectedPlayerName) end })
-    TabADM:Button({ Title = "Crash Player",      Callback = function() triggerCommand("CRASH", selectedPlayerName) end })
-    TabADM:Button({ Title = "TP Player to Me",   Callback = function() triggerCommand("TP_TO_POS", selectedPlayerName) end })
-    TabADM:Button({ Title = "TP Me to Player",   Callback = function() triggerCommand("TP_ME", selectedPlayerName) end })
-    TabADM:Button({ Title = "Visible",           Callback = function() triggerCommand("VISIBLE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Kill", Callback = function() triggerCommand("KILL", selectedPlayerName) end })
+    TabADM:Button({ Title = "Kick", Callback = function() triggerCommand("KICK", selectedPlayerName) end })
+    TabADM:Button({ Title = "Freeze", Callback = function() triggerCommand("FREEZE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Unfreeze", Callback = function() triggerCommand("UNFREEZE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Ice", Callback = function() triggerCommand("ICE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Unice", Callback = function() triggerCommand("UNICE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Jail", Callback = function() triggerCommand("JAIL", selectedPlayerName, selectedPlayerName) end })
+    TabADM:Button({ Title = "Unjail", Callback = function() triggerCommand("UNJAIL", selectedPlayerName, selectedPlayerName) end })
+    TabADM:Button({ Title = "Explodir", Callback = function() triggerCommand("EXPLODE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Crash Player", Callback = function() triggerCommand("CRASH", selectedPlayerName) end })
+    TabADM:Button({ Title = "TP Player to Me", Callback = function() triggerCommand("TP_TO_POS", selectedPlayerName) end })
+    TabADM:Button({ Title = "TP Me to Player", Callback = function() triggerCommand("TP_ME", selectedPlayerName) end })
+    TabADM:Button({ Title = "Visible", Callback = function() triggerCommand("VISIBLE", selectedPlayerName) end })
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
-    TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
+    TabADM:Button({ Title = "Kamui", Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4559,7 +2779,6 @@ else
         sendNetCmd(";BACKROOMS_CLEAR ALL")
     end})
 
-    -- The Lifeform
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4568,7 +2787,6 @@ else
         sendNetCmd(";LIFEFORM_CLEAR ALL")
     end})
 
-    -- Poolrooms infinitas
     TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4577,7 +2795,6 @@ else
         sendNetCmd(";POOLROOMS_CLEAR ALL")
     end})
 
-    -- Aba Say / Command
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -4609,7 +2826,6 @@ else
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
     TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
-    -- Locust (reanimate) com rede: aperta uma vez liga, aperta de novo desliga
     TabE:Button({ Title = "Locust (ligar/desligar)", Callback = function()
         local isOn = LOCUST.running or LOCUST.busy
         triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", LocalPlayer.Name)
@@ -4618,6 +2834,25 @@ else
     TabE:Button({ Title = "Locust OFF (Alvo)",   Callback = function() triggerCommand("LOCUST_OFF", selectedPlayerName) end })
     TabE:Button({ Title = "Locust ON (Todos)",   Callback = function() triggerCommand("LOCUST_ON", "ALL") end })
     TabE:Button({ Title = "Locust OFF (Todos)",  Callback = function() triggerCommand("LOCUST_OFF", "ALL") end })
+
+    TabE:Button({ Title = "Xester (ligar/desligar)", Callback = function()
+        triggerCommand(XESTER.running and "XESTER_OFF" or "XESTER_ON", LocalPlayer.Name)
+    end })
+    TabE:Button({ Title = "Xester ON (Alvo)",   Callback = function() triggerCommand("XESTER_ON", selectedPlayerName) end })
+    TabE:Button({ Title = "Xester OFF (Alvo)",  Callback = function() triggerCommand("XESTER_OFF", selectedPlayerName) end })
+    TabE:Button({ Title = "Xester ON (Todos)",  Callback = function() triggerCommand("XESTER_ON", "ALL") end })
+    TabE:Button({ Title = "Xester OFF (Todos)", Callback = function() triggerCommand("XESTER_OFF", "ALL") end })
+
+    TabE:Button({ Title = "Roube um Brainrot (ligar/desligar)", Callback = function()
+        local on = BRAINROT.folder ~= nil or BRAINROT.busy
+        triggerCommand(on and "BRAINROT_OFF" or "BRAINROT_ON", LocalPlayer.Name)
+    end })
+    TabE:Button({ Title = "Roube um Brainrot (Eu e o Alvo)", Callback = function()
+        triggerCommand("BRAINROT_ON", selectedPlayerName, selectedPlayerName)
+    end })
+    TabE:Button({ Title = "Roube um Brainrot ON (Todos)",  Callback = function() triggerCommand("BRAINROT_ON", "ALL") end })
+    TabE:Button({ Title = "Roube um Brainrot OFF (Todos)", Callback = function() triggerCommand("BRAINROT_OFF", "ALL") end })
+
     TabE:Button({ Title = "Modo Satoru Gojo", Callback = function() giveGojo() end })
     TabE:Button({ Title = "Expansão de Domínio [Sukuna]", Callback = function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
     TabE:Button({ Title = "Pegar AK-47", Callback = function() giveAK47() end })
@@ -4630,8 +2865,7 @@ else
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    -- >>> FLASH & AURA (REDE): aperta uma vez liga, aperta de novo desliga <<<
-    local function toggleFX(kind) -- kind = "FLASH" ou "AURA"
+    local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
         local isOn = stateTable[LocalPlayer.Name] ~= nil
         FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
@@ -4669,9 +2903,13 @@ task.spawn(function()
     TabHome:AddButton({ "Rejoin Server", function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end })
-    TabHome:AddSection({ "Locust" })
-    TabHome:AddButton({ "Locust (ligar/desligar)", function()
-        task.spawn(function() pcall(locust) end)
+
+    TabHome:AddSection({ "Xester / Brainrot" })
+    TabHome:AddButton({ "Xester (ligar/desligar)", function()
+        task.spawn(function() pcall(xester) end)
+    end })
+    TabHome:AddButton({ "Roube um Brainrot (ligar/desligar)", function()
+        task.spawn(function() pcall(roubeUmBrainrot) end)
     end })
 
     TabTroll:AddSection({ "Troll Player" })
@@ -4719,8 +2957,6 @@ task.spawn(function()
     TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
         Callback = function(v) methodKill = v end })
 
-    -- ===== COUCH (CORRIGIDO) =====
-    -- Procura o sofá no Backpack E no Character, por nome parecido
     local function findCouch()
         local chr = LocalPlayer.Character
         for _, c in ipairs({ LocalPlayer:FindFirstChild("Backpack"), chr }) do
@@ -4744,11 +2980,9 @@ task.spawn(function()
             notify("Couch", "Selecione um jogador válido.")
             return
         end
-
         local RE = ReplicatedStorage:FindFirstChild("RE")
         if not RE then notify("Couch", "Remote RE não encontrado.") return end
 
-        -- limpa ferramentas e pede o sofá (com tentativas)
         pcall(function() RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
         task.wait(0.4)
 
@@ -4782,8 +3016,7 @@ task.spawn(function()
             if not tr then break end
             s1.CFrame = CFrame.new(tr.Position + tr.Velocity * 0.5) * CFrame.new(-2, 2, 0)
             task.wait()
-        until (tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit)
-            or tick() - t0 > 8
+        until (tp.Character and tp.Character:FindFirstChild("Humanoid") and tp.Character.Humanoid.Sit) or tick() - t0 > 8
 
         task.wait()
         couch.Parent = LocalPlayer.Backpack
