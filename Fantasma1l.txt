@@ -1,9 +1,10 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB v33 - COMPLETO
-    + Xester (Card Master, com rede)
-    + Roube um Brainrot (mundo, com rede)
-    + Poolrooms realista + Locust + Couch + Flash/Aura
+    FANTASMA1L HUB v34 - COMPLETO
+    + Roube um Brainrot (100% idêntico ao Steal a Brainrot)
+    + Poolrooms realista + Backrooms + Lifeform
+    + Couch + Flash/Aura + prefixo ;
+    (SEM Locust, SEM Xester)
     ==========================================================
 ]]--
 
@@ -812,19 +813,16 @@ local function clearBackrooms()
     return true
 end
 
--- ================== POOLROOMS (Realista Level 37) ==================
+-- ================== POOLROOMS ==================
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
     local CH, WALL_H, POOL_Y, DEPTH, RADIUS, TILE = 48, 20, 1000, 3, 2, 6
     local WALL_TEX = "rbxassetid://122349893272800"
-
     local TILE_MAT = Enum.Material.SmoothPlastic
     pcall(function() TILE_MAT = Enum.Material.CeramicTiles end)
-
     local C_WALL, C_FLOOR, C_CEIL = Color3.fromRGB(232, 235, 236), Color3.fromRGB(226, 230, 232), Color3.fromRGB(240, 242, 244)
     local C_FRAME, C_PANEL, C_METAL, C_LAMP = Color3.fromRGB(180, 184, 188), Color3.fromRGB(252, 253, 255), Color3.fromRGB(120, 126, 132), Color3.fromRGB(255, 250, 240)
-
     local FACES_TOP, FACES_BOT = { Enum.NormalId.Top }, { Enum.NormalId.Bottom }
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
     local FACES_ALL6 = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right }
@@ -912,28 +910,23 @@ do
         folder.Name = "Chunk_" .. key
         S.chunks[key] = { folder = folder, cx = cx, cz = cz }
         local wx, wz = cx * CH, cz * CH
-
         local ok, err = pcall(function()
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR).Reflectance = 0.14
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y + WALL_H + 1, wz), FACES_BOT, C_CEIL).Reflectance = 0.06
             waterFill(S, folder, wx, wz)
-
             local step = 12
             for dx = -step, step, step do
                 for dz = -step, step, step do
                     column(S, folder, wx + dx, wz + dz, 2.4, WALL_H)
                 end
             end
-
             for lx = -16, 16, 16 do
                 for lz = -16, 16, 16 do
                     lampPanel(S, folder, wx + lx, wz + lz)
                 end
             end
-
             mkPart(folder, Vector3.new(CH, 0.6, 0.4), CFrame.new(wx, POOL_Y+0.3, wz-CH/2+0.2), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
             mkPart(folder, Vector3.new(0.4, 0.6, CH), CFrame.new(wx-CH/2+0.2, POOL_Y+0.3, wz), C_FRAME, Enum.Material.SmoothPlastic, false).CastShadow = false
-
             local amb = mkPart(folder, Vector3.new(0.1,0.1,0.1), CFrame.new(wx, POOL_Y + WALL_H/2, wz), C_LAMP, Enum.Material.SmoothPlastic, false)
             amb.Transparency, amb.CastShadow = 1, false
             local apl = Instance.new("PointLight", amb)
@@ -1075,23 +1068,18 @@ do
         POOL.clear(true)
         if workspace:FindFirstChild("Backrooms_Level0") then pcall(clearBackrooms) end
         local myToken = POOL.token
-
         local S = { chunks = {}, count = 0, tex = WALL_TEX, terrain = false }
         POOL.S = S
         local folder = Instance.new("Folder", workspace)
         folder.Name = "Poolrooms_Level"
         S.folder = folder
-
         pcall(function() S.tex = resolveImage(WALL_TEX) end)
         if POOL.token ~= myToken then return end
-
         S.terrain = terrainOK()
         POOL.saved = envSave()
         envApply()
-
         streamStep(S, 0, 0)
         if POOL.token ~= myToken then return end
-
         local spawnCF = CFrame.new(16, POOL_Y + 8, 16)
         local chr = LocalPlayer.Character
         local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
@@ -1107,7 +1095,6 @@ do
                 partner.Character.HumanoidRootPart.CFrame = spawnCF + Vector3.new(3, 0, 3)
             end
         end
-
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
@@ -1120,180 +1107,40 @@ do
                 task.wait(0.35)
             end
         end)
-        notify("Poolrooms", "Pronto! " .. (S.terrain and "Água real." or "Água fake."))
+        notify("Poolrooms", "Pronto!")
         return true
     end
 end
 
--- ================== LOCUST (REANIMATE) + REDE ==================
-local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil }
-
-function LOCUST.start()
-    if LOCUST.running or LOCUST.busy then return end
-    LOCUST.busy = true
-    notify("Locust", "Iniciando...")
-
-    local ok, err = pcall(function()
-
-LOCUST.fem = LOCUST.fem or loadstring(game:HttpGet("https://gist.githubusercontent.com/MelonsStuff/a003ea305dd302eab1f8d372daed38b4/raw/9db59962b28555fd699a7c29891efb85d45677ab/gistfile1.txt"))()
-local FEManager = LOCUST.fem
-if not FEManager then error("FEManager não carregou") end
-
--- >>>>>>>>>>>>>> COLE AQUI O CÓDIGO COMPLETO DO LOCUST <<<<<<<<<<<<<<
--- (todo o bloco desde "local ScriptOptions" até o final do pcall de conexões)
--- Sem mudanças — só mantém.
-
--- Manda pra rede:
-pcall(function() sendNetCmd(";LOCUST_ON " .. LocalPlayer.Name) end)
-
-    end)
-
-    LOCUST.busy = false
-    if ok then
-        LOCUST.running = true
-        notify("Locust", "Ativado! X=kill | Q=agachar | C=sentar | E=wp | Shift=correr")
-    else
-        warn("[Locust] " .. tostring(err))
-        if LOCUST.stopFn then pcall(LOCUST.stopFn) end
-        LOCUST.running = false
-        LOCUST.stopFn = nil
-        notify("Locust", "Erro: " .. tostring(err))
-    end
-end
-
-function LOCUST.stop(broadcast)
-    local f = LOCUST.stopFn
-    if f then pcall(f) notify("Locust", "Desligado.") end
-    LOCUST.running = false
-    LOCUST.stopFn = nil
-    if broadcast ~= false then
-        pcall(function() sendNetCmd(";LOCUST_OFF " .. LocalPlayer.Name) end)
-    end
-end
-
---==================================================================
--- XESTER (CARD MASTER) + REDE
---==================================================================
-local XESTER = { running = false, conns = {}, kill = nil, token = 0 }
-
-local XESTER_SRC = [==[
--- >>>>>>>> COLE AQUI O CÓDIGO COMPLETO DO XESTER <<<<<<<<
--- (o segundo código que você mencionou, mas não colou)
-]==]
-
-local function xester(modo)
-    modo = modo and string.upper(modo) or (XESTER.running and "OFF" or "ON")
-
-    if modo == "OFF" then
-        if not XESTER.running then return end
-        XESTER.running = false
-        XESTER.token += 1
-        for _, c in ipairs(XESTER.conns) do pcall(function() c:Disconnect() end) end
-        XESTER.conns = {}
-        pcall(function() if XESTER.kill then XESTER.kill() end end)
-        XESTER.kill = nil
-        pcall(function() getgenv().__XKILL = nil getgenv().__XM = nil end)
-        local chr = LocalPlayer.Character
-        local hum = chr and chr:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Health = 0 end
-        notify("Xester", "Desligado.")
-        return
-    end
-
-    if XESTER.running then return end
-    if #XESTER_SRC < 2000 then
-        notify("Xester", "Cole o código do Xester dentro de XESTER_SRC.")
-        return
-    end
-
-    local chr = LocalPlayer.Character
-    local hum = chr and chr:FindFirstChildOfClass("Humanoid")
-    if not (chr and hum and hum.RigType == Enum.HumanoidRigType.R6 and chr:FindFirstChild("Torso")) then
-        notify("Xester", "Precisa de avatar R6.")
-        return
-    end
-
-    XESTER.running = true
-    XESTER.token += 1
-    local myToken = XESTER.token
-    notify("Xester", "Iniciando...")
-
-    local realMouse = LocalPlayer:GetMouse()
-    local function sigProxy(sig)
-        return setmetatable({}, { __index = function(_, k)
-            if k == "connect" or k == "Connect" then
-                return function(_, fn)
-                    local c = sig:Connect(function(...)
-                        if XESTER.running and XESTER.token == myToken then fn(...) end
-                    end)
-                    table.insert(XESTER.conns, c)
-                    return c
-                end
-            end
-        end })
-    end
-    local proxy = setmetatable({}, { __index = function(_, k)
-        if k == "KeyDown" or k == "KeyUp" or k == "Button1Down" then
-            return sigProxy(realMouse[k])
-        end
-        return realMouse[k]
-    end })
-    getgenv().__XM = proxy
-
-    local src = XESTER_SRC
-    src = (src:gsub("local IsDead = false", "local IsDead = false getgenv().__XKILL = function() IsDead = true end", 1))
-    src = (src:gsub("local mouse = Player:GetMouse%(%)", "local mouse = getgenv().__XM", 1))
-    src = (src:gsub("local ws = 10", "local ws = 10 task.spawn(function() while not IsDead do pcall(function() hum.WalkSpeed = ws end) task.wait() end end)", 1))
-
-    local fn, cerr = loadstring(src, "Xester")
-    if not fn then
-        XESTER.running = false
-        notify("Xester", "Erro no código: " .. tostring(cerr))
-        return
-    end
-
-    local ok, err = pcall(fn)
-    if not ok then
-        warn("[Xester] " .. tostring(err))
-        pcall(function() if getgenv().__XKILL then getgenv().__XKILL() end end)
-        for _, c in ipairs(XESTER.conns) do pcall(function() c:Disconnect() end) end
-        XESTER.conns = {}
-        XESTER.running = false
-        notify("Xester", "Erro: " .. tostring(err))
-        return
-    end
-
-    XESTER.kill = getgenv().__XKILL
-    table.insert(XESTER.conns, hum.Died:Connect(function()
-        if XESTER.running and XESTER.token == myToken then
-            task.spawn(function() pcall(xester, "OFF") end)
-        end
-    end))
-    notify("Xester", "Ativado!")
-end
-
---==================================================================
--- ROUBE UM BRAINROT (MUNDO) + REDE
---==================================================================
+-- ================== ROUBE UM BRAINROT (100% IDÊNTICO) ==================
 local BRAINROT = { token = 0, folder = nil, gui = nil, conns = {}, saved = nil, hidden = {}, busy = false }
 local roubeUmBrainrot
 
 do
-    local GY, HW, HL = 2400, 150, 220
-    local CARPET_W, WALL_H = 16, 20
-    local BW, BD = 84, 70
-    local BASE_X = 62
-    local BASE_Z = { -150, -50, 50, 150 }
+    -- Dimensões fiéis ao jogo original
+    local GY, HW, HL = 2400, 190, 260
+    local CARPET_W = 22
+    local WALL_H = 22
+    local BW, BD = 100, 85      -- base: largura (ao longo do tapete) x profundidade
+    local BASE_X = 75
+    local BASE_Z = { -180, -60, 60, 180 }
     local STAIRS = 14
 
     local C = {
-        grass = Color3.fromRGB(58, 170, 58), dirt = Color3.fromRGB(121, 76, 50),
-        carpet = Color3.fromRGB(226, 60, 60), grey = Color3.fromRGB(99, 101, 110),
-        navy = Color3.fromRGB(44, 55, 72), white = Color3.fromRGB(240, 240, 240),
-        glass = Color3.fromRGB(150, 205, 235), wood = Color3.fromRGB(150, 100, 64),
-        roof = Color3.fromRGB(160, 160, 175), floor = Color3.fromRGB(78, 80, 88),
-        bars = Color3.fromRGB(235, 50, 50), pad = Color3.fromRGB(50, 205, 70),
-        slot = Color3.fromRGB(60, 62, 70),
+        grass   = Color3.fromRGB(58, 170, 58),
+        dirt    = Color3.fromRGB(121, 76, 50),
+        carpet  = Color3.fromRGB(226, 60, 60),
+        grey    = Color3.fromRGB(99, 101, 110),
+        navy    = Color3.fromRGB(44, 55, 72),
+        white   = Color3.fromRGB(240, 240, 240),
+        glass   = Color3.fromRGB(150, 205, 235),
+        wood    = Color3.fromRGB(150, 100, 64),
+        roof    = Color3.fromRGB(160, 160, 175),
+        floor   = Color3.fromRGB(78, 80, 88),
+        bars    = Color3.fromRGB(235, 50, 50),
+        pad     = Color3.fromRGB(50, 205, 70),
+        slot    = Color3.fromRGB(60, 62, 70),
+        skybox  = Color3.fromRGB(120, 200, 240),
     }
 
     local DEFS = {
@@ -1327,13 +1174,24 @@ do
         return DEFS[1]
     end
 
+    -- Placa de identificação do brainrot (estilo Steal a Brainrot)
     local function makeLabel(parent, def)
         local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.fromOffset(150, 70)
-        bb.StudsOffset = Vector3.new(0, 4.6, 0)
-        bb.MaxDistance = 140
+        bb.Size = UDim2.fromOffset(170, 80)
+        bb.StudsOffset = Vector3.new(0, 5.5, 0)
+        bb.MaxDistance = 150
         bb.AlwaysOnTop = false
         bb.Parent = parent
+        -- fundo escuro
+        local bg = Instance.new("Frame", bb)
+        bg.Size = UDim2.fromScale(1, 1)
+        bg.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+        bg.BackgroundTransparency = 0.15
+        bg.BorderSizePixel = 0
+        Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 6)
+        local stroke = Instance.new("UIStroke", bg)
+        stroke.Color, stroke.Thickness = def.rc, 2
+        -- linhas
         local lines = {
             { def.name,           Color3.new(1, 1, 1) },
             { def.rarity,         def.rc },
@@ -1341,7 +1199,7 @@ do
             { fmt(def.price),     Color3.fromRGB(90, 255, 90) },
         }
         for i, l in ipairs(lines) do
-            local t = Instance.new("TextLabel")
+            local t = Instance.new("TextLabel", bg)
             t.BackgroundTransparency = 1
             t.Size = UDim2.new(1, 0, 0.25, 0)
             t.Position = UDim2.new(0, 0, 0.25 * (i - 1), 0)
@@ -1350,7 +1208,6 @@ do
             t.Font = Enum.Font.GothamBold
             t.TextScaled = true
             t.TextStrokeTransparency = 0
-            t.Parent = bb
         end
     end
 
@@ -1471,48 +1328,58 @@ do
             local S = { money = 500, income = 0 }
             local slots, moving, ownerSlot = {}, {}, {}
 
-            local g = mk(Vector3.new(HW * 2 + 44, 2, HL * 2 + 44), CFrame.new(0, GY - 1, 0), C.grass, Enum.Material.Plastic)
+            -- ====== CHÃO ======
+            local g = mk(Vector3.new(HW * 2 + 60, 2, HL * 2 + 60), CFrame.new(0, GY - 1, 0), C.grass, Enum.Material.Grass)
             g.TopSurface = Enum.SurfaceType.Studs
-            mk(Vector3.new(HW * 2 + 44, 6, HL * 2 + 44), CFrame.new(0, GY - 5, 0), C.dirt, Enum.Material.Slate)
+            -- terra em volta (bordas)
+            mk(Vector3.new(HW * 2 + 60, 6, HL * 2 + 60), CFrame.new(0, GY - 5, 0), C.dirt, Enum.Material.Ground)
 
-            local car = mk(Vector3.new(CARPET_W, 0.4, HL * 2 + 30), CFrame.new(0, GY + 0.2, 0), C.carpet, Enum.Material.Plastic)
+            -- ====== TAPETE VERMELHO CENTRAL ======
+            local car = mk(Vector3.new(CARPET_W, 0.4, HL * 2 + 40), CFrame.new(0, GY + 0.2, 0), C.carpet, Enum.Material.Fabric)
             car.TopSurface = Enum.SurfaceType.Studs
 
+            -- ====== PAREDES AO REDOR ======
             for _, sx in ipairs({ -1, 1 }) do
-                mk(Vector3.new(4, WALL_H, HL * 2 + 8), CFrame.new(sx * (HW + 2), GY + WALL_H / 2, 0), C.dirt, Enum.Material.Slate)
+                mk(Vector3.new(4, WALL_H, HL * 2 + 20), CFrame.new(sx * (HW + 2), GY + WALL_H / 2, 0), C.dirt, Enum.Material.Ground)
             end
             for _, sz in ipairs({ -1, 1 }) do
                 local wz = sz * (HL + 2)
                 for _, sx in ipairs({ -1, 1 }) do
-                    mk(Vector3.new(142, WALL_H, 4), CFrame.new(sx * 83, GY + WALL_H / 2, wz), C.dirt, Enum.Material.Slate)
+                    mk(Vector3.new(200, WALL_H, 4), CFrame.new(sx * 95, GY + WALL_H / 2, wz), C.dirt, Enum.Material.Ground)
                 end
-                mk(Vector3.new(24, 6, 4), CFrame.new(0, GY + 17, wz), C.dirt, Enum.Material.Slate)
+                mk(Vector3.new(30, 8, 4), CFrame.new(0, GY + 18, wz), C.dirt, Enum.Material.Ground)
+                -- túnel de entrada
                 for _, sx in ipairs({ -1, 1 }) do
-                    mk(Vector3.new(2, 14, 10), CFrame.new(sx * 13, GY + 7, sz * (HL + 9)), C.navy)
+                    mk(Vector3.new(2, 14, 10), CFrame.new(sx * 15, GY + 7, sz * (HL + 9)), C.navy)
                 end
-                mk(Vector3.new(28, 2, 10), CFrame.new(0, GY + 15, sz * (HL + 9)), C.navy)
-                mk(Vector3.new(24, 14, 1), CFrame.new(0, GY + 7, sz * (HL + 14.5)), Color3.fromRGB(15, 15, 20))
+                mk(Vector3.new(30, 2, 10), CFrame.new(0, GY + 15, sz * (HL + 9)), C.navy)
+                mk(Vector3.new(30, 14, 1), CFrame.new(0, GY + 7, sz * (HL + 14.5)), Color3.fromRGB(15, 15, 20))
             end
 
+            -- ====== PAINÉIS PRETOS DE INFORMAÇÃO ======
             local boards = {
-                { -60, "PROBABILIDADES\nCommon 50%\nRare 25%\nEpic 15%\nDiamond 7%\nLegendary 3%" },
-                {  60, "COMO JOGAR\nCompre brainrots no tapete\nRoube das outras bases\nGuarde na sua base\nSegure E nos prompts" },
+                { -70, "PROBABILIDADES\nCommon 50%\nRare 25%\nEpic 15%\nDiamond 7%\nLegendary 3%" },
+                {  70, "COMO JOGAR\nCompre brainrots no tapete\nRoube das outras bases\nGuarde na sua base\nSegure E nos prompts" },
             }
             for _, b in ipairs(boards) do
                 local bd = mk(Vector3.new(26, 16, 1), CFrame.new(b[1], GY + 11, HL - 0.5), Color3.fromRGB(28, 32, 36), nil, false)
                 surfText(bd, Enum.NormalId.Front, b[2], Color3.fromRGB(235, 235, 235))
             end
 
+            -- ====== TENDAS LISTRADAS ======
             local function stall(x, z)
                 mk(Vector3.new(14, 0.6, 14), CFrame.new(x, GY + 0.3, z), Color3.fromRGB(150, 150, 155))
+                -- postes
                 for _, dx in ipairs({ -6, 6 }) do
                     for _, dz in ipairs({ -6, 6 }) do
                         mk(Vector3.new(0.7, 9, 0.7), CFrame.new(x + dx, GY + 5, z + dz), C.wood, Enum.Material.Wood, false)
                     end
                 end
+                -- teto listrado (vermelho + branco)
                 for k = 0, 6 do
                     mk(Vector3.new(2, 0.4, 15), CFrame.new(x - 6 + k * 2, GY + 9.6, z), (k % 2 == 0) and C.carpet or C.white, nil, false)
                 end
+                -- balcão
                 mk(Vector3.new(10, 3, 3), CFrame.new(x, GY + 2.1, z + 4), C.wood, Enum.Material.Wood)
             end
             for _, z in ipairs({ -100, 100 }) do
@@ -1520,6 +1387,7 @@ do
                 stall(18, z)
             end
 
+            -- ====== BASES (8 bases - 4 de cada lado) ======
             local others = {}
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer then table.insert(others, p.Name) end
@@ -1534,77 +1402,79 @@ do
                 local hw, hd = BW / 2, BD / 2
                 local CONC = Enum.Material.Concrete
 
+                -- piso
                 B(BW, 0.6, BD, 0, 0.3, 0, C.floor, CONC)
-                B(BW, 14, 2, 0, 7, hd - 1, C.grey, CONC)
-                B(2, 14, BD, -hw + 1, 7, 0, C.grey, CONC)
-                B(2, 14, BD, hw - 1, 7, 0, C.grey, CONC)
 
-                B(BW, 2, 2, 0, 1, -hd + 1, C.navy)
-                B(BW, 3, 2, 0, 12.5, -hd + 1, C.navy)
-                for _, sx in ipairs({ -1, 1 }) do B(6, 9, 2, sx * (hw - 3), 6.5, -hd + 1, C.navy) end
-                local gl = B(BW - 12, 9, 0.4, 0, 6.5, -hd + 1, C.glass, Enum.Material.Glass, false)
-                gl.Transparency = 0.6
-                B(BW - 12, 0.5, 0.6, 0, 2.2, -hd + 0.6, C.white, nil, false)
-                B(BW - 12, 0.5, 0.6, 0, 10.8, -hd + 0.6, C.white, nil, false)
-                local bx = -(hw - 6) + 1.2
+                -- andar 1: paredes fundo/laterais
+                B(BW, 16, 2, 0, 8, hd - 1, C.grey, CONC)
+                B(2, 16, BD, -hw + 1, 8, 0, C.grey, CONC)
+                B(2, 16, BD, hw - 1, 8, 0, C.grey, CONC)
+
+                -- andar 1: frente (janela GRANDE + grades vermelhas finas)
+                B(BW, 2, 2, 0, 1, -hd + 1, C.grey, CONC)
+                B(BW, 3, 2, 0, 14.5, -hd + 1, C.grey, CONC)
+                for _, sx in ipairs({ -1, 1 }) do B(6, 11, 2, sx * (hw - 3), 7.5, -hd + 1, C.grey, CONC) end
+                local gl = B(BW - 12, 11, 0.4, 0, 7.5, -hd + 1, C.glass, Enum.Material.Glass, false)
+                gl.Transparency = 0.55
+                -- grades vermelhas finas (vertical)
+                local bx = -(hw - 6) + 1.4
                 while bx < hw - 6 do
-                    if math.abs(bx) > 5 then B(0.8, 8.6, 0.8, bx, 6.5, -hd + 0.2, C.bars) end
-                    bx += 2.4
+                    if math.abs(bx) > 5 then
+                        B(0.35, 10.4, 0.4, bx, 7.5, -hd + 0.5, C.bars)
+                    end
+                    bx += 1.4
                 end
 
+                -- colunas de canto
                 for _, sx in ipairs({ -1, 1 }) do
                     for _, sz in ipairs({ -1, 1 }) do
-                        B(3, 14, 3, sx * (hw - 1.5), 7, sz * (hd - 1.5), C.navy)
+                        B(3, 16, 3, sx * (hw - 1.5), 8, sz * (hd - 1.5), C.navy)
                     end
                 end
 
-                B(BW + 2, 1, BD + 2, 0, 14.5, 0, C.grey, CONC)
-                B(BW + 3, 1, BD + 3, 0, 13.5, 0, C.navy, nil, false)
-                for _, lx in ipairs({ -22, 22 }) do
-                    for _, lz in ipairs({ -12, 14 }) do
-                        B(6, 0.3, 6, lx, 13.8, lz, Color3.fromRGB(255, 255, 255), Enum.Material.Neon, false)
-                    end
-                end
+                -- ====== SEGUNDO ANDAR (janela pequena) ======
+                B(BW + 2, 1, BD + 2, 0, 16.5, 0, C.grey, CONC)
+                B(BW + 3, 1, BD + 3, 0, 15.5, 0, C.navy, nil, false)
+                -- andar 2: paredes
+                B(BW, 14, 2, 0, 24, hd - 1, C.grey, CONC)
+                B(2, 14, BD, -hw + 1, 24, 0, C.grey, CONC)
+                B(2, 14, 57, hw - 1, 24, -6.5, C.grey, CONC)
+                B(2, 14, 4, hw - 1, 24, 33, C.grey, CONC)
+                B(2, 2, 9, hw - 1, 29.5, 26.5, C.grey, CONC)
+                B(BW, 3, 2, 0, 18.5, -hd + 1, C.grey, CONC)
+                B(BW, 3, 2, 0, 29.5, -hd + 1, C.grey, CONC)
+                for _, sx in ipairs({ -1, 1 }) do B(6, 8, 2, sx * (hw - 3), 24, -hd + 1, C.grey, CONC) end
+                local gl2 = B(BW - 12, 8, 0.4, 0, 24, -hd + 1, C.glass, Enum.Material.Glass, false)
+                gl2.Transparency = 0.55
+                B(BW - 12, 0.4, 0.5, 0, 20.4, -hd + 0.6, C.white, nil, false)
+                B(BW - 12, 0.4, 0.5, 0, 27.6, -hd + 0.6, C.white, nil, false)
 
-                B(BW, 13, 2, 0, 21.5, hd - 1, C.grey, CONC)
-                B(2, 13, BD, -hw + 1, 21.5, 0, C.grey, CONC)
-                B(2, 13, 57, hw - 1, 21.5, -6.5, C.grey, CONC)
-                B(2, 13, 4, hw - 1, 21.5, 33, C.grey, CONC)
-                B(2, 2, 9, hw - 1, 27, 26.5, C.grey, CONC)
-                B(BW, 3, 2, 0, 16.5, -hd + 1, C.navy)
-                B(BW, 3, 2, 0, 26.5, -hd + 1, C.navy)
-                for _, sx in ipairs({ -1, 1 }) do B(6, 7, 2, sx * (hw - 3), 21.5, -hd + 1, C.navy) end
-                local gl2 = B(BW - 12, 7, 0.4, 0, 21.5, -hd + 1, C.glass, Enum.Material.Glass, false)
-                gl2.Transparency = 0.6
-                B(BW - 12, 0.5, 0.6, 0, 18.2, -hd + 0.6, C.white, nil, false)
-                B(BW - 12, 0.5, 0.6, 0, 24.8, -hd + 0.6, C.white, nil, false)
-                for _, lx in ipairs({ -22, 22 }) do
-                    for _, lz in ipairs({ -12, 14 }) do
-                        B(6, 0.3, 6, lx, 27.8, lz, Color3.fromRGB(255, 255, 255), Enum.Material.Neon, false)
-                    end
-                end
+                -- telhado
+                B(BW + 4, 1.5, BD + 4, 0, 30.75, 0, C.roof)
 
-                B(BW + 4, 1.5, BD + 4, 0, 28.75, 0, C.roof)
-
+                -- escada externa em L (visível no canto direito-frontal da base)
                 for s = 1, STAIRS do
-                    local h = s * 15 / STAIRS
-                    local zc2 = -hd + 3 + (s - 1) * 4.6 + 2.3
-                    B(5, h, 4.6, hw + 2.5, h / 2, zc2, C.grey, CONC)
+                    local h = s * 16 / STAIRS
+                    local zc2 = -hd + 3 + (s - 1) * 5 + 2.5
+                    B(5, h, 5, hw + 2.8, h / 2, zc2, C.grey, CONC)
                 end
 
-                local nameTxt = (i == 1) and "Sua Base" or ((others[i - 1] or ("Base " .. i)) .. "'s Base")
-                local sign = B(26, 6, 1.2, -8, 16, -hd - 1.5, C.wood, Enum.Material.Wood, false)
+                -- ====== PLACA DE MADEIRA COM NOME DO DONO ======
+                local nameTxt = (i == 1) and (LocalPlayer.DisplayName .. "'s Base") or ((others[i - 1] or ("Base " .. i)) .. "'s Base")
+                local sign = B(30, 7, 1.5, -8, 18, -hd - 1.8, C.wood, Enum.Material.Wood, false)
                 surfText(sign, Enum.NormalId.Front, nameTxt, Color3.fromRGB(255, 240, 215))
 
-                B(13.6, 0.3, 13.6, 0, 0.15, -hd - 8, C.white, nil, false)
-                local pad = B(12, 0.4, 12, 0, 0.2, -hd - 8, C.pad, nil, false)
+                -- ====== PAD VERDE (SUA BASE / OCUPADA) ======
+                B(14, 0.3, 14, 0, 0.15, -hd - 9, C.white, nil, false)
+                local pad = B(12.5, 0.4, 12.5, 0, 0.2, -hd - 9, C.pad, nil, false)
                 surfText(pad, Enum.NormalId.Top, (i == 1) and "SUA BASE" or "OCUPADA", Color3.new(1, 1, 1))
 
+                -- ====== SLOTS (5 por andar) ======
                 slots[i] = {}
-                for _, fl in ipairs({ 0.6, 15 }) do
+                for _, fl in ipairs({ 0.6, 17 }) do
                     for k = -2, 2 do
-                        B(8, 0.2, 8, k * 14, fl + 0.1, 20, C.slot, nil, false)
-                        table.insert(slots[i], { cf = origin * CFrame.new(k * 14, fl, 20), model = nil })
+                        B(9, 0.2, 9, k * 15, fl + 0.1, 20, C.slot, nil, false)
+                        table.insert(slots[i], { cf = origin * CFrame.new(k * 15, fl, 20), model = nil })
                     end
                 end
             end
@@ -1614,6 +1484,7 @@ do
                 buildBase(i, side, BASE_Z[(i - 1) % 4 + 1])
             end
 
+            -- ====== LÓGICA ======
             local function freeSlot(idx)
                 for _, s in ipairs(slots[idx]) do
                     if not s.model then return s end
@@ -1625,6 +1496,7 @@ do
                 model:PivotTo(slot.cf * CFrame.new(0, 3, 0))
             end
 
+            -- GUI de dinheiro
             local pg = LocalPlayer:WaitForChild("PlayerGui")
             local sg = Instance.new("ScreenGui")
             sg.Name, sg.ResetOnSpawn = "RoubeUmBrainrotGui", false
@@ -1693,6 +1565,7 @@ do
                 end)
             end
 
+            -- Brainrots iniciais nas bases dos outros
             for i = 2, 8 do
                 for n = 1, 3 do
                     local slot = slots[i][math.random(#slots[i])]
@@ -1705,6 +1578,7 @@ do
                 end
             end
 
+            -- Movimento no tapete
             table.insert(BRAINROT.conns, RunService.Heartbeat:Connect(function(dt)
                 for idx = #moving, 1, -1 do
                     local b = moving[idx]
@@ -1720,6 +1594,7 @@ do
                 end
             end))
 
+            -- Spawner
             task.spawn(function()
                 while BRAINROT.token == myToken do
                     if #moving < 14 then
@@ -1733,6 +1608,7 @@ do
                 end
             end)
 
+            -- Renda passiva
             task.spawn(function()
                 while BRAINROT.token == myToken do
                     task.wait(1)
@@ -1743,6 +1619,7 @@ do
                 end
             end)
 
+            -- ====== AMBIENTE (skybox azul claro + nuvens) ======
             BRAINROT.saved = {}
             for _, k in ipairs({ "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogStart", "FogEnd", "FogColor", "ExposureCompensation" }) do
                 pcall(function() BRAINROT.saved[k] = Lighting[k] end)
@@ -1757,25 +1634,39 @@ do
             end)
             pcall(function()
                 Lighting.ClockTime = 14
-                Lighting.Brightness = 2
-                Lighting.Ambient = Color3.fromRGB(140, 140, 140)
-                Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+                Lighting.Brightness = 2.2
+                Lighting.Ambient = Color3.fromRGB(150, 150, 150)
+                Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
                 Lighting.FogStart = 0
                 Lighting.FogEnd = 100000
                 Lighting.ExposureCompensation = 0
+                Lighting.EnvironmentDiffuseScale = 1
+                Lighting.EnvironmentSpecularScale = 1
+
+                -- Skybox azul claro
                 local sky = Instance.new("Sky")
                 sky.Name = "RB_Sky"
+                sky.SkyboxBk = "rbxasset://textures/sky/sky512_bk.tex"
+                sky.SkyboxDn = "rbxasset://textures/sky/sky512_dn.tex"
+                sky.SkyboxFt = "rbxasset://textures/sky/sky512_ft.tex"
+                sky.SkyboxLf = "rbxasset://textures/sky/sky512_lf.tex"
+                sky.SkyboxRt = "rbxasset://textures/sky/sky512_rt.tex"
+                sky.SkyboxUp = "rbxasset://textures/sky/sky512_up.tex"
                 sky.Parent = Lighting
+
+                -- Nuvens brancas
                 local cl = Instance.new("Clouds")
                 cl.Name = "RB_Clouds"
                 cl.Cover = 0.55
                 cl.Density = 0.5
+                cl.Color = Color3.fromRGB(255, 255, 255)
                 cl.Parent = workspace.Terrain
             end)
 
+            -- ====== TELEPORTE ======
             task.spawn(function()
                 task.wait(0.5)
-                local spawnPos = Vector3.new(0, GY + 5, -HL + 18)
+                local spawnPos = Vector3.new(0, GY + 5, -HL + 22)
                 local cf = CFrame.lookAt(spawnPos, Vector3.new(0, GY + 5, 0))
                 local chr = LocalPlayer.Character
                 local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
@@ -1801,7 +1692,7 @@ do
     end
 end
 
--- ================== FLASH & AURA (REDE) ==================
+-- ================== FLASH & AURA ==================
 local FXNET = {
     flash = {}, aura = {},
     actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
@@ -2247,14 +2138,6 @@ function executeActionLocally(action, senderName, extraArg)
             end
         end)
     elseif action == "LIFEFORM_CLEAR" then task.spawn(function() pcall(clearLifeform) end)
-    elseif action == "LOCUST_ON" then
-        task.spawn(function() pcall(function() LOCUST.start() end) end)
-    elseif action == "LOCUST_OFF" then
-        task.spawn(function() pcall(function() LOCUST.stop(false) end) end)
-    elseif action == "XESTER_ON" then
-        task.spawn(function() pcall(xester, "ON") end)
-    elseif action == "XESTER_OFF" then
-        task.spawn(function() pcall(xester, "OFF") end)
     elseif action == "BRAINROT_ON" then
         task.spawn(function() pcall(roubeUmBrainrot, "ON", extraArg) end)
     elseif action == "BRAINROT_OFF" then
@@ -2395,16 +2278,7 @@ function processNetMessage(msg, senderName)
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
 
-    if action == "LOCUST_ON" or action == "LOCUST_OFF" then
-        if senderName ~= LocalPlayer.Name then
-            task.spawn(function()
-                pcall(function() executeActionLocally(action, senderName, extraArg or target) end)
-            end)
-        end
-        return
-    end
-
-    if action == "XESTER_ON" or action == "XESTER_OFF" or action == "BRAINROT_ON" or action == "BRAINROT_OFF" then
+    if action == "BRAINROT_ON" or action == "BRAINROT_OFF" then
         if senderName ~= LocalPlayer.Name then
             task.spawn(function()
                 pcall(function() executeActionLocally(action, senderName, extraArg or target) end)
@@ -2795,6 +2669,14 @@ else
         sendNetCmd(";POOLROOMS_CLEAR ALL")
     end})
 
+    TabADM:Button({ Title = "Roube um Brainrot (Eu e o Alvo)", Callback = function()
+        triggerCommand("BRAINROT_ON", selectedPlayerName, selectedPlayerName)
+    end})
+    TabADM:Button({ Title = "Roube um Brainrot (Limpar)", Callback = function()
+        task.spawn(function() pcall(roubeUmBrainrot, "OFF") end)
+        sendNetCmd(";BRAINROT_OFF ALL")
+    end})
+
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -2826,33 +2708,6 @@ else
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
     TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
-    TabE:Button({ Title = "Locust (ligar/desligar)", Callback = function()
-        local isOn = LOCUST.running or LOCUST.busy
-        triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", LocalPlayer.Name)
-    end })
-    TabE:Button({ Title = "Locust ON (Alvo)",    Callback = function() triggerCommand("LOCUST_ON", selectedPlayerName) end })
-    TabE:Button({ Title = "Locust OFF (Alvo)",   Callback = function() triggerCommand("LOCUST_OFF", selectedPlayerName) end })
-    TabE:Button({ Title = "Locust ON (Todos)",   Callback = function() triggerCommand("LOCUST_ON", "ALL") end })
-    TabE:Button({ Title = "Locust OFF (Todos)",  Callback = function() triggerCommand("LOCUST_OFF", "ALL") end })
-
-    TabE:Button({ Title = "Xester (ligar/desligar)", Callback = function()
-        triggerCommand(XESTER.running and "XESTER_OFF" or "XESTER_ON", LocalPlayer.Name)
-    end })
-    TabE:Button({ Title = "Xester ON (Alvo)",   Callback = function() triggerCommand("XESTER_ON", selectedPlayerName) end })
-    TabE:Button({ Title = "Xester OFF (Alvo)",  Callback = function() triggerCommand("XESTER_OFF", selectedPlayerName) end })
-    TabE:Button({ Title = "Xester ON (Todos)",  Callback = function() triggerCommand("XESTER_ON", "ALL") end })
-    TabE:Button({ Title = "Xester OFF (Todos)", Callback = function() triggerCommand("XESTER_OFF", "ALL") end })
-
-    TabE:Button({ Title = "Roube um Brainrot (ligar/desligar)", Callback = function()
-        local on = BRAINROT.folder ~= nil or BRAINROT.busy
-        triggerCommand(on and "BRAINROT_OFF" or "BRAINROT_ON", LocalPlayer.Name)
-    end })
-    TabE:Button({ Title = "Roube um Brainrot (Eu e o Alvo)", Callback = function()
-        triggerCommand("BRAINROT_ON", selectedPlayerName, selectedPlayerName)
-    end })
-    TabE:Button({ Title = "Roube um Brainrot ON (Todos)",  Callback = function() triggerCommand("BRAINROT_ON", "ALL") end })
-    TabE:Button({ Title = "Roube um Brainrot OFF (Todos)", Callback = function() triggerCommand("BRAINROT_OFF", "ALL") end })
-
     TabE:Button({ Title = "Modo Satoru Gojo", Callback = function() giveGojo() end })
     TabE:Button({ Title = "Expansão de Domínio [Sukuna]", Callback = function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
     TabE:Button({ Title = "Pegar AK-47", Callback = function() giveAK47() end })
@@ -2864,6 +2719,16 @@ else
     TabE:Button({ Title = "Meme na cara 3", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME3") end })
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
+
+    TabE:Button({ Title = "Roube um Brainrot (ligar/desligar)", Callback = function()
+        local on = BRAINROT.folder ~= nil or BRAINROT.busy
+        triggerCommand(on and "BRAINROT_OFF" or "BRAINROT_ON", LocalPlayer.Name)
+    end })
+    TabE:Button({ Title = "Roube um Brainrot (Eu e o Alvo)", Callback = function()
+        triggerCommand("BRAINROT_ON", selectedPlayerName, selectedPlayerName)
+    end })
+    TabE:Button({ Title = "Roube um Brainrot ON (Todos)",  Callback = function() triggerCommand("BRAINROT_ON", "ALL") end })
+    TabE:Button({ Title = "Roube um Brainrot OFF (Todos)", Callback = function() triggerCommand("BRAINROT_OFF", "ALL") end })
 
     local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
@@ -2904,10 +2769,7 @@ task.spawn(function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end })
 
-    TabHome:AddSection({ "Xester / Brainrot" })
-    TabHome:AddButton({ "Xester (ligar/desligar)", function()
-        task.spawn(function() pcall(xester) end)
-    end })
+    TabHome:AddSection({ "Roube um Brainrot" })
     TabHome:AddButton({ "Roube um Brainrot (ligar/desligar)", function()
         task.spawn(function() pcall(roubeUmBrainrot) end)
     end })
