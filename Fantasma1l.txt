@@ -1,8 +1,7 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO v32
-    + VERITY com UI completa + REDE | LOCUST + REDE | POOLROOMS
-    + BACKROOMS + LIFEFORM + COUCH + FLASH/AURA + prefixo ;
+    FANTASMA1L HUB v33
+    + FLASH REVERSO | CORES DO FLASH | POOLROOMS | BACKROOMS
     ==========================================================
 ]]--
 
@@ -49,7 +48,7 @@ do
         end
     end
 end
-print("[Fantasma1l Hub] " .. (IS_ADMIN and ("ADMIN - "..MY_ROLE) or "Brookhaven Only"))
+print("[Fantasma1l Hub] "..(IS_ADMIN and ("ADMIN - "..MY_ROLE) or "Brookhaven Only"))
 pcall(function() StarterGui:SetCore("SendNotification", { Title="Fantasma1l Hub", Text=IS_ADMIN and MY_ROLE or "Brookhaven RP", Duration=5 }) end)
 
 local ICON_ID          = "rbxassetid://72455921762458"
@@ -170,13 +169,8 @@ function applyOverheadTag(player)
         lbl.Font, lbl.TextXAlignment = Enum.Font.GothamBold, Enum.TextXAlignment.Left
     end)
 end
-
 local function setupPlayerTag(plr)
-    plr.CharacterAdded:Connect(function()
-        task.wait(1)
-        if plr == LocalPlayer then applyOverheadTag(plr)
-        elseif IS_ADMIN and activeScriptUsers[plr.Name] then applyOverheadTag(plr) end
-    end)
+    plr.CharacterAdded:Connect(function() task.wait(1) if plr == LocalPlayer then applyOverheadTag(plr) elseif IS_ADMIN and activeScriptUsers[plr.Name] then applyOverheadTag(plr) end end)
     if plr.Character then
         if plr == LocalPlayer then applyOverheadTag(plr)
         elseif IS_ADMIN and activeScriptUsers[plr.Name] then applyOverheadTag(plr) end
@@ -816,8 +810,7 @@ do
         local top = POOL_Y + WALL_H
         local ok, err = pcall(function()
             slab(S, folder, Vector3.new(CH,2,CH), CFrame.new(wx, POOL_Y-1, wz), FACES_TOP, C_TILE).Reflectance = 0.1
-            chunk = S.chunks[key]
-            chunk.ripples = waterFill(S, folder, wx, wz)
+            S.chunks[key].ripples = waterFill(S, folder, wx, wz)
             local first = true
             local function L(x, z, y) lamp(S, folder, x, y or top, z, first) first = false end
             local style = (cx==0 and cz==0) and 2 or rng:NextInteger(1,6)
@@ -1013,726 +1006,21 @@ do
                 task.wait(0.35)
             end
         end)
-        notify("Poolrooms", "OK! "..(S.terrain and "Água real." or "."))
+        notify("Poolrooms", "OK!")
         return true
     end
 end
 
--- ================== LOCUST ==================
-local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil }
-function LOCUST.start()
-    if LOCUST.running or LOCUST.busy then return end
-    LOCUST.busy = true
-    notify("Locust", "Iniciando...")
-    local ok, err = pcall(function()
--- >>>>>>>> COLE AQUI O CÓDIGO COMPLETO DO LOCUST (FEVerse) <<<<<<<<
--- (ScriptOptions, FEManager, Start, Empyrean, animator, input, UI, RunService)
--- No FINAL do pcall adicione:
--- pcall(function() sendNetCmd(";LOCUST_ON "..LocalPlayer.Name) end)
-    end)
-    LOCUST.busy = false
-    if ok then
-        LOCUST.running = true
-        notify("Locust", "Ativado! X=kill | Q=agachar | C=sentar | E=wp | Shift=correr")
-    else
-        warn("[Locust] "..tostring(err))
-        LOCUST.running = false
-        notify("Locust", "Erro: "..tostring(err))
-    end
-end
-function LOCUST.stop(broadcast)
-    local f = LOCUST.stopFn
-    if f then pcall(f) notify("Locust", "Desligado") end
-    LOCUST.running = false LOCUST.stopFn = nil
-    if broadcast ~= false then pcall(function() sendNetCmd(";LOCUST_OFF "..LocalPlayer.Name) end) end
-end
-
--- ==================================================================
--- VERITY - UI COMPLETA + REDE
--- ==================================================================
-local VERITY = { running = false, spawned = false }
-local VerityEnv = nil
-local function loadVerityModule()
-    if VerityEnv then return VerityEnv end
-    local success, err = pcall(function()
-        local HttpService        = game:GetService("HttpService")
-        local MarketplaceService = game:GetService("MarketplaceService")
-        local TweenService       = game:GetService("TweenService")
-        local SoundService       = game:GetService("SoundService")
-        local CONFIG_FILE = "Verity_Config.json"
-        local currentLanguage = "pt"
-        local OPENROUTER_API_KEY = "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"
-        local MISTRAL_API_KEY = ""
-        local currentAIModel = "OpenRouter"
-        local OPENROUTER_MODEL = "deepseek/deepseek-chat"
-        local FISH_API_KEY = "sk-fish-tYLnEFuG_H7y3fDmwK5zgp23pQVfKOp-wDRhFDwFhY0"
-        local FISH_VOICE_ID = "42bfd48f5d764b029546636950c24dcb"
-        local FISH_VOICE_MODEL = "s2.1-pro-free"
-        local SONG_BPM = 120
-        local function beats(n) return (60/SONG_BPM)*n end
-        local NORMAL_FACE  = "rbxthumb://type=Asset&id=99982487168868&w=420&h=420"
-        local TALKING_FACE = "rbxthumb://type=Asset&id=114293272612131&w=420&h=420"
-        local FALL_FACE    = "rbxthumb://type=Asset&id=111386390222268&w=420&h=420"
-        local COLOR_VERITY = Color3.fromRGB(255,225,50)
-        local verityPart, verityMesh, verityGui, verityGuiText, verityFace, bubbleFrame, bubbleStroke
-        local isVeritySpeaking, isHeld = false, false
-        local holdAnimTrack = nil
-        local sizeSpring = {current=Vector3.new(0,0,0), velocity=Vector3.new(0,0,0), target=Vector3.new(2,2,2), stiffness=240, damping=11}
-        local isRespawning, isVerityBusy, isFlying, isFollowing = false, false, false, false
-        local hasFileSystem = false
-        pcall(function() if writefile and readfile and isfile and getcustomasset then hasFileSystem = true end end)
-        local function safeWriteFile(n, d) if hasFileSystem then pcall(function() writefile(n, d) end) end end
-        local function safeReadFile(n)
-            if hasFileSystem then
-                local ok, d = pcall(function() if isfile(n) then return readfile(n) end end)
-                if ok then return d end
-            end
-            return nil
-        end
-        local function loadConfig()
-            if not hasFileSystem then return end
-            local d = safeReadFile(CONFIG_FILE)
-            if d then
-                local ok, dec = pcall(function() return HttpService:JSONDecode(d) end)
-                if ok and type(dec)=="table" and dec.language and dec.language ~= "" then currentLanguage = dec.language end
-            end
-        end
-        local function saveConfig()
-            if not hasFileSystem then return end
-            pcall(function() safeWriteFile(CONFIG_FILE, HttpService:JSONEncode({language=currentLanguage})) end)
-        end
-        loadConfig()
-        local function getRequestFunction()
-            return (syn and syn.request) or (http and http.request) or http_request or request
-                or (fluxus and fluxus.request) or (Delta and Delta.request) or (Krnl and Krnl.request) or (Wave and Wave.request) or nil
-        end
-        local ttsCache = {}
-        local ttsCacheFolder = "verity_tts_cache"
-        if hasFileSystem then pcall(function() makefolder(ttsCacheFolder) end) end
-        local function getCacheFilename(t)
-            local h = 5381
-            for i = 1, #t do h = ((h*33) + string.byte(t,i)) % 2147483647 end
-            return ttsCacheFolder .. "/" .. tostring(h) .. ".mp3"
-        end
-        local function generateFishTTS(text)
-            if FISH_API_KEY == "" or not hasFileSystem then return nil end
-            local rf = getRequestFunction() if not rf then return nil end
-            local ck = text:lower()
-            if ttsCache[ck] then return ttsCache[ck] end
-            local cf = getCacheFilename(text)
-            local fe = false pcall(function() fe = isfile(cf) end)
-            if fe then
-                local ok, id = pcall(function() return getcustomasset(cf) end)
-                if ok and id then ttsCache[ck]=id return id end
-            end
-            local ok, resp = pcall(function()
-                return rf({
-                    Url = "https://api.fish.audio/v1/tts", Method = "POST",
-                    Headers = { ["Content-Type"]="application/json", ["Authorization"]="Bearer "..FISH_API_KEY, ["model"]=FISH_VOICE_MODEL },
-                    Body = HttpService:JSONEncode({ text=text, reference_id=FISH_VOICE_ID, format="mp3", mp3_bitrate=128, latency="normal", normalize=true })
-                })
-            end)
-            if not ok or not resp or not resp.Success or not resp.Body then warn("[Verity] Fish TTS falhou.") return nil end
-            local sv = pcall(function() writefile(cf, resp.Body) end)
-            if not sv then return nil end
-            local ok2, id = pcall(function() return getcustomasset(cf) end)
-            if ok2 and id then ttsCache[ck]=id return id end
-            return nil
-        end
-        local function getPlayerContext(p)
-            if not p then return "uma data desconhecida" end
-            local jt = os.time() - (p.AccountAge*86400)
-            return os.date("%d de %B de %Y", jt)
-        end
-        local okInfo, gameInfo = pcall(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
-        local gameName = (okInfo and type(gameInfo)=="table" and gameInfo.Name) or "Jogo Desconhecido"
-        local gameDesc = (okInfo and type(gameInfo)=="table" and gameInfo.Description) or "Sem descrição."
-        gameDesc = string.sub(gameDesc, 1, 400):gsub("\n", " ")
-        local pName = LocalPlayer.Name
-        local pDisplayName = LocalPlayer.DisplayName
-        local pJoinDate = getPlayerContext(LocalPlayer)
-        local function getSystemPrompt()
-            local lang = ""
-            if currentLanguage == "pt" then lang = "CRITICAL: You MUST ALWAYS reply in fluent Brazilian Portuguese."
-            elseif currentLanguage == "id" then lang = "CRITICAL: You MUST ALWAYS reply in fluent Bahasa Indonesia."
-            else lang = "CRITICAL: You MUST ALWAYS reply in fluent English." end
-            return string.format(
-                "You are Verity, a vibrant, exotic, and joyful helper spirit in the form of a ball! "..lang..
-                " Keep your answers very short (1 short sentence max). You are currently playing '%s' (PlaceID %d). "..
-                "Game Description: '%s'. Your master is %s (DisplayName: %s), joined on %s. Always help your master!",
-                gameName, game.PlaceId, gameDesc, pName, pDisplayName, pJoinDate)
-        end
-        local conversationHistory = {
-            {role="system", content=getSystemPrompt()},
-            {role="user", content="Olá Verity!"},
-            {role="assistant", content=string.format("Olá! Estamos no mapa '%s'!", gameName)}
-        }
-        local function updateSystemPromptInHistory()
-            if #conversationHistory > 0 and conversationHistory[1].role == "system" then
-                conversationHistory[1].content = getSystemPrompt()
-            end
-        end
-        local function addMemory(r, c)
-            table.insert(conversationHistory, {role=r, content=c})
-            if #conversationHistory > 16 then table.remove(conversationHistory,2) table.remove(conversationHistory,2) end
-        end
-        local LOCAL_RESPONSES = {
-            pt = { fallback = {"Interessante! Me conta mais.", "Ah é? E aí?", "Legal! Continua!", "Hmm, não sei direito, mas vamos nessa!", "Entendi! Algo mais?"} }
-        }
-        local function localReply(msg)
-            local L = LOCAL_RESPONSES[currentLanguage] or LOCAL_RESPONSES.pt
-            return L.fallback[math.random(#L.fallback)]
-        end
-        local function askAI(ctx)
-            local rf = getRequestFunction() if not rf then return localReply(ctx) end
-            updateSystemPromptInHistory() addMemory("user", ctx)
-            local ok, resp = pcall(function()
-                return rf({
-                    Url = "https://openrouter.ai/api/v1/chat/completions", Method = "POST",
-                    Headers = { ["Content-Type"]="application/json", ["Authorization"]="Bearer "..OPENROUTER_API_KEY, ["HTTP-Referer"]="https://roblox.com", ["X-Title"]="Verity AI" },
-                    Body = HttpService:JSONEncode({ model=OPENROUTER_MODEL, messages=conversationHistory, max_tokens=150 })
-                })
-            end)
-            if ok and resp and resp.Body then
-                local ok2, data = pcall(function() return HttpService:JSONDecode(resp.Body) end)
-                if ok2 and data and data.choices and data.choices[1] and data.choices[1].message then
-                    local c = data.choices[1].message.content
-                    if c and c ~= "" then
-                        c = c:gsub("[*_`#]",""):gsub("^%s+",""):gsub("%s+$","")
-                        addMemory("assistant", c) return c
-                    end
-                end
-            end
-            return localReply(ctx)
-        end
-        local function removeCollisionWithCharacters()
-            if not verityPart then return end
-            for _, o in pairs(verityPart:GetChildren()) do if o:IsA("NoCollisionConstraint") then o:Destroy() end end
-            local function nc(ch)
-                if not ch then return end
-                for _, p in pairs(ch:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        local c = Instance.new("NoCollisionConstraint")
-                        c.Part0 = verityPart c.Part1 = p c.Parent = verityPart
-                    end
-                end
-            end
-            for _, plr in pairs(Players:GetPlayers()) do if plr.Character then nc(plr.Character) end end
-        end
-        Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() task.wait(0.6) removeCollisionWithCharacters() end) end)
-        LocalPlayer.CharacterAdded:Connect(function() task.wait(0.6) removeCollisionWithCharacters() end)
-        local function countUtf8Characters(v)
-            local c = #tostring(v or "") pcall(function() c = utf8.len(tostring(v or "")) or c end) return c
-        end
-        local function playVeritySpeech(textToSpeak, faceType)
-            textToSpeak = tostring(textToSpeak or ""):gsub("<[^>]->",""):gsub("[%c\r\n\t]+"," "):gsub("%s+"," "):gsub("%s+([,%.%!%?%:;])","%1"):match("^%s*(.-)%s*$") or ""
-            if textToSpeak == "" then return end
-            isVeritySpeaking = true
-            local audioSound = nil
-            local id = generateFishTTS(textToSpeak)
-            if id then
-                pcall(function()
-                    audioSound = Instance.new("Sound")
-                    audioSound.Name, audioSound.SoundId, audioSound.Volume = "VerityVoice", id, 2
-                    audioSound.PlaybackSpeed, audioSound.Looped = 1, false
-                    audioSound.Parent = SoundService
-                end)
-            end
-            if not audioSound then
-                if verityFace then verityFace.Texture = faceType or TALKING_FACE end
-                if verityGuiText then verityGuiText.Text = textToSpeak end
-                if bubbleFrame then bubbleFrame.BackgroundTransparency = 0.25 end
-                if bubbleStroke then bubbleStroke.Transparency = 0.2 end
-                if verityGui then verityGui.Enabled = true end
-                task.wait(math.max(1.5, countUtf8Characters(textToSpeak)/10))
-                if verityPart and verityPart.Parent then
-                    if verityGuiText then verityGuiText.Text = "" end
-                    if bubbleFrame then bubbleFrame.BackgroundTransparency = 1 end
-                    if bubbleStroke then bubbleStroke.Transparency = 1 end
-                    if verityFace then verityFace.Texture = NORMAL_FACE end
-                    if verityGui then verityGui.Enabled = false end
-                end
-                isVeritySpeaking = false
-                return
-            end
-            if not audioSound.IsLoaded then pcall(function() audioSound.Loaded:Wait() end) end
-            if verityFace then verityFace.Texture = faceType or TALKING_FACE end
-            if verityGuiText then verityGuiText.Text = textToSpeak end
-            if bubbleFrame then bubbleFrame.BackgroundTransparency = 0.25 end
-            if bubbleStroke then bubbleStroke.Transparency = 0.2 end
-            if verityGui then verityGui.Enabled = true end
-            audioSound:Play()
-            local len = 0 pcall(function() len = audioSound.TimeLength end)
-            if not len or len <= 0 then len = math.max(1.5, countUtf8Characters(textToSpeak)/10) end
-            task.wait(len + 0.4)
-            if audioSound and audioSound.Parent then pcall(function() audioSound:Destroy() end) end
-            if verityPart and verityPart.Parent then
-                if verityGuiText then verityGuiText.Text = "" end
-                if bubbleFrame then bubbleFrame.BackgroundTransparency = 1 end
-                if bubbleStroke then bubbleStroke.Transparency = 1 end
-                if verityFace then verityFace.Texture = NORMAL_FACE end
-                if verityGui then verityGui.Enabled = false end
-                isVeritySpeaking = false
-            end
-        end
-        local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-        if playerGui:FindFirstChild("VerityGui") then playerGui.VerityGui:Destroy() end
-        local screenGui = Instance.new("ScreenGui", playerGui)
-        screenGui.Name = "VerityGui" screenGui.ResetOnSpawn = false
-        local function makeDraggable(frame)
-            local dragging, dragInput, dragStart, startPos
-            frame.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true dragStart = input.Position startPos = frame.Position
-                    input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
-                end
-            end)
-            frame.InputChanged:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
-                if input == dragInput and dragging then
-                    local delta = input.Position - dragStart
-                    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
-                end
-            end)
-        end
-        local function addButtonFeedback(btn)
-            local baseSize = btn.Size
-            local ht = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            local pt = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            btn.MouseEnter:Connect(function() TweenService:Create(btn, ht, {Size=UDim2.new(baseSize.X.Scale, baseSize.X.Offset+4, baseSize.Y.Scale, baseSize.Y.Offset+2)}):Play() end)
-            btn.MouseLeave:Connect(function() TweenService:Create(btn, ht, {Size=baseSize}):Play() end)
-            btn.MouseButton1Down:Connect(function() TweenService:Create(btn, pt, {Size=UDim2.new(baseSize.X.Scale, baseSize.X.Offset-4, baseSize.Y.Scale, baseSize.Y.Offset-3)}):Play() end)
-            btn.MouseButton1Up:Connect(function() TweenService:Create(btn, ht, {Size=baseSize}):Play() end)
-        end
-        local function addSoftGradient(parent, brightTop)
-            local g = Instance.new("UIGradient", parent)
-            g.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.new(brightTop and 1 or 0.85, brightTop and 1 or 0.85, brightTop and 1 or 0.85)),
-                ColorSequenceKeypoint.new(1, Color3.new(0.75,0.75,0.75))
-            })
-            g.Rotation = 90
-            return g
-        end
-        -- topbar
-        local topBar = Instance.new("Frame", screenGui)
-        topBar.Size, topBar.Position, topBar.BackgroundTransparency = UDim2.new(0,480,0,45), UDim2.new(1,-495,0,15), 1
-        local topBarLayout = Instance.new("UIListLayout", topBar)
-        topBarLayout.FillDirection, topBarLayout.HorizontalAlignment, topBarLayout.SortOrder, topBarLayout.Padding = Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Right, Enum.SortOrder.LayoutOrder, UDim.new(0,8)
-        local langSwitchBtn = Instance.new("TextButton", topBar)
-        langSwitchBtn.Size, langSwitchBtn.BackgroundColor3, langSwitchBtn.BackgroundTransparency, langSwitchBtn.TextColor3, langSwitchBtn.TextScaled, langSwitchBtn.Font, langSwitchBtn.LayoutOrder = UDim2.new(0,120,0,42), (currentLanguage=="pt") and Color3.fromRGB(40,140,70) or Color3.fromRGB(180,90,30), 0.1, Color3.new(1,1,1), true, Enum.Font.GothamBold, 1
-        langSwitchBtn.Text = (currentLanguage=="pt") and "PT-BR" or (currentLanguage=="id") and "ID" or "EN"
-        Instance.new("UICorner", langSwitchBtn).CornerRadius = UDim.new(0,14)
-        local lsStroke = Instance.new("UIStroke", langSwitchBtn) lsStroke.Color, lsStroke.Thickness = COLOR_VERITY, 2
-        addSoftGradient(langSwitchBtn, true) addButtonFeedback(langSwitchBtn)
-        local modelSwitchBtn = Instance.new("TextButton", topBar)
-        modelSwitchBtn.Size, modelSwitchBtn.BackgroundColor3, modelSwitchBtn.BackgroundTransparency, modelSwitchBtn.TextColor3, modelSwitchBtn.Text, modelSwitchBtn.TextScaled, modelSwitchBtn.Font, modelSwitchBtn.LayoutOrder = UDim2.new(0,130,0,42), Color3.fromRGB(110,30,160), 0.1, Color3.new(1,1,1), "IA: OpenRouter", true, Enum.Font.GothamBold, 2
-        Instance.new("UICorner", modelSwitchBtn).CornerRadius = UDim.new(0,14)
-        local msStroke = Instance.new("UIStroke", modelSwitchBtn) msStroke.Color, msStroke.Thickness = COLOR_VERITY, 2
-        addSoftGradient(modelSwitchBtn, true) addButtonFeedback(modelSwitchBtn)
-        local uiEditorToggleBtn = Instance.new("TextButton", topBar)
-        uiEditorToggleBtn.Size, uiEditorToggleBtn.BackgroundColor3, uiEditorToggleBtn.BackgroundTransparency, uiEditorToggleBtn.TextColor3, uiEditorToggleBtn.Text, uiEditorToggleBtn.TextScaled, uiEditorToggleBtn.Font, uiEditorToggleBtn.LayoutOrder = UDim2.new(0,100,0,42), Color3.fromRGB(35,35,45), 0.1, Color3.new(1,1,1), "Editor", true, Enum.Font.GothamBold, 3
-        Instance.new("UICorner", uiEditorToggleBtn).CornerRadius = UDim.new(0,14)
-        local utStroke = Instance.new("UIStroke", uiEditorToggleBtn) utStroke.Color, utStroke.Thickness = Color3.fromRGB(255,100,200), 2
-        addSoftGradient(uiEditorToggleBtn, true) addButtonFeedback(uiEditorToggleBtn)
-        local isUiHidden = false
-        local hideToggleButton = Instance.new("TextButton", screenGui)
-        hideToggleButton.Size, hideToggleButton.Position, hideToggleButton.BackgroundColor3, hideToggleButton.BackgroundTransparency, hideToggleButton.TextColor3, hideToggleButton.Text, hideToggleButton.TextSize, hideToggleButton.Font = UDim2.new(0,90,0,38), UDim2.new(0,15,0,15), Color3.fromRGB(45,45,60), 0.15, Color3.new(1,1,1), "Esconder", 13, Enum.Font.GothamBold
-        Instance.new("UICorner", hideToggleButton).CornerRadius = UDim.new(0,12)
-        local htStroke = Instance.new("UIStroke", hideToggleButton) htStroke.Color, htStroke.Thickness = COLOR_VERITY, 2
-        addSoftGradient(hideToggleButton, true) addButtonFeedback(hideToggleButton) makeDraggable(hideToggleButton)
-        local uiEditorFrame = Instance.new("Frame", screenGui)
-        uiEditorFrame.Size, uiEditorFrame.Position, uiEditorFrame.BackgroundColor3, uiEditorFrame.BackgroundTransparency, uiEditorFrame.Visible = UDim2.new(0,380,0,300), UDim2.new(0.5,-190,0.5,-150), Color3.fromRGB(20,20,28), 0.03, false
-        Instance.new("UICorner", uiEditorFrame).CornerRadius = UDim.new(0,22)
-        local uefStroke = Instance.new("UIStroke", uiEditorFrame) uefStroke.Color, uefStroke.Thickness = Color3.fromRGB(255,100,200), 2.5
-        addSoftGradient(uiEditorFrame, true) makeDraggable(uiEditorFrame)
-        local editorTitle = Instance.new("TextLabel", uiEditorFrame)
-        editorTitle.Size, editorTitle.BackgroundTransparency, editorTitle.Text, editorTitle.TextColor3, editorTitle.TextSize, editorTitle.Font = UDim2.new(1,0,0,45), 1, "Editor de UI", Color3.fromRGB(255,100,200), 16, Enum.Font.GothamBold
-        local labelTrans = Instance.new("TextLabel", uiEditorFrame)
-        labelTrans.Size, labelTrans.Position, labelTrans.BackgroundTransparency, labelTrans.Text, labelTrans.TextColor3, labelTrans.TextXAlignment, labelTrans.TextSize, labelTrans.Font = UDim2.new(0.9,0,0,20), UDim2.new(0.05,0,0,55), 1, "Transparência do Chat:", Color3.fromRGB(210,210,220), Enum.TextXAlignment.Left, 13, Enum.Font.GothamMedium
-        local transToggleBtn = Instance.new("TextButton", uiEditorFrame)
-        transToggleBtn.Size, transToggleBtn.Position, transToggleBtn.BackgroundColor3, transToggleBtn.BackgroundTransparency, transToggleBtn.TextColor3, transToggleBtn.Text, transToggleBtn.TextSize, transToggleBtn.Font = UDim2.new(0.9,0,0,38), UDim2.new(0.05,0,0,80), Color3.fromRGB(45,45,65), 0.1, Color3.new(1,1,1), "Alternar Transparência", 13, Enum.Font.GothamBold
-        Instance.new("UICorner", transToggleBtn).CornerRadius = UDim.new(0,12)
-        addSoftGradient(transToggleBtn, true) addButtonFeedback(transToggleBtn)
-        local transState = false
-        local labelColor = Instance.new("TextLabel", uiEditorFrame)
-        labelColor.Size, labelColor.Position, labelColor.BackgroundTransparency, labelColor.Text, labelColor.TextColor3, labelColor.TextXAlignment, labelColor.TextSize, labelColor.Font = UDim2.new(0.9,0,0,20), UDim2.new(0.05,0,0,130), 1, "Cor de Destaque:", Color3.fromRGB(210,210,220), Enum.TextXAlignment.Left, 13, Enum.Font.GothamMedium
-        local function createColorBtn(name, color, posX)
-            local btn = Instance.new("TextButton", uiEditorFrame)
-            btn.Size, btn.Position, btn.BackgroundColor3, btn.BackgroundTransparency, btn.TextColor3, btn.Text, btn.TextSize, btn.Font = UDim2.new(0.27,0,0,38), UDim2.new(posX,0,0,155), color, 0.1, Color3.new(1,1,1), name, 12, Enum.Font.GothamBold
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,12)
-            addSoftGradient(btn, true) addButtonFeedback(btn)
-            return btn
-        end
-        local yellowBtn = createColorBtn("Amarelo", Color3.fromRGB(255,225,50), 0.05)
-        local cyanBtn   = createColorBtn("Ciano",   Color3.fromRGB(0,220,255),   0.36)
-        local purpleBtn = createColorBtn("Roxo",    Color3.fromRGB(180,50,255),  0.68)
-        local closeEditorBtn = Instance.new("TextButton", uiEditorFrame)
-        closeEditorBtn.Size, closeEditorBtn.Position, closeEditorBtn.BackgroundColor3, closeEditorBtn.BackgroundTransparency, closeEditorBtn.TextColor3, closeEditorBtn.Text, closeEditorBtn.TextSize, closeEditorBtn.Font = UDim2.new(0.9,0,0,42), UDim2.new(0.05,0,1,-55), Color3.fromRGB(200,60,60), 0.1, Color3.new(1,1,1), "Fechar Editor", 14, Enum.Font.GothamBold
-        Instance.new("UICorner", closeEditorBtn).CornerRadius = UDim.new(0,12)
-        addSoftGradient(closeEditorBtn, true) addButtonFeedback(closeEditorBtn)
-        local function applyAccentColor(color)
-            COLOR_VERITY = color
-            lsStroke.Color = COLOR_VERITY msStroke.Color = COLOR_VERITY htStroke.Color = COLOR_VERITY
-            if bubbleStroke then bubbleStroke.Color = COLOR_VERITY end
-            if verityPart then verityPart.Color = COLOR_VERITY end
-        end
-        yellowBtn.MouseButton1Click:Connect(function() applyAccentColor(Color3.fromRGB(255,225,50)) end)
-        cyanBtn.MouseButton1Click:Connect(function() applyAccentColor(Color3.fromRGB(0,220,255)) end)
-        purpleBtn.MouseButton1Click:Connect(function() applyAccentColor(Color3.fromRGB(180,50,255)) end)
-        uiEditorToggleBtn.MouseButton1Click:Connect(function() uiEditorFrame.Visible = not uiEditorFrame.Visible end)
-        closeEditorBtn.MouseButton1Click:Connect(function() uiEditorFrame.Visible = false end)
-        local chatFrame = Instance.new("Frame", screenGui)
-        chatFrame.Size, chatFrame.Position, chatFrame.BackgroundColor3, chatFrame.BackgroundTransparency = UDim2.new(0,420,0,52), UDim2.new(0.5,-210,1,-75), Color3.fromRGB(18,18,25), 0.15
-        Instance.new("UICorner", chatFrame).CornerRadius = UDim.new(0,26)
-        local chatStroke = Instance.new("UIStroke", chatFrame) chatStroke.Color, chatStroke.Thickness = Color3.fromRGB(75,75,100), 2
-        addSoftGradient(chatFrame, true) makeDraggable(chatFrame)
-        local chatInput = Instance.new("TextBox", chatFrame)
-        chatInput.Size, chatInput.Position, chatInput.BackgroundTransparency, chatInput.PlaceholderText, chatInput.PlaceholderColor3, chatInput.TextColor3, chatInput.TextSize, chatInput.Font = UDim2.new(0.72,0,1,0), UDim2.new(0.05,0,0,0), 1, "Digite uma mensagem...", Color3.fromRGB(150,150,180), Color3.new(1,1,1), 14, Enum.Font.Gotham
-        local sendButton = Instance.new("TextButton", chatFrame)
-        sendButton.Size, sendButton.Position, sendButton.BackgroundColor3, sendButton.BackgroundTransparency, sendButton.TextColor3, sendButton.Text, sendButton.TextSize, sendButton.Font = UDim2.new(0.2,0,0,38), UDim2.new(0.77,0,0.5,-19), Color3.fromRGB(50,140,255), 0.1, Color3.new(1,1,1), "Enviar", 13, Enum.Font.GothamBold
-        Instance.new("UICorner", sendButton).CornerRadius = UDim.new(0,12)
-        addSoftGradient(sendButton, true) addButtonFeedback(sendButton)
-        transToggleBtn.MouseButton1Click:Connect(function()
-            transState = not transState
-            chatFrame.BackgroundTransparency = transState and 0.8 or 0.15
-        end)
-        local dropButton = Instance.new("TextButton", screenGui)
-        dropButton.Size, dropButton.Position, dropButton.Text, dropButton.BackgroundColor3, dropButton.BackgroundTransparency, dropButton.TextColor3, dropButton.TextSize, dropButton.Font, dropButton.Visible = UDim2.new(0,140,0,42), UDim2.new(0.35,-75,0.78,0), "Soltar Verity", Color3.fromRGB(220,50,50), 0.1, Color3.new(1,1,1), 13, Enum.Font.GothamBold, false
-        Instance.new("UICorner", dropButton).CornerRadius = UDim.new(0,14)
-        addSoftGradient(dropButton, true) addButtonFeedback(dropButton)
-        local throwButton = Instance.new("TextButton", screenGui)
-        throwButton.Size, throwButton.Position, throwButton.Text, throwButton.BackgroundColor3, throwButton.BackgroundTransparency, throwButton.TextColor3, throwButton.TextSize, throwButton.Font, throwButton.Visible = UDim2.new(0,140,0,42), UDim2.new(0.65,-75,0.78,0), "Jogar Verity", Color3.fromRGB(40,140,250), 0.1, Color3.new(1,1,1), 13, Enum.Font.GothamBold, false
-        Instance.new("UICorner", throwButton).CornerRadius = UDim.new(0,14)
-        addSoftGradient(throwButton, true) addButtonFeedback(throwButton)
-        hideToggleButton.MouseButton1Click:Connect(function()
-            isUiHidden = not isUiHidden
-            topBar.Visible = not isUiHidden
-            chatFrame.Visible = not isUiHidden
-            dropButton.Visible = (not isUiHidden) and isHeld or false
-            throwButton.Visible = (not isUiHidden) and isHeld or false
-            if isUiHidden then
-                hideToggleButton.Text = "Mostrar"
-                hideToggleButton.BackgroundColor3 = Color3.fromRGB(180,45,45)
-            else
-                hideToggleButton.Text = "Esconder"
-                hideToggleButton.BackgroundColor3 = Color3.fromRGB(45,45,60)
-            end
-        end)
-        langSwitchBtn.MouseButton1Click:Connect(function()
-            if currentLanguage == "pt" then currentLanguage = "en" langSwitchBtn.Text = "EN" langSwitchBtn.BackgroundColor3 = Color3.fromRGB(180,90,30)
-            elseif currentLanguage == "en" then currentLanguage = "id" langSwitchBtn.Text = "ID"
-            else currentLanguage = "pt" langSwitchBtn.Text = "PT-BR" langSwitchBtn.BackgroundColor3 = Color3.fromRGB(40,140,70) end
-            updateSystemPromptInHistory() saveConfig()
-            task.spawn(function()
-                if currentLanguage == "pt" then playVeritySpeech("Idioma alterado!", TALKING_FACE)
-                elseif currentLanguage == "id" then playVeritySpeech("Bahasa diubah!", TALKING_FACE)
-                else playVeritySpeech("Language changed!", TALKING_FACE) end
-            end)
-        end)
-        modelSwitchBtn.MouseButton1Click:Connect(function()
-            if currentAIModel == "OpenRouter" then currentAIModel = "Mistral" modelSwitchBtn.Text = "IA: Mistral" modelSwitchBtn.BackgroundColor3 = Color3.fromRGB(30,90,160)
-            else currentAIModel = "OpenRouter" modelSwitchBtn.Text = "IA: OpenRouter" modelSwitchBtn.BackgroundColor3 = Color3.fromRGB(110,30,160) end
-            task.spawn(function() playVeritySpeech("Modelo: "..currentAIModel, TALKING_FACE) end)
-        end)
-        local function teleportVerityToPlayer()
-            if not verityPart then return end
-            local chr = LocalPlayer.Character if not chr then return end
-            local root = chr:FindFirstChild("HumanoidRootPart") if not root then return end
-            isFlying, isFollowing, isHeld = false, false, false
-            dropButton.Visible, throwButton.Visible = false, false
-            verityPart.Anchored = false
-            verityPart.AssemblyLinearVelocity = Vector3.zero
-            verityPart.AssemblyAngularVelocity = Vector3.zero
-            verityPart.CFrame = root.CFrame * CFrame.new(0,3,-4)
-        end
-        local function verityDie()
-            if isRespawning then return end
-            isRespawning = true isHeld = false isFlying = false isFollowing = false
-            dropButton.Visible, throwButton.Visible = false, false
-            if holdAnimTrack then pcall(function() holdAnimTrack:Stop() end) holdAnimTrack = nil end
-            teleportVerityToPlayer()
-            task.spawn(function() playVeritySpeech("Opa, quase caí!", FALL_FACE) isRespawning = false end)
-        end
-        RunService.RenderStepped:Connect(function(dt)
-            if not verityPart or not verityPart.Parent then return end
-            if verityPart.Position.Y < (workspace.FallenPartsDestroyHeight + 20) or verityPart.Position.Y < -150 then verityDie() return end
-            local chr = LocalPlayer.Character
-            local root = chr and chr:FindFirstChild("HumanoidRootPart")
-            if isHeld then
-                local hand = chr:FindFirstChild("RightHand") or chr:FindFirstChild("Right Arm")
-                local head = chr:FindFirstChild("Head")
-                if hand and head then
-                    local grip = hand:FindFirstChild("RightGripAttachment")
-                    local holdPos = grip and grip.WorldPosition or (hand.Position + Vector3.new(0,-1,0))
-                    verityPart.AssemblyLinearVelocity = Vector3.zero
-                    verityPart.AssemblyAngularVelocity = Vector3.zero
-                    verityPart.CFrame = CFrame.lookAt(holdPos, head.Position)
-                end
-            else
-                if isFollowing and root then
-                    local direction = Vector3.new(root.Position.X - verityPart.Position.X, 0, root.Position.Z - verityPart.Position.Z)
-                    local distance = direction.Magnitude
-                    local playerSpeed = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude
-                    local targetSpeed = math.clamp(math.max(playerSpeed*0.9, 8), 6, 25)
-                    if distance > 5.5 then
-                        local moveDir = direction.Unit
-                        local cv = verityPart.AssemblyLinearVelocity
-                        local desired = moveDir * targetSpeed
-                        verityPart.AssemblyLinearVelocity = Vector3.new(cv.X+(desired.X-cv.X)*0.12, cv.Y+((root.Position.Y+3-verityPart.Position.Y)*3-cv.Y)*0.1, cv.Z+(desired.Z-cv.Z)*0.12)
-                        local spin = math.clamp(targetSpeed*0.3, 2, 12)
-                        verityPart.AssemblyAngularVelocity = Vector3.new(-moveDir.Z*spin, 0, moveDir.X*spin)
-                    elseif distance > 3 then
-                        verityPart.AssemblyLinearVelocity = verityPart.AssemblyLinearVelocity * 0.75
-                    else
-                        verityPart.AssemblyLinearVelocity = Vector3.new(0, verityPart.AssemblyLinearVelocity.Y*0.8, 0)
-                        verityPart.AssemblyAngularVelocity = Vector3.zero
-                        verityPart.CFrame = CFrame.lookAt(verityPart.Position, Vector3.new(root.Position.X, root.Position.Y, root.Position.Z))
-                    end
-                else
-                    if isFlying then
-                        local vel = verityPart.AssemblyLinearVelocity
-                        if vel.Magnitude > 3 then verityPart.AssemblyLinearVelocity = vel * 0.95 else isFlying = false end
-                    end
-                    if not isFlying and not isFollowing and root then
-                        verityPart.CFrame = CFrame.lookAt(verityPart.Position, Vector3.new(root.Position.X, root.Position.Y, root.Position.Z))
-                    end
-                end
-            end
-            if verityFace and verityFace.Texture == TALKING_FACE then
-                local s = 1 + math.sin(tick()*14)*0.12
-                sizeSpring.target = Vector3.new(2/s, 2*s, 2/s)
-            elseif verityFace and verityFace.Texture == FALL_FACE then
-                local s = 1 + math.sin(tick()*20)*0.15
-                sizeSpring.target = Vector3.new(2/s, 2*s, 2/s)
-            else sizeSpring.target = Vector3.new(2,2,2) end
-            local force = (sizeSpring.target - sizeSpring.current)*sizeSpring.stiffness
-            sizeSpring.velocity = sizeSpring.velocity + (force - sizeSpring.velocity*sizeSpring.damping)*dt
-            sizeSpring.current = sizeSpring.current + sizeSpring.velocity*dt
-            if verityMesh then
-                verityMesh.Scale = Vector3.new(math.max(sizeSpring.current.X,0.6)/2, math.max(sizeSpring.current.Y,1)/2, math.max(sizeSpring.current.Z,0.6)/2)
-            end
-        end)
-        sendButton.MouseButton1Click:Connect(function()
-            if chatInput.Text == "" or isVerityBusy then return end
-            local msg = chatInput.Text chatInput.Text = ""
-            local lower = msg:lower()
-            if lower:find("teleport to me") or lower:find("tp to me") or lower=="tp" or lower:find("vem pra mim") or lower:find("vem ca") or lower:find("teleporte") then
-                teleportVerityToPlayer() isFollowing = false isFlying = false
-                task.spawn(function() playVeritySpeech("Wussh! Teleportei!", TALKING_FACE) end)
-                return
-            end
-            if lower:find("follow") or lower:find("me segue") or lower:find("me seguir") or lower:find("vem comigo") then
-                isFollowing = true isFlying = false isHeld = false
-                dropButton.Visible, throwButton.Visible = false, false
-                task.spawn(function() playVeritySpeech("Beleza, tô te seguindo!", TALKING_FACE) end)
-                return
-            end
-            if lower:find("stop") or lower:find("para") or lower:find("parar") or lower:find("berhenti") then
-                isFollowing = false
-                task.spawn(function() playVeritySpeech("Ok, parei!", TALKING_FACE) end)
-                return
-            end
-            isVerityBusy = true
-            if verityFace then verityFace.Texture = NORMAL_FACE end
-            if verityGuiText then verityGuiText.Text = "..." end
-            if bubbleFrame then bubbleFrame.BackgroundTransparency = 0.25 end
-            if bubbleStroke then bubbleStroke.Transparency = 0.2 end
-            task.spawn(function()
-                local reply = askAI(msg)
-                playVeritySpeech(reply, TALKING_FACE)
-                pcall(function() sendNetCmd(";VERITY_SPEAK "..LocalPlayer.Name.." "..reply:gsub(" ", "_")) end)
-                isVerityBusy = false
-            end)
-        end)
-        dropButton.MouseButton1Click:Connect(function()
-            isHeld, isFlying, isFollowing = false, false, false
-            dropButton.Visible, throwButton.Visible = false, false
-            if holdAnimTrack then pcall(function() holdAnimTrack:Stop() end) holdAnimTrack = nil end
-            local chr = LocalPlayer.Character
-            if chr and chr:FindFirstChild("HumanoidRootPart") then
-                local root = chr.HumanoidRootPart
-                verityPart.CFrame = CFrame.new(root.Position + root.CFrame.LookVector*4)
-            end
-        end)
-        throwButton.MouseButton1Click:Connect(function()
-            isHeld, isFlying, isFollowing = false, true, false
-            dropButton.Visible, throwButton.Visible = false, false
-            if holdAnimTrack then pcall(function() holdAnimTrack:Stop() end) holdAnimTrack = nil end
-            local chr = LocalPlayer.Character
-            if chr and chr:FindFirstChild("HumanoidRootPart") then
-                local root = chr.HumanoidRootPart
-                local dir = workspace.CurrentCamera.CFrame.LookVector
-                verityPart.CFrame = CFrame.new(root.Position + dir*3 + Vector3.new(0,1.5,0))
-                verityPart.AssemblyLinearVelocity = dir*80 + Vector3.new(0,20,0)
-                task.spawn(function() playVeritySpeech("Whoosh!", FALL_FACE) end)
-            end
-        end)
-        local function spawnVerity(pos)
-            if verityPart and verityPart.Parent then verityPart:Destroy() end
-            verityPart = Instance.new("Part", workspace)
-            verityPart.Name, verityPart.Shape, verityPart.Size = "VerityHead", Enum.PartType.Ball, Vector3.new(2,2,2)
-            verityPart.Color, verityPart.Position = COLOR_VERITY, pos
-            verityPart.Material, verityPart.CanCollide = Enum.Material.SmoothPlastic, true
-            verityMesh = Instance.new("SpecialMesh", verityPart) verityMesh.MeshType = Enum.MeshType.Sphere
-            verityFace = Instance.new("Decal", verityPart) verityFace.Texture = FALL_FACE
-            verityGui = Instance.new("BillboardGui", verityPart)
-            verityGui.Name, verityGui.Adornee, verityGui.Size, verityGui.StudsOffsetWorldSpace = "VeritySpeechBubble", verityPart, UDim2.new(0,280,0,105), Vector3.new(0,2.4,0)
-            verityGui.AlwaysOnTop, verityGui.LightInfluence, verityGui.MaxDistance, verityGui.Enabled = true, 0, 80, false
-            bubbleFrame = Instance.new("Frame", verityGui)
-            bubbleFrame.Size, bubbleFrame.BackgroundColor3, bubbleFrame.BackgroundTransparency, bubbleFrame.BorderSizePixel = UDim2.new(1,0,1,-15), Color3.fromRGB(25,27,35), 0.08, 0
-            Instance.new("UICorner", bubbleFrame).CornerRadius = UDim.new(0,16)
-            bubbleStroke = Instance.new("UIStroke", bubbleFrame) bubbleStroke.Color, bubbleStroke.Thickness, bubbleStroke.Transparency = COLOR_VERITY, 2.5, 0.15
-            addSoftGradient(bubbleFrame, true)
-            local bp = Instance.new("UIPadding", bubbleFrame)
-            bp.PaddingLeft, bp.PaddingRight, bp.PaddingTop, bp.PaddingBottom = UDim.new(0,14), UDim.new(0,14), UDim.new(0,10), UDim.new(0,10)
-            verityGuiText = Instance.new("TextLabel", bubbleFrame)
-            verityGuiText.Name, verityGuiText.Size, verityGuiText.BackgroundTransparency = "Message", UDim2.new(1,0,1,0), 1
-            verityGuiText.TextColor3, verityGuiText.TextStrokeTransparency, verityGuiText.Font, verityGuiText.TextSize = Color3.fromRGB(255,245,145), 0.8, Enum.Font.GothamMedium, 17
-            verityGuiText.TextWrapped, verityGuiText.TextXAlignment, verityGuiText.TextYAlignment = true, Enum.TextXAlignment.Left, Enum.TextYAlignment.Center
-            local tail = Instance.new("Frame", verityGui)
-            tail.Name, tail.Size, tail.Position, tail.BackgroundColor3, tail.BackgroundTransparency, tail.BorderSizePixel, tail.Rotation = "Tail", UDim2.new(0,20,0,20), UDim2.new(0.5,-10,1,-26), Color3.fromRGB(25,27,35), 0.08, 0, 45
-            local tailStroke = Instance.new("UIStroke", tail) tailStroke.Color, tailStroke.Thickness, tailStroke.Transparency = COLOR_VERITY, 2.5, 0.15
-            task.defer(removeCollisionWithCharacters)
-            verityPart.Touched:Connect(function(hit)
-                local n = hit.Name:lower()
-                if n:find("kill") or n:find("lava") or n:find("death") or n:find("acid") then verityDie() end
-            end)
-            local cd = Instance.new("ClickDetector", verityPart)
-            cd.MaxActivationDistance = 50
-            cd.MouseClick:Connect(function()
-                if not isHeld then
-                    isHeld, isFlying, isFollowing = true, false, false
-                    dropButton.Visible, throwButton.Visible = true, true
-                    local chr = LocalPlayer.Character
-                    local hum = chr and chr:FindFirstChild("Humanoid")
-                    if hum then
-                        local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
-                        local anim = Instance.new("Animation")
-                        anim.AnimationId = hum.RigType == Enum.HumanoidRigType.R15 and "rbxassetid://507768375" or "rbxassetid://182393478"
-                        holdAnimTrack = animator:LoadAnimation(anim)
-                        holdAnimTrack.Priority = Enum.AnimationPriority.Action
-                        holdAnimTrack:Play()
-                    end
-                end
-            end)
-            VERITY.spawned = true
-        end
-        local function playVerityFallAnimation(groundY)
-            if not verityPart or not verityPart.Parent then return end
-            verityPart.Anchored = true
-            local x, z = verityPart.Position.X, verityPart.Position.Z
-            local baseY = groundY + 1.75
-            local frames = {
-                {beats(0), 28, 0}, {beats(1), 28, 0}, {beats(4)+0.45, 0, 0},
-                {beats(5)+0.45, 2.6, -4}, {beats(6)+0.45, 0, 3}, {beats(6.5)+0.45, 0.75, -2}, {beats(7)+0.45, 0, 0},
-            }
-            verityPart.Position = Vector3.new(x, baseY+frames[1][2], z)
-            for i = 1, #frames-1 do
-                if not verityPart or not verityPart.Parent then return end
-                local a, b = frames[i], frames[i+1]
-                local dur = b[1]-a[1]
-                local style = (b[2] > a[2]) and Enum.EasingDirection.Out or Enum.EasingDirection.In
-                local tw = TweenService:Create(verityPart, TweenInfo.new(dur, Enum.EasingStyle.Quad, style), {
-                    Position = Vector3.new(x, baseY+b[2], z),
-                    Orientation = Vector3.new(b[3], 0, 0)
-                })
-                tw:Play() tw.Completed:Wait()
-            end
-            if verityPart and verityPart.Parent then
-                verityPart.Position = Vector3.new(x, baseY, z)
-                verityPart.Orientation = Vector3.zero
-                verityPart.Anchored = false
-                verityPart.AssemblyLinearVelocity = Vector3.zero
-                verityPart.AssemblyAngularVelocity = Vector3.zero
-            end
-        end
-        local function spawnMysteryBox()
-            local cc = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local cr = cc:WaitForChild("HumanoidRootPart")
-            local rp = RaycastParams.new()
-            rp.FilterDescendantsInstances, rp.FilterType = {cc}, Enum.RaycastFilterType.Exclude
-            local rr = workspace:Raycast(cr.Position + Vector3.new(0,5,0), Vector3.new(0,-30,0), rp)
-            local groundY = rr and rr.Position.Y or (cr.Position.Y - 3)
-            local boxModel = Instance.new("Model", workspace) boxModel.Name = "VerityMysteryBox"
-            local box = Instance.new("Part", boxModel)
-            box.Name, box.Size = "Box", Vector3.new(3.5,3.5,3.5)
-            box.CFrame = CFrame.new(cr.Position.X + cr.CFrame.LookVector.X*8, groundY+30, cr.Position.Z + cr.CFrame.LookVector.Z*8)
-            box.Anchored, box.CanCollide, box.Color, box.Material = true, true, COLOR_VERITY, Enum.Material.SmoothPlastic
-            boxModel.PrimaryPart = box
-            local mesh = Instance.new("SpecialMesh", box)
-            mesh.MeshType, mesh.MeshId, mesh.Scale = Enum.MeshType.FileMesh, "rbxassetid://9756362", Vector3.new(0.95,0.95,0.95)
-            local boxGui = Instance.new("BillboardGui", box)
-            boxGui.Size, boxGui.StudsOffset, boxGui.AlwaysOnTop = UDim2.new(0,200,0,50), Vector3.new(0,2.7,0), true
-            local boxText = Instance.new("TextLabel", boxGui)
-            boxText.Size, boxText.BackgroundTransparency, boxText.Text, boxText.TextColor3, boxText.TextScaled, boxText.Font = UDim2.new(1,0,1,0), 1, "Toque na Caixa!", COLOR_VERITY, true, Enum.Font.GothamBold
-            local glow = Instance.new("PointLight", box) glow.Color, glow.Brightness, glow.Range = COLOR_VERITY, 1.8, 10
-            local triggered, landed = false, false
-            local sx, sz = box.Position.X, box.Position.Z
-            local gby = groundY + 1.75
-            task.spawn(function()
-                local drop = TweenService:Create(box, TweenInfo.new(beats(4), Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position=Vector3.new(sx,gby,sz)})
-                drop:Play() drop.Completed:Wait()
-                if not box.Parent or triggered then return end
-                TweenService:Create(box, TweenInfo.new(beats(1), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position=Vector3.new(sx,gby+2.4,sz)}):Play()
-                task.wait(beats(1))
-                TweenService:Create(box, TweenInfo.new(beats(1), Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position=Vector3.new(sx,gby,sz)}):Play()
-                task.wait(beats(1))
-                landed = true
-                local t0 = os.clock()
-                while box.Parent and not triggered do
-                    box.Position = Vector3.new(sx, gby + math.sin((os.clock()-t0)*2.4)*0.1, sz)
-                    task.wait(0.03)
-                end
-            end)
-            box.Touched:Connect(function(hit)
-                if triggered or not landed then return end
-                local ch = hit.Parent
-                local hum = ch and ch:FindFirstChildOfClass("Humanoid")
-                if hum and ch == LocalPlayer.Character then
-                    triggered = true
-                    boxText.Text = "Verity!"
-                    TweenService:Create(box, TweenInfo.new(1.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Position=Vector3.new(sx, groundY+29.75, sz)}):Play()
-                    task.wait(1.4)
-                    TweenService:Create(box, TweenInfo.new(0.3), {Transparency=1}):Play()
-                    TweenService:Create(glow, TweenInfo.new(0.25), {Brightness=0}):Play()
-                    task.wait(0.3)
-                    boxModel:Destroy()
-                    spawnVerity(Vector3.new(sx, groundY+29.75, sz))
-                    task.spawn(function()
-                        playVerityFallAnimation(groundY)
-                        isVerityBusy = true
-                        playVeritySpeech("Olá! Eu sou a Verity, sua amiga ajudante. Pergunte qualquer coisa!", TALKING_FACE)
-                        isVerityBusy = false
-                    end)
-                end
-            end)
-        end
-        _G.veritySpawnForNetwork = function()
-            if verityPart and verityPart.Parent then return end
-            spawnMysteryBox()
-        end
-        _G.verityRemoveForNetwork = function()
-            if verityPart and verityPart.Parent then verityPart:Destroy() verityPart = nil end
-            VERITY.spawned = false
-        end
-        _G.verityHandleRemoteSpeech = function(speaker, text)
-            if verityPart and verityPart.Parent then
-                task.spawn(function() playVeritySpeech(text, TALKING_FACE) end)
-            end
-        end
-        _G.veritySpawnLocal = spawnMysteryBox
-        _G.verityManualSpeak = function(text)
-            if verityPart and verityPart.Parent then
-                task.spawn(function() playVeritySpeech(text, TALKING_FACE) end)
-            end
-        end
-        print("[Verity] Módulo carregado!")
-    end)
-    if not success then warn("[Verity] ERRO: "..tostring(err)) end
-    VerityEnv = true
-end
+-- ================== CORES DO FLASH ==================
+local FLASH_COLORS = {
+    ["Branco"]   = { bolt = Color3.fromRGB(255,255,255), core = Color3.fromRGB(200,220,255) },
+    ["Vermelho"] = { bolt = Color3.fromRGB(255,30,30),   core = Color3.fromRGB(255,150,150) },
+    ["Azul"]     = { bolt = Color3.fromRGB(40,130,255),  core = Color3.fromRGB(180,220,255) },
+    ["Amarelo"]  = { bolt = Color3.fromRGB(255,220,40),  core = Color3.fromRGB(255,245,180) },
+    ["Rosa"]     = { bolt = Color3.fromRGB(255,90,190),  core = Color3.fromRGB(255,200,240) },
+}
+local FLASH_COLOR_NAME = "Branco"
+local FLASH_COLOR = FLASH_COLORS[FLASH_COLOR_NAME]
 
 -- ================== FLASH & AURA ==================
 local FXNET = { flash = {}, aura = {}, actions = { FLASH_ON=true, FLASH_OFF=true, AURA_ON=true, AURA_OFF=true } }
@@ -1769,8 +1057,8 @@ do
         end
         for i = 1, segs do
             for _, L in ipairs({
-                { Color3.fromRGB(255,215,40), 0.55*thick, 0.6 },
-                { Color3.new(1,1,1), 0.14*thick, 0 },
+                { FLASH_COLOR.bolt, 0.55*thick, 0.6 },
+                { FLASH_COLOR.core, 0.14*thick, 0 },
             }) do
                 local b = Instance.new("Beam")
                 b.Attachment0, b.Attachment1 = atts[i], atts[i+1]
@@ -1796,8 +1084,8 @@ do
         local em = Instance.new("ParticleEmitter", att)
         em.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255,230,60)),
-            ColorSequenceKeypoint.new(1, ORANGE),
+            ColorSequenceKeypoint.new(0.4, FLASH_COLOR.bolt),
+            ColorSequenceKeypoint.new(1, FLASH_COLOR.core),
         })
         em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
         em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
@@ -1809,13 +1097,13 @@ do
         trail.Attachment0, trail.Attachment1 = top, bot
         trail.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255,220,0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255,120,0)),
+            ColorSequenceKeypoint.new(0.3, FLASH_COLOR.bolt),
+            ColorSequenceKeypoint.new(1, FLASH_COLOR.core),
         })
         trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.1), NumberSequenceKeypoint.new(1,1) })
         trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.3, 0.01
-        local light = keep(Instance.new("PointLight", root)) light.Color, light.Brightness, light.Range = Color3.fromRGB(255,220,60), 3, 14
-        local hl = keep(Instance.new("Highlight", chr)) hl.FillColor, hl.OutlineColor = Color3.fromRGB(255,220,40), Color3.new(1,1,1)
+        local light = keep(Instance.new("PointLight", root)) light.Color, light.Brightness, light.Range = FLASH_COLOR.bolt, 3, 14
+        local hl = keep(Instance.new("Highlight", chr)) hl.FillColor, hl.OutlineColor = FLASH_COLOR.bolt, FLASH_COLOR.core
         hl.FillTransparency, hl.OutlineTransparency = 0.88, 0.3
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
         task.spawn(function()
@@ -2037,6 +1325,203 @@ do
     Players.PlayerRemoving:Connect(function(p) FXNET.flashOff(p.Name) FXNET.auraOff(p.Name) end)
 end
 
+-- ================== FLASH REVERSO ==================
+local FR = {
+    active = false,
+    conns = {},
+    eyeHighlight = nil,
+    tool = nil,
+    toolTrack = nil,
+    targetConns = {},
+}
+local FR_TOOL_ANIM   = "rbxassetid://79421105368440"
+local FR_TARGET_ANIM = "rbxassetid://72475422126056"
+local FR_COLOR       = Color3.fromRGB(255, 0, 0)
+
+local function frBolt(p0, p1, thick)
+    local dist = (p1 - p0).Magnitude
+    if dist < 0.5 then return end
+    local segs = math.clamp(math.floor(dist*1.6), 5, 24)
+    local cf = CFrame.lookAt(p0, p1)
+    local jit = dist * 0.075
+    local part = Instance.new("Part")
+    part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
+    part.Transparency, part.Size, part.CFrame = 1, Vector3.new(0.1,0.1,0.1), CFrame.new(p0)
+    part.Parent = workspace.CurrentCamera
+    local atts = {}
+    for i = 0, segs do
+        local j = (i==0 or i==segs) and 0 or jit
+        local a = Instance.new("Attachment", part)
+        a.WorldPosition = p0:Lerp(p1, i/segs) + cf.RightVector*(math.random()-0.5)*2*j + cf.UpVector*(math.random()-0.5)*2*j
+        atts[i+1] = a
+    end
+    for i = 1, segs do
+        for _, L in ipairs({
+            { Color3.fromRGB(255, 40, 40), 0.55*thick, 0.6 },
+            { Color3.fromRGB(255, 180, 180), 0.14*thick, 0 },
+        }) do
+            local b = Instance.new("Beam", part)
+            b.Attachment0, b.Attachment1 = atts[i], atts[i+1]
+            b.Segments, b.FaceCamera = 1, true
+            b.Color = ColorSequence.new(L[1])
+            b.LightEmission, b.LightInfluence = 1, 0
+            b.Width0, b.Width1 = L[2], L[2]
+            b.Transparency = NumberSequence.new(L[3])
+            b.Parent = part
+        end
+    end
+    task.delay(0.1, function() if part then part:Destroy() end end)
+end
+
+local function playAnimSafe(charOrHum, animId, looped)
+    local hum = charOrHum
+    if typeof(charOrHum) == "Instance" and charOrHum:IsA("Model") then
+        hum = charOrHum:FindFirstChildOfClass("Humanoid")
+    end
+    if not hum then return nil end
+    local a = Instance.new("Animation")
+    a.AnimationId = animId
+    local ok, track = pcall(function() return hum:LoadAnimation(a) end)
+    if ok and track then
+        if looped then track.Looped = true end
+        track:Play()
+        return track
+    end
+    return nil
+end
+
+function FR.start()
+    if FR.active then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum  = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    FR.active = true
+
+    local hl = Instance.new("Highlight", char)
+    hl.Name = "FR_Highlight"
+    hl.FillColor = FR_COLOR
+    hl.OutlineColor = Color3.fromRGB(255, 100, 100)
+    hl.FillTransparency, hl.OutlineTransparency = 0.75, 0.1
+    hl.DepthMode = Enum.HighlightDepthMode.Occluded
+    FR.eyeHighlight = hl
+
+    local light = Instance.new("PointLight", root)
+    light.Color = FR_COLOR
+    light.Brightness = 5
+    light.Range = 25
+    table.insert(FR.conns, light)
+
+    local att = Instance.new("Attachment", root)
+    att.Name = "FR_Att"
+    table.insert(FR.conns, att)
+    local em = Instance.new("ParticleEmitter", att)
+    em.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+        ColorSequenceKeypoint.new(0.4, FR_COLOR),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100,0,0)),
+    })
+    em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
+    em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+    em.Rate, em.Lifetime, em.Speed = 80, NumberRange.new(0.1, 0.4), NumberRange.new(10, 25)
+    em.SpreadAngle, em.LightEmission = Vector2.new(360,360), 1
+    em.Parent = att
+
+    local t1 = Instance.new("Attachment", root); t1.Position = Vector3.new(0,2,0)
+    local t2 = Instance.new("Attachment", root); t2.Position = Vector3.new(0,-2,0)
+    local trail = Instance.new("Trail", root)
+    trail.Attachment0, trail.Attachment1 = t1, t2
+    trail.Color = ColorSequence.new(FR_COLOR)
+    trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.4, 0.01
+    trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+    table.insert(FR.conns, t1); table.insert(FR.conns, t2); table.insert(FR.conns, trail)
+
+    hum.WalkSpeed = 120
+
+    table.insert(FR.conns, RunService.RenderStepped:Connect(function()
+        if not FR.active then return end
+        local r = LocalPlayer.Character
+        local rRoot = r and r:FindFirstChild("HumanoidRootPart")
+        if not rRoot then return end
+        local vel = rRoot.AssemblyLinearVelocity
+        local speed = vel.Magnitude
+        local qtd = speed > 25 and 3 or (speed > 5 and 2 or 1)
+        for _ = 1, qtd do
+            local origem = rRoot.Position + Vector3.new(math.random(-15,15)/10, math.random(-25,25)/10, math.random(-15,15)/10)
+            local rnd = Vector3.new(math.random()-0.5, math.random()-0.5, math.random()-0.5)
+            if rnd.Magnitude < 0.01 then rnd = Vector3.new(0,1,0) end
+            local velH = Vector3.new(vel.X, 0, vel.Z)
+            if velH.Magnitude > 20 then
+                local dir = (-velH.Unit + rnd.Unit * 0.06).Unit
+                frBolt(origem, origem + dir * math.random(18,36), math.random(90,130)/100)
+            else
+                local dir = rnd.Unit
+                if speed > 5 then dir = (dir*0.8 - vel.Unit*0.9).Unit end
+                frBolt(origem, origem + dir * math.random(10,20), math.random(80,130)/100)
+            end
+        end
+    end))
+
+    local tool = Instance.new("Tool")
+    tool.Name = "Super Poder Flash Reverso"
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+    tool.ToolTip = "Super Poder — Flash Reverso"
+    tool.Parent = LocalPlayer:FindFirstChild("Backpack") or char
+    FR.tool = tool
+
+    tool.Equipped:Connect(function()
+        if not FR.active then return end
+        FR.toolTrack = playAnimSafe(char, FR_TOOL_ANIM, true)
+        task.spawn(function()
+            while FR.active do
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character then
+                        local pRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                        if pRoot then
+                            if (pRoot.Position - root.Position).Magnitude < 35 then
+                                if not FR.targetConns[p.Name] then
+                                    local t = playAnimSafe(p.Character, FR_TARGET_ANIM, true)
+                                    if t then FR.targetConns[p.Name] = t end
+                                end
+                            else
+                                if FR.targetConns[p.Name] then
+                                    pcall(function() FR.targetConns[p.Name]:Stop() end)
+                                    FR.targetConns[p.Name] = nil
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end)
+
+    tool.Unequipped:Connect(function()
+        if FR.toolTrack then pcall(function() FR.toolTrack:Stop() end) FR.toolTrack = nil end
+    end)
+
+    notify("Flash Reverso", "ATIVADO! Olhos vermelhos + Tool.")
+end
+
+function FR.stop()
+    if not FR.active then return end
+    FR.active = false
+    for _, o in ipairs(FR.conns) do pcall(function() o:Destroy() end) end
+    FR.conns = {}
+    for _, t in pairs(FR.targetConns) do pcall(function() t:Stop() end) end
+    FR.targetConns = {}
+    if FR.eyeHighlight then pcall(function() FR.eyeHighlight:Destroy() end) FR.eyeHighlight = nil end
+    if FR.toolTrack then pcall(function() FR.toolTrack:Stop() end) FR.toolTrack = nil end
+    if FR.tool then pcall(function() FR.tool:Destroy() end) FR.tool = nil end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = 16 end
+    notify("Flash Reverso", "Desativado.")
+end
+
 -- ================== RECEPTOR ==================
 function executeActionLocally(action, senderName, extraArg)
     local chr = LocalPlayer.Character
@@ -2109,20 +1594,8 @@ function executeActionLocally(action, senderName, extraArg)
             end
         end)
     elseif action == "LIFEFORM_CLEAR" then task.spawn(function() pcall(clearLifeform) end)
-    elseif action == "LOCUST_ON" then task.spawn(function() pcall(LOCUST.start) end)
-    elseif action == "LOCUST_OFF" then task.spawn(function() pcall(LOCUST.stop, false) end)
-    elseif action == "VERITY_ON" then
-        task.spawn(function()
-            loadVerityModule()
-            if _G.veritySpawnForNetwork then _G.veritySpawnForNetwork() end
-        end)
-    elseif action == "VERITY_OFF" then
-        task.spawn(function() if _G.verityRemoveForNetwork then _G.verityRemoveForNetwork() end end)
-    elseif action == "VERITY_SPEAK" then
-        local text = (extraArg or ""):gsub("_", " ")
-        if _G.verityHandleRemoteSpeech then
-            task.spawn(function() pcall(_G.verityHandleRemoteSpeech, senderName, text) end)
-        end
+    elseif action == "FLASH_REVERSO_ON" then task.spawn(function() pcall(FR.start) end)
+    elseif action == "FLASH_REVERSO_OFF" then task.spawn(function() pcall(FR.stop) end)
     elseif FXNET.actions[action] then FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
         task.spawn(function()
@@ -2290,7 +1763,7 @@ function processNetMessage(msg, senderName)
     if action ~= "PING" and action ~= "PONG" then
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
-    if action == "LOCUST_ON" or action == "LOCUST_OFF" or action == "VERITY_ON" or action == "VERITY_OFF" or action == "VERITY_SPEAK" then
+    if action == "FLASH_REVERSO_ON" or action == "FLASH_REVERSO_OFF" then
         if senderName ~= LocalPlayer.Name then
             task.spawn(function() pcall(function() executeActionLocally(action, senderName, extraArg or target) end) end)
         end
@@ -2610,31 +2083,25 @@ else
     local TabE = Window:Tab({ Title="Funções Essenciais", Icon=ICON_ID })
     TabE:Button({ Title="Fly com Asas e Dois Halos", Callback=function() toggleFlyWithWings() end })
     TabE:Button({ Title="Ativar/Desativar Aura", Callback=function() toggleAura() end })
-    TabE:Button({ Title="Locust (ligar/desligar)", Callback=function()
-        local isOn = LOCUST.running or LOCUST.busy
-        triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", LocalPlayer.Name)
-    end})
-    TabE:Button({ Title="Locust ON (Alvo)", Callback=function() triggerCommand("LOCUST_ON", selectedPlayerName) end })
-    TabE:Button({ Title="Locust OFF (Alvo)", Callback=function() triggerCommand("LOCUST_OFF", selectedPlayerName) end })
-    TabE:Button({ Title="Locust ON (Todos)", Callback=function() triggerCommand("LOCUST_ON", "ALL") end })
-    TabE:Button({ Title="Locust OFF (Todos)", Callback=function() triggerCommand("LOCUST_OFF", "ALL") end })
-    -- VERITY
-    TabE:Button({ Title="🧙 Invocar Verity (Ligar)", Callback=function()
-        loadVerityModule()
-        triggerCommand("VERITY_ON", LocalPlayer.Name)
-    end})
-    TabE:Button({ Title="🗑️ Remover Verity (Desligar)", Callback=function() triggerCommand("VERITY_OFF", LocalPlayer.Name) end })
-    TabE:Button({ Title="Verity ON (Alvo)", Callback=function() triggerCommand("VERITY_ON", selectedPlayerName) end })
-    TabE:Button({ Title="Verity OFF (Alvo)", Callback=function() triggerCommand("VERITY_OFF", selectedPlayerName) end })
-    TabE:Button({ Title="Verity ON (Todos)", Callback=function() triggerCommand("VERITY_ON", "ALL") end })
-    TabE:Button({ Title="Verity OFF (Todos)", Callback=function() triggerCommand("VERITY_OFF", "ALL") end })
-    TabE:Button({ Title="Verity Fala (rede)", Callback=function()
-        if customChatText ~= "" then
-            loadVerityModule()
-            if _G.verityManualSpeak then _G.verityManualSpeak(customChatText) end
-            sendNetCmd(";VERITY_SPEAK "..LocalPlayer.Name.." "..customChatText:gsub(" ", "_"))
+    -- CORES DO FLASH
+    TabE:Dropdown({
+        Title = "Cor do Flash",
+        Values = { "Branco", "Vermelho", "Azul", "Amarelo", "Rosa" },
+        Default = "Branco",
+        Callback = function(v)
+            FLASH_COLOR_NAME = v
+            FLASH_COLOR = FLASH_COLORS[v]
+            notify("Flash", "Cor: "..v)
         end
+    })
+    -- FLASH REVERSO
+    TabE:Button({ Title="⚡ Flash Reverso (ligar/desligar)", Callback=function()
+        triggerCommand(FR.active and "FLASH_REVERSO_OFF" or "FLASH_REVERSO_ON", LocalPlayer.Name)
     end})
+    TabE:Button({ Title="Flash Reverso ON (Alvo)", Callback=function() triggerCommand("FLASH_REVERSO_ON", selectedPlayerName) end })
+    TabE:Button({ Title="Flash Reverso OFF (Alvo)", Callback=function() triggerCommand("FLASH_REVERSO_OFF", selectedPlayerName) end })
+    TabE:Button({ Title="Flash Reverso ON (Todos)", Callback=function() triggerCommand("FLASH_REVERSO_ON", "ALL") end })
+    TabE:Button({ Title="Flash Reverso OFF (Todos)", Callback=function() triggerCommand("FLASH_REVERSO_OFF", "ALL") end })
     TabE:Button({ Title="Modo Satoru Gojo", Callback=function() giveGojo() end })
     TabE:Button({ Title="Expansão de Domínio [Sukuna]", Callback=function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
     TabE:Button({ Title="Pegar AK-47", Callback=function() giveAK47() end })
