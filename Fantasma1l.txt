@@ -1,7 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v32: Couch corrigido | Poolrooms Level 37 realista | Locust em rede)
+    (v32: Couch v3 corrigido | Poolrooms Level 37 realista | Locust em rede)
     ==========================================================
 ]]--
 
@@ -29,7 +29,7 @@ local WHITELIST = {
 }
 
 local NETWORK_ROLES = {}
-local REQUIRE_WHITELIST = true -- true = só obedece comandos de quem está na WHITELIST (evita estranhos usando ;KICK ALL etc.)
+local REQUIRE_WHITELIST = true
 local IS_ADMIN, MY_ROLE = false, "USER"
 do
     local entry = WHITELIST[LocalPlayer.Name]
@@ -1036,27 +1036,23 @@ local function clearBackrooms()
 end
 
 -- ================== POOLROOMS (LEVEL 37 - SALÃO INFINITO) ==================
--- Salão infinito: piso azulejado coberto por água rasa turquesa, colunas e paredes brancas de azulejo,
--- teto branco com painéis fluorescentes frios em grade perfeita e névoa leve ao fundo.
--- O mundo é feito de "chunks" 64x64 gerados em volta de você (nunca acaba).
--- Sombras: usa Future (se o executor tiver sethiddenproperty) + luzes COM sombra nos painéis mais próximos.
 local POOL = { token = 0, saved = nil, S = nil, hidden = {} }
 
 do
     local TweenService = game:GetService("TweenService")
     local Debris       = game:GetService("Debris")
 
-    local CH           = 64                       -- tamanho do chunk
-    local OFFS         = { -24, -8, 8, 24 }       -- posição das colunas dentro do chunk (grade de 16 studs)
-    local PANEL_OFFS   = { -32, -16, 0, 16 }      -- painéis de luz: centro de cada vão entre 4 colunas
-    local COL_W        = 3.6                      -- largura das colunas
-    local WALL_H       = 24                       -- pé-direito
-    local POOL_Y       = 1000                     -- topo do piso
-    local WATER_H      = 1.6                      -- água rasa (dá pra andar)
-    local RADIUS       = 2                        -- chunks carregados em volta de você
-    local TILE         = 4                        -- studs por azulejo
-    local LIGHT_COUNT  = 36                       -- quantos painéis têm luz real (os mais próximos)
-    local SHADOW_COUNT = 10                       -- quantos desses projetam sombra
+    local CH           = 64
+    local OFFS         = { -24, -8, 8, 24 }
+    local PANEL_OFFS   = { -32, -16, 0, 16 }
+    local COL_W        = 3.6
+    local WALL_H       = 24
+    local POOL_Y       = 1000
+    local WATER_H      = 1.6
+    local RADIUS       = 2
+    local TILE         = 4
+    local LIGHT_COUNT  = 36
+    local SHADOW_COUNT = 10
     local WALL_TEX     = "rbxassetid://122349893272800"
 
     local C_TILE  = Color3.fromRGB(246, 248, 248)
@@ -1074,9 +1070,6 @@ do
     local FACES_TOP   = { Enum.NormalId.Top }
     local FACES_SIDES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
 
-    ----------------------------------------------------------------
-    -- PRIMITIVAS
-    ----------------------------------------------------------------
     local function mkPart(parent, size, cf, color, mat, collide)
         local p = Instance.new("Part")
         p.Anchored = true
@@ -1093,7 +1086,6 @@ do
         return p
     end
 
-    -- laje azulejada brilhante (textura nas faces pedidas)
     local function slab(S, parent, size, cf, faces, color, collide)
         local p = mkPart(parent, size, cf, color or C_TILE, Enum.Material.SmoothPlastic, collide ~= false)
         p.Reflectance = 0.12
@@ -1110,7 +1102,6 @@ do
         return p
     end
 
-    -- faixa úmida na base (desgaste/umidade perto da água)
     local function wetBand(parent, w, d, x, z)
         local b = mkPart(parent, Vector3.new(w, 3, d), CFrame.new(x, POOL_Y + 1.5, z), C_WET, Enum.Material.SmoothPlastic, false)
         b.Transparency = 0.6
@@ -1119,9 +1110,6 @@ do
         return b
     end
 
-    ----------------------------------------------------------------
-    -- CHUNK
-    ----------------------------------------------------------------
     local function buildChunk(S, cx, cz)
         if POOL.token ~= S.token then return end
         local key = cx .. "," .. cz
@@ -1138,22 +1126,18 @@ do
         local ceilBottom = POOL_Y + WALL_H
 
         local ok, err = pcall(function()
-            -- piso azulejado
             slab(S, folder, Vector3.new(CH, 2, CH), CFrame.new(wx, POOL_Y - 1, wz), FACES_TOP, C_FLOOR)
 
-            -- água rasa turquesa (reflexiva, calma)
             local w = mkPart(folder, Vector3.new(CH, WATER_H, CH), CFrame.new(wx, POOL_Y + WATER_H / 2, wz), C_WATER, Enum.Material.Glass, false)
             w.Name = "PoolWater"
             w.Transparency = 0.55
             w.Reflectance = 0.22
             w.CastShadow = false
 
-            -- teto branco
             local ceil = mkPart(folder, Vector3.new(CH, 2, CH), CFrame.new(wx, ceilBottom + 1, wz), C_CEIL, Enum.Material.SmoothPlastic, true)
             ceil.Name = "Ceiling"
             ceil.Reflectance = 0.04
 
-            -- colunas brancas em grade simétrica
             for _, dx in ipairs(OFFS) do
                 for _, dz in ipairs(OFFS) do
                     local x, z = wx + dx, wz + dz
@@ -1164,7 +1148,6 @@ do
                 end
             end
 
-            -- paredes de azulejo (divisórias ocasionais entre colunas)
             local gap = (OFFS[2] - OFFS[1]) - COL_W
             for i = 1, #OFFS - 1 do
                 for j = 1, #OFFS do
@@ -1185,7 +1168,6 @@ do
                 end
             end
 
-            -- painéis fluorescentes frios em grade perfeita
             for _, u in ipairs(PANEL_OFFS) do
                 for _, v in ipairs(PANEL_OFFS) do
                     local x, z = wx + u, wz + v
@@ -1226,9 +1208,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- LUZES (só os painéis mais próximos têm luz real e sombra)
-    ----------------------------------------------------------------
     local function updateLights(S, pos)
         local list = {}
         for _, ch in pairs(S.chunks) do
@@ -1261,9 +1240,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- AMBIENTE (luz fria, sombra, névoa)
-    ----------------------------------------------------------------
     local LIGHT_PROPS = {
         "Ambient", "OutdoorAmbient", "Brightness", "ColorShift_Top", "ColorShift_Bottom",
         "ExposureCompensation", "ClockTime", "FogColor", "FogStart", "FogEnd", "GlobalShadows",
@@ -1297,7 +1273,6 @@ do
         set("FogEnd", 250)
         pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
 
-        -- remove atmosferas do jogo (só uma funciona por vez)
         pcall(function()
             for _, c in ipairs(Lighting:GetChildren()) do
                 if c:IsA("Atmosphere") then
@@ -1347,9 +1322,6 @@ do
         end
     end
 
-    ----------------------------------------------------------------
-    -- API
-    ----------------------------------------------------------------
     function POOL.clear(silent)
         POOL.token += 1
         local S = POOL.S
@@ -1390,7 +1362,6 @@ do
         POOL.saved = envSave()
         envApply()
 
-        -- primeiro só o entorno imediato (rápido), depois o resto vai sendo gerado
         streamStep(S, 0, 0, 1)
         if POOL.token ~= myToken then return end
 
@@ -1413,7 +1384,6 @@ do
             end
         end
 
-        -- se você morrer/respawnar, volta pro salão
         S.conn = LocalPlayer.CharacterAdded:Connect(function(c)
             local h = c:WaitForChild("HumanoidRootPart", 10)
             if h and POOL.token == myToken then
@@ -1422,7 +1392,6 @@ do
             end
         end)
 
-        -- streaming infinito + gerenciador de luzes/sombras
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
@@ -1437,7 +1406,6 @@ do
             end
         end)
 
-        -- ondulações suaves na água (gotas ao redor + passos)
         task.spawn(function()
             local fx = Instance.new("Folder")
             fx.Name = "Ripples"
@@ -1481,12 +1449,8 @@ do
 end
 
 -- ================== LOCUST (REANIMATE) + REDE ==================
--- Script "Locust" (FEVerse) embutido como função. Liga/desliga localmente ou pela rede:
---   ;LOCUST_ON <alvo|ALL>      ;LOCUST_OFF <alvo|ALL>
--- Controles: X = modo kill | Q = agachar | C = sentar | E = waypoint/teleporte | Shift = correr
 local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil, users = {}, marks = {} }
 
--- quem está com Locust ligado (todo cliente do hub fica sabendo pela rede)
 function LOCUST.announce(on)
     local me = LocalPlayer.Name
     local was = LOCUST.users[me] == true
@@ -1495,7 +1459,6 @@ function LOCUST.announce(on)
     sendNetCmd(";LOCUST_STATE " .. me .. " " .. (on and "ON" or "OFF"))
 end
 
--- marca visual (contorno + etiqueta) no alvo que está com Locust, pra todo mundo do hub ver
 function LOCUST.mark(name, on)
     local old = LOCUST.marks[name]
     if old then
@@ -1519,7 +1482,6 @@ function LOCUST.mark(name, on)
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         hl.Parent = char
         table.insert(st.objs, hl)
-        -- etiqueta presa num acessório (os acessórios seguem o corpo do Locust)
         task.spawn(function()
             local handle
             local t0 = os.clock()
@@ -1574,12 +1536,10 @@ function LOCUST.start()
 
     local ok, err = pcall(function()
 
--- FEManager (baixa/gerencia arquivos) - cacheado entre execuções
 LOCUST.fem = LOCUST.fem or loadstring(game:HttpGet("https://gist.githubusercontent.com/MelonsStuff/a003ea305dd302eab1f8d372daed38b4/raw/9db59962b28555fd699a7c29891efb85d45677ab/gistfile1.txt"))()
 local FEManager = LOCUST.fem
 if not FEManager then error("FEManager não carregou") end
 
--- tables
 local ScriptOptions = {
 	Settings = {
 		AnimationSpeed = 1.25;
@@ -1601,26 +1561,15 @@ local ScriptOptions = {
 		ToolFling = false,
 	};
 	Reanimate_Settings = {
-		Frequency = 6, -- this is basically how fast the oscillation goes
-		Amplification = 6, -- this is how far the oscillation goes
-		FrontOffset = 2.5, -- this is how much youre in front of the player during prediction
+		Frequency = 6,
+		Amplification = 6,
+		FrontOffset = 2.5,
 	}
 }
 
-local AnimatorCache = {
-	Joints = {};
-	AnimDefaults = {};
-	Rigs = {};
-}
+local AnimatorCache = { Joints = {}; AnimDefaults = {}; Rigs = {}; }
+local ScriptCache = { StoredMotors = {}; TrashBin = {}; HitHumanoids = {}; ActiveConnections = {}; }
 
-local ScriptCache = {
-	StoredMotors = {};
-	TrashBin = {};
-	HitHumanoids = {};
-	ActiveConnections = {};
-}
-
--- limpeza (usada no reset do personagem e no ;LOCUST_OFF)
 local function Cleanup()
 	for _, v in ipairs(ScriptCache.TrashBin) do pcall(function() v:Destroy() end) end
 	for _, v in ipairs(ScriptCache.ActiveConnections) do pcall(function() v:Disconnect() end) end
@@ -1629,30 +1578,12 @@ local function Cleanup()
 	pcall(function() workspace.CurrentCamera.FieldOfView = 70 end)
 end
 
-local Directories = {
-	Main = "FEVerse/",
-	RBXMs ="FEVerse/RBXMs/",
-	Sounds = "FEVerse/Sounds/",
-	Songs = "FEVerse/Songs/",
-}
+local Directories = { Main = "FEVerse/"; RBXMs ="FEVerse/RBXMs/"; Sounds = "FEVerse/Sounds/"; Songs = "FEVerse/Songs/"; }
 
 local States = {
-	Movement = {
-		Idle = false;
-		Walking = false;
-		Running = false;
-		Crouching = false;
-		Sitting = false;
-	};
-	Input = {
-		Debounce = false;
-		Shift = false;
-		KillMode = false;
-	};
-	Waypoint = {
-		SavedPosition = nil;
-		TVLocation = nil;
-	}
+	Movement = { Idle = false; Walking = false; Running = false; Crouching = false; Sitting = false; };
+	Input = { Debounce = false; Shift = false; KillMode = false; };
+	Waypoint = { SavedPosition = nil; TVLocation = nil; }
 }
 
 local Services = {
@@ -1666,7 +1597,6 @@ local Services = {
 
 for i, v in pairs(Directories) do FEManager.EnsureFolder(v) end
 
--- baixa os arquivos se faltarem (antes de carregar o .rbxm, então não precisa rodar 2x)
 local function haveFiles()
 	if typeof(isfile) ~= "function" then return false end
 	return isfile(Directories.RBXMs .. "Locust.rbxm") and isfile(Directories.Songs .. "LocustTheme.mp3")
@@ -1682,12 +1612,10 @@ if not haveFiles() then
 	notify("Locust", "Arquivos baixados.")
 end
 
--- effects setup
 local script = Services.InsertService:LoadLocalAsset(getcustomasset(Directories.RBXMs.."Locust.rbxm"))
 local Animations = script:WaitForChild("Animations")
 local Objects = script:WaitForChild("Objects")
 
--- reanim start
 local Start, Stop
 local Empyrean
 do
@@ -1793,7 +1721,6 @@ do
 	local mathpi = math.pi
 
 	local nan = 0 / 0
-
 	local next = next
 
 	local OptionsAccessories = nil
@@ -1817,39 +1744,27 @@ do
 	local OptionsUseServerBreakJoints
 
 	local osclock = os.clock
-
 	local PreRenderConnection = nil
-
 	local RBXScriptConnections = {}
-
 	local replicatesignal = replicatesignal
-
 	local Rig = nil
 	local RigHumanoid = nil
 	local RigHumanoidRootPart = nil
-
 	local sethiddenproperty = sethiddenproperty
 	local setscriptable = setscriptable
-
 	local stringfind = string.find
-
 	local table = table
 	local tableclear = table.clear
 	local tablefind = table.find
 	local tableinsert = table.insert
 	local tableremove = table.remove
-
 	local Targets = {}
-
 	local task = task
 	local taskdefer = task.defer
 	local taskspawn = task.spawn
 	local taskwait = task.wait
-
 	local Time = nil
-
 	local Tools = {}
-
 	local Vector3 = Vector3
 	local Vector3new = Vector3.new
 	local FlingVelocity = Vector3new(16384, 16384, 16384)
@@ -1859,22 +1774,17 @@ do
 	local Vector3xzAxis = Vector3new(1, 0, 1)
 	local Vector3zero = Vector3.zero
 	local AntiSleep = Vector3zero
-
 	local Color3fromRGB = Color3.fromRGB
 
 	R15Animation.AnimationId = "rbxassetid://507767968"
 	R6Animation.AnimationId = "rbxassetid://180436148"
-
 	Humanoid = nil
-
 	Destroy(HumanoidDescription)
 	HumanoidDescription = nil
 
 	local FindFirstChildOfClassAndName = function(Parent, ClassName, Name)
 		for Index, Child in next, GetChildren(Parent) do
-			if IsA(Child, ClassName) and Child.Name == Name then
-				return Child
-			end
+			if IsA(Child, ClassName) and Child.Name == Name then return Child end
 		end
 	end
 
@@ -1882,23 +1792,19 @@ do
 		for Index, Child in GetChildren(Character) do
 			if IsA(Child, "Accoutrement") then
 				local Handle = FindFirstChildOfClassAndName(Child, "BasePart", "Handle")
-
 				if Handle then
 					local MeshId = nil
 					local TextureId = nil
-
 					if IsA(Handle, "MeshPart") then
 						MeshId = Handle.MeshId
 						TextureId = Handle.TextureID
 					else
 						local SpecialMesh = FindFirstChildOfClass(Handle, "SpecialMesh")
-
 						if SpecialMesh then
 							MeshId = SpecialMesh.MeshId
 							TextureId = SpecialMesh.TextureId
 						end
 					end
-
 					if MeshId then
 						if stringfind(MeshId, Table.MeshId) and stringfind(TextureId, Table.TextureId) then
 							return Handle
@@ -1909,9 +1815,7 @@ do
 		end
 	end
 
-	local NewIndex = function(self, Index, Value)
-		self[Index] = Value
-	end
+	local NewIndex = function(self, Index, Value) self[Index] = Value end
 
 	local DescendantAdded = function(Descendant)
 		if IsA(Descendant, "Accoutrement") and OptionsHatDrop then
@@ -1925,93 +1829,63 @@ do
 			end
 		elseif IsA(Descendant, "Attachment") then
 			local Attachment = Attachments[Descendant.Name]
-
 			if Attachment then
 				local Parent = Descendant.Parent
-
 				if IsA(Parent, "BasePart") then
 					local MeshId = nil
 					local TextureId = nil
-
 					if IsA(Parent, "MeshPart") then
 						MeshId = Parent.MeshId
 						TextureId = Parent.TextureID
 					else
 						local SpecialMesh = FindFirstChildOfClass(Parent, "SpecialMesh")
-
 						if SpecialMesh then
 							MeshId = SpecialMesh.MeshId
 							TextureId = SpecialMesh.TextureId
 						end
 					end
-
 					if MeshId then
 						for Index, Table in next, Accessories do
 							if Table.MeshId == MeshId and Table.TextureId == TextureId then
 								local Handle = Table.Handle
-
-								tableinsert(Aligns, {
-									LastPosition = Handle.Position,
-									Offset = CFrameidentity,
-									Part0 = Parent,
-									Part1 = Handle
-								})
-
+								tableinsert(Aligns, { LastPosition = Handle.Position, Offset = CFrameidentity, Part0 = Parent, Part1 = Handle })
 								return
 							end
 						end
-
 						for Index, Table in next, OptionsAccessories do
 							if stringfind(MeshId, Table.MeshId) and stringfind(TextureId, Table.TextureId) then
 								local Instance = nil
 								local TableName = Table.Name
 								local TableNames = Table.Names
-
 								if TableName then
 									Instance = FindFirstChildOfClassAndName(Rig, "BasePart", TableName)
 								else
 									for Index, TableName in next, TableNames do
 										local Child = FindFirstChildOfClassAndName(Rig, "BasePart", TableName)
-
 										if not ( TableNames[Index + 1] and Blacklist[Child] ) then
 											Instance = Child
 											break
 										end
 									end
 								end
-
 								if Instance then
 									local Blacklisted = Blacklist[Instance]
-
 									if not ( Blacklisted and Blacklisted.MeshId == MeshId and Blacklisted.TextureId == TextureId ) then
-										tableinsert(Aligns, {
-											Offset = Table.Offset,
-											Part0 = Parent,
-											Part1 = Instance
-										})
-
+										tableinsert(Aligns, { Offset = Table.Offset, Part0 = Parent, Part1 = Instance })
 										Blacklist[Instance] = { MeshId = MeshId, TextureId = TextureId }
-
 										return
 									end
 								end
 							end
 						end
-
 						local Accoutrement = FindFirstAncestorWhichIsA(Parent, "Accoutrement")
-
 						if Accoutrement and IsA(Accoutrement, "Accoutrement") then
 							local AccoutrementClone = Clone(Accoutrement)
-
 							local HandleClone = FindFirstChildOfClassAndName(AccoutrementClone, "BasePart", "Handle")
 							HandleClone.Transparency = OptionsRigTransparency
-
 							for Index, Descendant in next, GetDescendants(HandleClone) do
-								if IsA(Descendant, "JointInstance") then
-									Destroy(Descendant)
-								end
+								if IsA(Descendant, "JointInstance") then Destroy(Descendant) end
 							end
-
 							local AccessoryWeld = Instancenew("Weld")
 							AccessoryWeld.C0 = Descendant.CFrame
 							AccessoryWeld.C1 = Attachment.CFrame
@@ -2019,19 +1893,9 @@ do
 							AccessoryWeld.Part0 = HandleClone
 							AccessoryWeld.Part1 = Attachment.Parent
 							AccessoryWeld.Parent = HandleClone
-
 							AccoutrementClone.Parent = Rig
-
-							tableinsert(Accessories, {
-								Handle = HandleClone,
-								MeshId = MeshId,
-								TextureId = TextureId
-							})
-							tableinsert(Aligns, {
-								Offset = CFrameidentity,
-								Part0 = Parent,
-								Part1 = HandleClone
-							})
+							tableinsert(Accessories, { Handle = HandleClone, MeshId = MeshId, TextureId = TextureId })
+							tableinsert(Aligns, { Offset = CFrameidentity, Part0 = Parent, Part1 = HandleClone })
 						end
 					end
 				end
@@ -2042,35 +1906,26 @@ do
 	local SetCameraSubject = function()
 		local CameraCFrame = CurrentCamera.CFrame
 		local Position = RigHumanoidRootPart.CFrame.Position
-
 		CurrentCamera.CameraSubject = RigHumanoid
 		Wait(PreRender)
 		CurrentCamera.CFrame = CameraCFrame + RigHumanoidRootPart.CFrame.Position - Position
 	end
 
 	local OnCameraSubjectChanged = function()
-		if CurrentCamera.CameraSubject ~= RigHumanoid then
-			taskdefer(SetCameraSubject)
-		end
+		if CurrentCamera.CameraSubject ~= RigHumanoid then taskdefer(SetCameraSubject) end
 	end
 
 	local OnCameraTypeChanged = function()
-		if CurrentCamera.CameraType ~= Custom then
-			CurrentCamera.CameraType = Custom
-		end
+		if CurrentCamera.CameraType ~= Custom then CurrentCamera.CameraType = Custom end
 	end
 
 	local OnCurrentCameraChanged = function()
 		local Camera = Workspace.CurrentCamera
-
 		if Camera and OptionsSetCameraSubject then
 			CurrentCamera = Workspace.CurrentCamera
-
 			taskspawn(SetCameraSubject)
-
 			OnCameraSubjectChanged()
 			tableinsert(RBXScriptConnections, Connect(GetPropertyChangedSignal(CurrentCamera, "CameraSubject"), OnCameraSubjectChanged))
-
 			if OptionsSetCameraType then
 				OnCameraTypeChanged()
 				tableinsert(RBXScriptConnections, Connect(GetPropertyChangedSignal(CurrentCamera, "CameraType"), OnCameraTypeChanged))
@@ -2078,135 +1933,89 @@ do
 		end
 	end
 
-	local SetCharacter = function()
-		LocalPlayer.Character = Rig
-	end
-
-	local SetSimulationRadius = function()
-		LocalPlayer.SimulationRadius = OptionsSimulationRadius
-	end
+	local SetCharacter = function() LocalPlayer.Character = Rig end
+	local SetSimulationRadius = function() LocalPlayer.SimulationRadius = OptionsSimulationRadius end
 
 	local WaitForChildOfClass = function(Parent, ClassName)
 		local Child = FindFirstChildOfClass(Parent, ClassName)
-
 		while not Child do
 			Wait(Parent.ChildAdded)
 			Child = FindFirstChildOfClass(Parent, ClassName)
 		end
-
 		return Child
 	end
 
 	local WaitForChildOfClassAndName = function(Parent, ...)
 		local Child = FindFirstChildOfClassAndName(Parent, ...)
-
 		while not Child do
 			Wait(Parent.ChildAdded)
 			Child = FindFirstChildOfClassAndName(Parent, ...)
 		end
-
 		return Child
 	end
 
 	local Fling = function(Target, Options)
 		if Target then
 			local Highlight = Options.Highlight
-
-			if IsA(Target, "Humanoid") then
-				Target = Target.Parent
-			end
+			if IsA(Target, "Humanoid") then Target = Target.Parent end
 			if IsA(Target, "Model") then
 				Target = FindFirstChildOfClassAndName(Target, "BasePart", "HumanoidRootPart") or FindFirstChildWhichIsA(Character, "BasePart")
 			end
-
 			if not tablefind(Targets, Target) and IsA(Target, "BasePart") and not Target.Anchored and not IsDescendantOf(Character, Target) and not IsDescendantOf(Rig, Target) then
 				local Model = FindFirstAncestorOfClass(Target, "Model")
-
 				if Model and FindFirstChildOfClass(Model, "Humanoid") then
 					Target = FindFirstChildOfClassAndName(Model, "BasePart", "HumanoidRootPart") or FindFirstChildWhichIsA(Character, "BasePart") or Target	
 				else
 					Model = Target
 				end
-
 				if Highlight then
 					local HighlightObject = type(Highlight) == "boolean" and Highlight and Instancenew("Highlight") or Clone(Highlight)
 					HighlightObject.Adornee = Model
 					HighlightObject.Parent = Model
 					HighlightObject.OutlineColor = Color3fromRGB(255, 0, 0)
 					HighlightObject.FillColor = Color3fromRGB(0, 0, 0)
-
 					Options.HighlightObject = HighlightObject
 					tableinsert(Highlights, HighlightObject)
 				end
-
 				Targets[Target] = Options
 			end
 		end
 	end
 
 	local OnCharacterAdded = function(NewCharacter)
-
-
 		if NewCharacter ~= Rig then
 			tableclear(Aligns)
 			tableclear(Blacklist)
 			tableclear(Accessories)
 			for _, child in next, GetChildren(Rig) do
-				if IsA(child, "Accoutrement") then
-					Destroy(child)
-				end
+				if IsA(child, "Accoutrement") then Destroy(child) end
 			end
-
-
 			Character = NewCharacter
-
-			if OptionsSetCameraSubject then
-				taskspawn(SetCameraSubject)
-			end
-
-			if OptionsSetCharacter then
-				taskdefer(SetCharacter)
-			end
-
-			if OptionsParentCharacter then
-				Character.Parent = Rig
-			end
-
-			for Index, Descendant in next, GetDescendants(Character) do
-				taskspawn(DescendantAdded, Descendant)
-			end
-
+			if OptionsSetCameraSubject then taskspawn(SetCameraSubject) end
+			if OptionsSetCharacter then taskdefer(SetCharacter) end
+			if OptionsParentCharacter then Character.Parent = Rig end
+			for Index, Descendant in next, GetDescendants(Character) do taskspawn(DescendantAdded, Descendant) end
 			tableinsert(RBXScriptConnections, Connect(Character.DescendantAdded, DescendantAdded))
-
 			Humanoid = WaitForChildOfClass(Character, "Humanoid")
 			local HumanoidRootPart = WaitForChildOfClassAndName(Character, "BasePart", "HumanoidRootPart")
-
 			if IsFirst then
 				if OptionsApplyDescription and Humanoid then
 					local AppliedDescription = GetAppliedDescription(Humanoid)
 					SetAccessories(AppliedDescription, {}, true)
 					taskspawn(ApplyDescription, RigHumanoid, AppliedDescription)
 				end
-
 				if HumanoidRootPart then
 					RigHumanoidRootPart.CFrame = HumanoidRootPart.CFrame
-
 					if OptionsSetCollisionGroup then
 						local CollisionGroup = HumanoidRootPart.CollisionGroup
-
 						for Index, Descendant in next, GetDescendants(Rig) do
-							if IsA(Descendant, "BasePart") then
-								Descendant.CollisionGroup = CollisionGroup
-							end
+							if IsA(Descendant, "BasePart") then Descendant.CollisionGroup = CollisionGroup end
 						end
 					end
 				end
-
 				IsFirst = false
 			end
-
 			local IsAlive = true
-
 			if HumanoidRootPart then
 				for Target, Options in next, Targets do
 					if IsDescendantOf(Target, Workspace) then
@@ -2214,18 +2023,12 @@ do
 						local PredictionFling = Options.PredictionFling
 						local LastPosition = FirstPosition
 						local Timeout = osclock() + Options.Timeout or 1
-
 						if HumanoidRootPart then
 							while IsDescendantOf(Target, Workspace) and osclock() < Timeout do
 								local DeltaTime = taskwait()
 								local Position = Target.Position
-
-								if ( Position - FirstPosition ).Magnitude > 100 then
-									break
-								end
-
+								if ( Position - FirstPosition ).Magnitude > 100 then break end
 								local Offset = Vector3zero
-
 								if PredictionFling then
 									local BaseOffset = (Position - LastPosition) / DeltaTime * 0.13
 									local Frequency = ScriptOptions.Reanimate_Settings.Frequency
@@ -2237,61 +2040,42 @@ do
 									local FrontFaceOffset = TargetFace * ScriptOptions.Reanimate_Settings.FrontOffset
 									Offset = BaseOffset + OscillatedOffset + FrontFaceOffset
 								end
-
 								HumanoidRootPart.AssemblyAngularVelocity = FlingVelocity
 								HumanoidRootPart.AssemblyLinearVelocity = FlingVelocity
-
 								HumanoidRootPart.CFrame = CFrame.new(Target.Position + Offset) * CFrame.Angles(0, Target.Orientation.Y, 0)
 								LastPosition = Position
 							end
 						end
 					end
-
 					local HighlightObject = Options.HighlightObject
-
-					if HighlightObject then
-						Destroy(HighlightObject)
-					end
-
+					if HighlightObject then Destroy(HighlightObject) end
 					Targets[Target] = nil
 				end
-
 				HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
 				HumanoidRootPart.AssemblyLinearVelocity = Vector3zero
-
 				if OptionsHatDrop then
 					taskspawn(function()
 						WaitForChildOfClassAndName(Character, "LocalScript", "Animate").Enabled = false
-
-						for Index, AnimationTrack in next, GetPlayingAnimationTracks(Humanoid) do
-							AnimationTrack:Stop()
-						end
-
+						for Index, AnimationTrack in next, GetPlayingAnimationTracks(Humanoid) do AnimationTrack:Stop() end
 						LoadAnimation(Humanoid, Humanoid.RigType == R6 and R6Animation or R15Animation):Play(0)
-
 						pcall(NewIndex, Workspace, "FallenPartsDestroyHeight", nan)
-
 						local RootPartCFrame = RigHumanoidRootPart.CFrame
 						RootPartCFrame = CFramenew(RootPartCFrame.X, HatDropY, RootPartCFrame.Z)
-
 						while IsAlive do
 							HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
 							HumanoidRootPart.AssemblyLinearVelocity = HatDropLinearVelocity
 							HumanoidRootPart.CFrame = RootPartCFrame
-
 							taskwait()
 						end
 					end)
 				elseif OptionsHideCharacter then
 					local HideCharacterOffset = typeof(OptionsHideCharacter) == "Vector3" and OptionsHideCharacter or HideCharacterOffset
 					local RootPartCFrame = RigHumanoidRootPart.CFrame + HideCharacterOffset
-
 					taskspawn(function()
 						while IsAlive do
 							HumanoidRootPart.AssemblyAngularVelocity = Vector3zero
 							HumanoidRootPart.AssemblyLinearVelocity = Vector3zero
 							HumanoidRootPart.CFrame = RootPartCFrame
-
 							taskwait()
 						end
 					end)
@@ -2299,148 +2083,90 @@ do
 					HumanoidRootPart.CFrame = RigHumanoidRootPart.CFrame + Vector3new(mathrandom(- OptionsTeleportRadius, OptionsTeleportRadius), 0, mathrandom(- OptionsTeleportRadius, OptionsTeleportRadius))
 				end
 			end
-
 			local ToolFling = OptionsDefaultFlingOptions.ToolFling
 			local Tools2 = {}
-
 			if ToolFling then
 				local Backpack = FindFirstChildOfClass(LocalPlayer, "Backpack")
-
 				tableclear(Tools)
-
 				if type(ToolFling) == "string" then
 					local Tool = FindFirstChildOfClassAndName(Backpack, "Tool", ToolFling)
-
-					if Tool then
-						Tool.Parent = Character
-						tableinsert(Tools2, Tool)
-					end
+					if Tool then Tool.Parent = Character tableinsert(Tools2, Tool) end
 				else
 					for Index, Tool in GetChildren(Backpack) do
-						if IsA(Tool, "Tool") then
-							Tool.Parent = Character
-							tableinsert(Tools2, Tool)
-						end
+						if IsA(Tool, "Tool") then Tool.Parent = Character tableinsert(Tools2, Tool) end
 					end
 				end
-
 				UnequipTools(Humanoid)
 			end
-
 			taskwait(OptionsBreakJointsDelay)
-
 			ModelBreakJoints(Character)
-
-			if replicatesignal and OptionsUseServerBreakJoints then
-				replicatesignal(Humanoid.ServerBreakJoints)
-			end
-
+			if replicatesignal and OptionsUseServerBreakJoints then replicatesignal(Humanoid.ServerBreakJoints) end
 			ChangeState(Humanoid, Dead)
 			Wait(Humanoid.Died)
 			tableclear(Aligns)
 			tableclear(Blacklist)
 			tableclear(Accessories)
-			-- pretty much FORCE welds to delete cause games with ragdoll messed ts up and only 3 hats worked (fixed)
 			for i, v in next, GetChildren(Rig) do
-				if IsA(v, "Accoutrement") then
-					Destroy(v)
-				end
+				if IsA(v, "Accoutrement") then Destroy(v) end
 			end
-			for Index, Descendant in next, GetDescendants(Character) do
-				taskspawn(DescendantAdded, Descendant)
-			end
-
+			for Index, Descendant in next, GetDescendants(Character) do taskspawn(DescendantAdded, Descendant) end
 			for Index, Tool in Tools2 do
 				local Handle = FindFirstChildOfClassAndName(Tool, "BasePart", "Handle")
-
-				if Handle then
-					Tool.Parent = Character
-				else
-					tableremove(Tools2, Index)
-				end
+				if Handle then Tool.Parent = Character else tableremove(Tools2, Index) end
 			end
-
 			Tools = Tools2
 			UnequipTools(Humanoid)
-
 			IsAlive = false
-
-			if OptionsHatDrop then
-				pcall(NewIndex, Workspace, "FallenPartsDestroyHeight", FallenPartsDestroyHeight)
-			end
+			if OptionsHatDrop then pcall(NewIndex, Workspace, "FallenPartsDestroyHeight", FallenPartsDestroyHeight) end
 		end
 	end
 
 	local OnInputBegan = function(InputObject)
 		local UserInputType = InputObject.UserInputType
-
 		if UserInputType == MouseButton1 or UserInputType == Touch then
 			local Target = Mouse.Target
-
 			local HatFling = OptionsDefaultFlingOptions.HatFling
 			local ToolFling = OptionsDefaultFlingOptions.ToolFling
-
 			if HatFling and OptionsHatDrop then
 				local Part = type(HatFling) == "table" and GetHandleFromTable(HatFling)
-
 				if not Part then
 					for Index, Child in GetChildren(Character) do
 						if IsA(Child, "Accoutrement") then
 							local Handle = FindFirstChildOfClassAndName(Child, "BasePart", "Handle")
-
-							if Handle then
-								Part = Handle
-								break
-							end
+							if Handle then Part = Handle break end
 						end
 					end
 				end
-
 				if Part then
 					Exceptions[Part] = true
-
 					while IsMouseButtonPressed(UserInputService, MouseButton1) do
 						if Part.ReceiveAge == 0 then
 							Part.AssemblyAngularVelocity = FlingVelocity
 							Part.AssemblyLinearVelocity = FlingVelocity
 							Part.CFrame = Mouse.Hit + AntiSleep
 						end
-
 						taskwait()
 					end
-
 					Exceptions[Part] = nil
 				end
 			elseif ToolFling then
 				local Backpack = FindFirstChildOfClass(LocalPlayer, "Backpack")
 				local Tool = nil
-
-				if type(ToolFling) == "string" then
-					Tool = FindFirstChild(Backpack, ToolFling) or FindFirstChild(Character, ToolFling)
-				end
-
-				if not Tool then
-					Tool = FindFirstChildOfClass(Backpack, "Tool") or FindFirstChildOfClass(Character, "Tool")
-				end
-
+				if type(ToolFling) == "string" then Tool = FindFirstChild(Backpack, ToolFling) or FindFirstChild(Character, ToolFling) end
+				if not Tool then Tool = FindFirstChildOfClass(Backpack, "Tool") or FindFirstChildOfClass(Character, "Tool") end
 				if Tool then
 					local Handle = FindFirstChildOfClassAndName(Tool, "BasePart", "Handle") or FindFirstChildWhichIsA(Tool, "BasePart")
-
 					if Handle then
 						Tool.Parent = Character
-
 						while IsMouseButtonPressed(UserInputService, MouseButton1) do
 							if Handle.ReceiveAge == 0 then
 								Handle.AssemblyAngularVelocity = FlingVelocity
 								Handle.AssemblyLinearVelocity = FlingVelocity
 								Handle.CFrame = Mouse.Hit + AntiSleep
 							end
-
 							taskwait()
 						end
-
 						UnequipTools(Humanoid)
-
 						Handle.AssemblyAngularVelocity = Vector3zero
 						Handle.AssemblyLinearVelocity = Vector3zero
 						Handle.CFrame = RigHumanoidRootPart.CFrame
@@ -2456,32 +2182,22 @@ do
 		Time = osclock()
 		local DeltaTime = Time - LastTime
 		LastTime = Time
-
 		if not OptionsSetCharacter and IsLockCenter then
 			local Position = RigHumanoidRootPart.Position
 			RigHumanoidRootPart.CFrame = CFramelookAt(Position, Position + CurrentCamera.CFrame.LookVector * Vector3xzAxis)
 		end
-
-		if OptionsSimulationRadius then
-			pcall(SetSimulationRadius)
-		end
-
+		if OptionsSimulationRadius then pcall(SetSimulationRadius) end
 		AntiSleep = mathsin(Time * 15) * 0.0015 * Vector3one
 		local Axis = 27 + mathsin(Time)
-
 		for Index, Table in next, Aligns do
 			local Part0 = Table.Part0
-
 			if not Exceptions[Part0] then
 				if Part0.ReceiveAge == 0 then
 					if IsDescendantOf(Part0, Workspace) and not GetJoints(Part0)[1] and not IsGrounded(Part0) then
 						local Part1 = Table.Part1
-
 						Part0.AssemblyAngularVelocity = Vector3zero
-
 						local LinearVelocity = Part1.AssemblyLinearVelocity * Axis
 						Part0.AssemblyLinearVelocity = Vector3new(LinearVelocity.X, Axis, LinearVelocity.Z)
-
 						Part0.CFrame = Part1.CFrame * Table.Offset + AntiSleep
 					end
 				else
@@ -2491,7 +2207,6 @@ do
 				end
 			end
 		end
-
 		if not OptionsSetCharacter and Humanoid then
 			Move(RigHumanoid, Humanoid.MoveDirection)
 			RigHumanoid.Jump = Humanoid.Jump
@@ -2501,10 +2216,8 @@ do
 	local OnPreRender = function()
 		local Position = RigHumanoidRootPart.Position
 		RigHumanoidRootPart.CFrame = CFramelookAt(Position, Position + CurrentCamera.CFrame.LookVector * Vector3xzAxis)
-
 		for Index, Table in next, Aligns do
 			local Part0 = Table.Part0
-
 			if Part0.ReceiveAge == 0 and IsDescendantOf(Part0, Workspace) and not GetJoints(Part0)[1] and not IsGrounded(Part0) then
 				Part0.CFrame = Table.Part1.CFrame * Table.Offset
 			end
@@ -2513,7 +2226,6 @@ do
 
 	local OnMouseBehaviorChanged = function()
 		IsLockCenter = UserInputService.MouseBehavior == LockCenter
-
 		if IsLockCenter then
 			PreRenderConnection = Connect(PreRender, OnPreRender)
 			tableinsert(RBXScriptConnections, PreRenderConnection)
@@ -2526,15 +2238,11 @@ do
 	local OnPreSimulation = function()
 		if OptionsDisableCharacterCollisions and Character then
 			for Index, Descendant in next, GetDescendants(Character) do
-				if IsA(Descendant, "BasePart") then
-					Descendant.CanCollide = false
-				end
+				if IsA(Descendant, "BasePart") then Descendant.CanCollide = false end
 			end
 		end
 		for Index, Descendant in next, GetChildren(Rig) do
-			if IsA(Descendant, "BasePart") then
-				Descendant.CanCollide = false
-			end
+			if IsA(Descendant, "BasePart") then Descendant.CanCollide = false end
 		end
 	end
 
@@ -2549,7 +2257,6 @@ do
 		if not IsRunning then
 			IsFirst = true
 			IsRunning = true
-
 			Options = Options or {}
 			OptionsAccessories = Options.Accessories or {}
 			OptionsApplyDescription = Options.ApplyDescription
@@ -2571,21 +2278,17 @@ do
 			OptionsSimulationRadius = Options.SimulationRadius
 			OptionsTeleportRadius = Options.TeleportRadius
 			OptionsUseServerBreakJoints = Options.UseServerBreakJoints
-
 			if OptionsDisableHealthBar then
 				IsHealthEnabled = GetCoreGuiEnabled(StarterGui, Health)
 				SetCoreGuiEnabled(StarterGui, Health, false)
 			end
-
 			BindableEvent = Instancenew("BindableEvent")
 			tableinsert(RBXScriptConnections, Connect(BindableEvent.Event, Stop))
-
 			Rig = Objects:FindFirstChild("StarterCharacter"):Clone()
 			Rig.Name = "non"
 			RigHumanoid = Rig.Humanoid
 			RigHumanoidRootPart = Rig.HumanoidRootPart
 			Rig.Parent = Workspace
-
 			for Index, Descendant in next, GetDescendants(Rig) do
 				if IsA(Descendant, "Attachment") then
 					Attachments[Descendant.Name] = Descendant
@@ -2593,53 +2296,30 @@ do
 					Descendant.Transparency = OptionsRigTransparency
 				end
 			end
-
 			if OptionsRigSize then
 				ScaleTo(Rig, OptionsRigSize)
-
 				RigHumanoid.JumpPower = 50
 				RigHumanoid.WalkSpeed = 16
 			end
-
 			OnCurrentCameraChanged()
 			tableinsert(RBXScriptConnections, Connect(CurrentCameraChanged, OnCurrentCameraChanged))
-
-			if OptionsClickFling then
-				tableinsert(RBXScriptConnections, Connect(InputBegan, OnInputBegan))
-			end
-
+			if OptionsClickFling then tableinsert(RBXScriptConnections, Connect(InputBegan, OnInputBegan)) end
 			local Character = LocalPlayer.Character
-
-			if Character then
-				OnCharacterAdded(Character)
-			end
-
+			if Character then OnCharacterAdded(Character) end
 			tableinsert(RBXScriptConnections, Connect(CharacterAdded, OnCharacterAdded))
-
 			LastTime = osclock()
 			tableinsert(RBXScriptConnections, Connect(PostSimulation, OnPostSimulation))
-
 			if not OptionsSetCharacter then
 				OnMouseBehaviorChanged()
 				tableinsert(RBXScriptConnections, Connect(MouseBehaviorChanged, OnMouseBehaviorChanged))
 			end
-
 			if OptionsDisableCharacterCollisions or OptionsDisableRigCollisions then
 				OnPreSimulation()
 				tableinsert(RBXScriptConnections, Connect(PreSimulation, OnPreSimulation))
 			end
-
 			IsRegistered = pcall(SetCore, StarterGui, "ResetButtonCallback", BindableEvent)
-
-			if not IsRegistered then
-				taskspawn(Register)
-			end
-
-			return {
-				BindableEvent = BindableEvent,
-				Fling = Fling,
-				Rig = Rig
-			}
+			if not IsRegistered then taskspawn(Register) end
+			return { BindableEvent = BindableEvent, Fling = Fling, Rig = Rig }
 		end
 	end
 
@@ -2647,35 +2327,17 @@ do
 		if IsRunning then
 			IsFirst = false
 			IsRunning = false
-
-			for Index, Highlight in Highlights do
-				Destroy(Highlight)
-			end
-
+			for Index, Highlight in Highlights do Destroy(Highlight) end
 			tableclear(Highlights)
-
-			for Index, RBXScriptConnection in next, RBXScriptConnections do
-				Disconnect(RBXScriptConnection)
-			end
-
+			for Index, RBXScriptConnection in next, RBXScriptConnections do Disconnect(RBXScriptConnection) end
 			tableclear(RBXScriptConnections)
-
 			Destroy(BindableEvent)
-
-			if Character.Parent == Rig then
-				Character.Parent = Workspace
-			end
-
-			if Humanoid then
-				ChangeState(Humanoid, Dead)
-			end
-
+			if Character.Parent == Rig then Character.Parent = Workspace end
+			if Humanoid then ChangeState(Humanoid, Dead) end
 			Destroy(Rig)
-
 			if OptionsDisableHealthBar and not GetCoreGuiEnabled(StarterGui, Health) then
 				SetCoreGuiEnabled(StarterGui, Health, IsHealthEnabled)
 			end
-
 			if IsRegistered then
 				pcall(SetCore, StarterGui, "ResetButtonCallback", true)
 			else
@@ -2689,7 +2351,6 @@ local Rad = math.rad
 
 Empyrean = Start({
 	Accessories = {
-		-- Swords / Spears Rig
 		{ Name = "RigTorso", MeshId = "92048094600083",  TextureId = "89519907183882", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(60)) },
 		{ Name = "RigUpperRL", MeshId = "76624859423759",  TextureId = "81203167910667", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), Rad(-180), Rad(135)) },
 		{ Name = "RigUpperLL", MeshId = "76624859423759",  TextureId = "124580012086562", Offset = CFrame.new(0, 1.25, 0) * CFrame.Angles(Rad(0), 0, Rad(135)) },
@@ -2699,7 +2360,6 @@ Empyrean = Start({
 		{ Name = "RigUpperRA", MeshId = "17605983196",  TextureId = "17606581728", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0), Rad(0), Rad(0)) },
 		{ Name = "RigLowerLA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
 		{ Name = "RigLowerRA", MeshId = "110382824830787",  TextureId = "119800753686181", Offset = CFrame.new(0, 5.5, 0) * CFrame.Angles(0, Rad(-0), Rad(0)) },
-		-- Block Rig
 		{ Name = "RigTorso", MeshId = "17345242336",  TextureId = "17345250641", Offset = CFrame.new(0, -2, 0) * CFrame.Angles(0, Rad(0), Rad(0)) },
 		{ Name = "RigUpperLL", MeshId = "70807086513216",  TextureId = "87564259970629", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
 		{ Name = "RigLowerLL", MeshId = "98818051326497",  TextureId = "87142331045456", Offset = CFrame.new(0, 2, 0) * CFrame.Angles(Rad(0),  Rad(0), Rad(0)) },
@@ -2713,13 +2373,7 @@ Empyrean = Start({
 	ApplyDescription = true,
 	BreakJointsDelay = 0.265,
 	ClickFling = false,
-	DefaultFlingOptions = {
-		HatFling = false,
-		Highlight = true,
-		PredictionFling = true,
-		Timeout = 0.5,
-		ToolFling = false,
-	},
+	DefaultFlingOptions = { HatFling = false, Highlight = true, PredictionFling = true, Timeout = 0.5, ToolFling = false },
 	DisableCharacterCollisions = true,
 	DisableHealthBar = true,
 	DisableRigCollisions = true,
@@ -2739,7 +2393,6 @@ Empyrean = Start({
 })
 if not Empyrean then error("reanimação já estava ativa") end
 
--- a partir daqui já dá pra desligar pela rede (;LOCUST_OFF)
 LOCUST.running = true
 LOCUST.stopFn = function()
 	pcall(function() Empyrean.BindableEvent:Fire() end)
@@ -2749,7 +2402,6 @@ LOCUST.stopFn = function()
 	LOCUST.announce(false)
 end
 
--- character setup
 local Camera = workspace.CurrentCamera
 local Player = Services.Players.LocalPlayer
 local Character = Empyrean.Rig
@@ -2769,12 +2421,9 @@ Theme.Volume = 1
 Theme.Looped = true
 Theme:Play()
 
--- animator module
 local Contains = function(Table, Check)
 	for Index, Value in next, Table do 
-		if rawequal(Check, Index) or rawequal(Check, Value) then 
-			return true
-		end
+		if rawequal(Check, Index) or rawequal(Check, Value) then return true end
 	end
 	return false
 end
@@ -2805,23 +2454,19 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 	Class.Speed = 1
 	Class.KeepLast = 0
 	local Keyframes = KeyframeSequence:GetKeyframes()
-	table.sort(Keyframes, function(a, b) return a.Time < b.Time end) -- Thanks 10k_i, roblox not sorting by default.
+	table.sort(Keyframes, function(a, b) return a.Time < b.Time end)
 	Class.Length = Keyframes[#(Keyframes)].Time
 	local Yield = function(Seconds)
 		local Elapsed = 0
 		local Target = Seconds / (Class.Speed * ScriptOptions.Settings.AnimationSpeed)
-		repeat
-			Elapsed += Services.RunService.Heartbeat:Wait()
-		until Elapsed >= Target
+		repeat Elapsed += Services.RunService.Heartbeat:Wait() until Elapsed >= Target
 	end
-	if Sequence:FindFirstChild("xSIXxNull", true) or Sequence:FindFirstChild("xSIXxCustomDir", true) or Sequence:FindFirstChild("xSIXxCustomStyle", true) then -- Moon Suite Fix
+	if Sequence:FindFirstChild("xSIXxNull", true) or Sequence:FindFirstChild("xSIXxCustomDir", true) or Sequence:FindFirstChild("xSIXxCustomStyle", true) then
 		local Children = Sequence:GetChildren()
 		for i = 1, #(Children) do
 			if Children[i]:FindFirstChild("Torso") then
 				local Limbs = Children[i].Torso:GetChildren()
-				for l = 1, #(Limbs) do
-					Limbs[l].Parent = Children[i].HumanoidRootPart.Torso
-				end
+				for l = 1, #(Limbs) do Limbs[l].Parent = Children[i].HumanoidRootPart.Torso end
 				Children[i].Torso:Destroy()
 			end
 		end
@@ -2844,21 +2489,15 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 	Class.Completed = Completion.Event
 	Class.KeyframeReached = Reached.Event
 	Class["Play"] = function(self, FadeIn, Speed)
-		if Speed and Speed < 0 then
-			Speed += (Speed*2)
-		end
+		if Speed and Speed < 0 then Speed += (Speed*2) end
 		Class.Speed = Speed or Class.Speed
 		Class.Stopped = false
 		Class.IsPlaying = true
 		task.spawn(function()
 			wait(1/60)
-			if FadeIn ~= nil then
-				Class.TimePosition -= FadeIn
-			end
+			if FadeIn ~= nil then Class.TimePosition -= FadeIn end
 			Class.Completed:Connect(function()
-				if Class.Looped ~= false then
-					Class.TimePosition = 0
-				end
+				if Class.Looped ~= false then Class.TimePosition = 0 end
 			end)
 			repeat game:GetService("RunService").Heartbeat:Wait()
 				Class.TimePosition += (1 * Class.Speed) / (60 * Class.Speed) 
@@ -2887,9 +2526,7 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 				for K = 1, #(Keyframes) do 
 					local K0, K1, K2 = Keyframes[K-1], Keyframes[K], Keyframes[K+1]
 					if Class.Stopped ~= true then
-						if K0 ~= nil then 
-							Yield(K1.Time - K0.Time)
-						end
+						if K0 ~= nil then Yield(K1.Time - K0.Time) end
 						task.spawn(function()
 							for i = 1, #(K1:GetDescendants()) do 
 								local Pose = K1:GetDescendants()[i]
@@ -2899,9 +2536,7 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 								end
 							end
 						end)
-						if K == #(Keyframes) and Class.KeepLast > 0 then
-							Yield(Class.KeepLast)
-						end
+						if K == #(Keyframes) and Class.KeepLast > 0 then Yield(Class.KeepLast) end
 						Reached:Fire(K1.Name)
 					else
 						break
@@ -2917,38 +2552,27 @@ local LoadBoneAnimation = function(Rig, KeyframeSequence)
 		Class.IsPlaying = false
 	end
 	Class["AdjustSpeed"] = function(self, Speed)
-		if Speed < 0 then
-			Speed += (Speed*2)
-		end
+		if Speed < 0 then Speed += (Speed*2) end
 		Class.Speed = Speed or Class.Speed
 	end
 	return Class
 end
 
--- animator functions
 local PlayAnim = function(Rig, Animation, AnimSpeed)
-	if not AnimatorCache.Rigs[Rig] then
-		AnimatorCache.Rigs[Rig] = {}
-	end
+	if not AnimatorCache.Rigs[Rig] then AnimatorCache.Rigs[Rig] = {} end
 	if not AnimatorCache.Rigs[Rig][Animation.Name] then
 		AnimatorCache.Rigs[Rig][Animation.Name] = LoadBoneAnimation(Rig, Animation)
 	end
 	for Name, Track in pairs(AnimatorCache.Rigs[Rig]) do
-		if Name ~= Animation.Name then
-			Track:Stop()
-		end
+		if Name ~= Animation.Name then Track:Stop() end
 	end
 	local AnimInstance = AnimatorCache.Rigs[Rig][Animation.Name]
-	if not AnimInstance.IsPlaying then
-		AnimInstance:Play(AnimSpeed or 1)
-	end
+	if not AnimInstance.IsPlaying then AnimInstance:Play(AnimSpeed or 1) end
 	return AnimInstance
 end
 
 local StopAnim = function(Rig, Animation)
-	if not AnimatorCache.Rigs[Rig] then
-		AnimatorCache.Rigs[Rig] = {}
-	end
+	if not AnimatorCache.Rigs[Rig] then AnimatorCache.Rigs[Rig] = {} end
 	if not AnimatorCache.Rigs[Rig][Animation.Name] then
 		AnimatorCache.Rigs[Rig][Animation.Name] = LoadBoneAnimation(Rig, Animation)
 	end
@@ -2969,7 +2593,6 @@ local RestoreMovement = function()
 	end
 end
 
--- functions
 local PlayUISFX = function(Audio)
 	local Sound = Instance.new("Sound", workspace)
 	Sound.SoundId = "rbxassetid://" .. Audio
@@ -3016,9 +2639,7 @@ end
 
 local CanHit = function(Target)
 	local Time = os.clock()
-	if ScriptCache.HitHumanoids[Target] and Time < ScriptCache.HitHumanoids[Target] then
-		return false
-	end
+	if ScriptCache.HitHumanoids[Target] and Time < ScriptCache.HitHumanoids[Target] then return false end
 	ScriptCache.HitHumanoids[Target] = Time + 1.15
 	return true
 end
@@ -3033,7 +2654,7 @@ local NewHitbox = function(Position, Size, HitSound)
 	Hitbox.CanCollide = false
 	Hitbox.CanQuery = false
 	Hitbox.CanTouch = true
-	Hitbox.CFrame = Position or RootPart.CFrame -- RootPart.CFrame * CFrame.new(0, 0, -(4 / 2 + 2))
+	Hitbox.CFrame = Position or RootPart.CFrame
 	Hitbox.Parent = workspace
 	local OverlapParams = OverlapParams.new()
 	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -3056,18 +2677,12 @@ local NewHitbox = function(Position, Size, HitSound)
 	local HitboxFade = game:GetService("TweenService"):Create(Hitbox, TweenInfo.new(0.5), {Transparency = 1})
 	HitboxFade:Play()
 	game:GetService("Debris"):AddItem(Hitbox, 0.5)
-	return Hitbox -- added incase you wanna make it animated or even position it somewhere else
+	return Hitbox
 end
 
-local SetWalkSpeed = function(Speed)
-	Humanoid.WalkSpeed = Speed
-end
+local SetWalkSpeed = function(Speed) Humanoid.WalkSpeed = Speed end
+local SetRootAnchored = function(Anchored) RootPart.Anchored = Anchored end
 
-local SetRootAnchored = function(Anchored)
-	RootPart.Anchored = Anchored
-end
-
--- attacks
 local ToggleCrouch = function()
 	States.Movement.Crouching = not States.Movement.Crouching
 	States.Movement.Idle = false
@@ -3100,16 +2715,14 @@ local Waypoint = function()
 		local TeleportAnim = PlayAnim(Locust, Animations.Spawn, 0.1)
 		RootPart.CFrame = CFrame.new(States.Waypoint.SavedPosition)
 		TeleportAnim.Completed:Wait()
-		States.Waypoint.SavedPosition   = nil
+		States.Waypoint.SavedPosition = nil
 		States.Input.Debounce = false
 		SetRootAnchored(false)
 		RestoreMovement()
 	end
 end
 
-local ToggleKillMode = function()
-	States.Input.KillMode = not States.Input.KillMode
-end
+local ToggleKillMode = function() States.Input.KillMode = not States.Input.KillMode end
 
 local Kill = function(Target)
 	if States.Input.Debounce then return end
@@ -3134,37 +2747,21 @@ local Kill = function(Target)
 	RestoreMovement()
 end
 
--- input
 local KeyDown = Services.UserInputService.InputBegan:Connect(function(Key, GPE)
 	if GPE then return end
-	if Key.UserInputType == Enum.UserInputType.MouseButton1 then
-		Kill(Mouse.Target)
-	end
-	if Key.KeyCode == Enum.KeyCode.Q then
-		ToggleCrouch()
-	end
-	if Key.KeyCode == Enum.KeyCode.C then
-		ToggleSit()
-	end
-	if Key.KeyCode == Enum.KeyCode.X then
-		ToggleKillMode()
-	end
-	if Key.KeyCode == Enum.KeyCode.E then
-		Waypoint()
-	end
-	if Key.KeyCode == Enum.KeyCode.T then
-	end
-	if Key.KeyCode == Enum.KeyCode.LeftShift then
-		States.Input.Shift = true
-	end
+	if Key.UserInputType == Enum.UserInputType.MouseButton1 then Kill(Mouse.Target) end
+	if Key.KeyCode == Enum.KeyCode.Q then ToggleCrouch() end
+	if Key.KeyCode == Enum.KeyCode.C then ToggleSit() end
+	if Key.KeyCode == Enum.KeyCode.X then ToggleKillMode() end
+	if Key.KeyCode == Enum.KeyCode.E then Waypoint() end
+	if Key.KeyCode == Enum.KeyCode.T then end
+	if Key.KeyCode == Enum.KeyCode.LeftShift then States.Input.Shift = true end
 end)
 table.insert(ScriptCache.ActiveConnections, KeyDown)
 
 local KeyUp = Services.UserInputService.InputEnded:Connect(function(Key, GPE)
 	if GPE then return end
-	if Key.KeyCode == Enum.KeyCode.LeftShift then
-		States.Input.Shift = false
-	end
+	if Key.KeyCode == Enum.KeyCode.LeftShift then States.Input.Shift = false end
 end)
 table.insert(ScriptCache.ActiveConnections, KeyUp)
 
@@ -3175,22 +2772,18 @@ local InfiniteJump = Services.UserInputService.JumpRequest:Connect(function()
 end)
 table.insert(ScriptCache.ActiveConnections, InfiniteJump)
 
--- mobile ui
 local GUI = script:WaitForChild("UIs").MobileUI
 GUI.Parent = game:GetService("CoreGui")
 table.insert(ScriptCache.TrashBin, GUI)
 
 local UpdateUI = function()
 	local LastInput = Services.UserInputService:GetLastInputType()
-	if LastInput == Enum.UserInputType.Touch
-	then GUI.Enabled = true
+	if LastInput == Enum.UserInputType.Touch then GUI.Enabled = true
 	else GUI.Enabled = false
 	end
 end
 
 UpdateUI()
-
-
 table.insert(ScriptCache.ActiveConnections, Services.UserInputService.LastInputTypeChanged:Connect(UpdateUI))
 
 GUI.AbilitiesUI["ToggleKill"].MouseButton1Down:connect(function() ToggleKillMode() end)
@@ -3199,7 +2792,6 @@ GUI.AbilitiesUI["Sit"].MouseButton1Down:connect(function() ToggleSit() end)
 GUI.AbilitiesUI["Crouch"].MouseButton1Down:connect(function() ToggleCrouch() end)
 GUI.AbilitiesUI["Sprint"].MouseButton1Down:connect(function() States.Input.Shift = not States.Input.Shift end)
 
--- settings ui
 local MainGUI = script.UIs:WaitForChild("MainGUI")
 MainGUI.Parent = game:GetService("CoreGui")
 table.insert(ScriptCache.TrashBin, MainGUI)
@@ -3215,9 +2807,7 @@ UIDragDetector.DragStart:Connect(function()
 	PlayUISFX(18755588842)
 end)
 
-FloatingButton.MouseEnter:Connect(function()
-	PlayUISFX(122453173810540)
-end)
+FloatingButton.MouseEnter:Connect(function() PlayUISFX(122453173810540) end)
 
 local SetupToggle = function(Setting)
 	local Object = SettingsHolder:FindFirstChild(Setting)
@@ -3232,7 +2822,7 @@ local SetupToggle = function(Setting)
 	end)
 end
 
-local SetupTextBox = function(Setting) -- currently only used in the rigsize (no other textboxes will exist i think)
+local SetupTextBox = function(Setting)
 	local Object = SettingsHolder:FindFirstChild(Setting)
 	if not Object then return end
 	local TextBox = Object:FindFirstChildWhichIsA("TextBox")
@@ -3251,11 +2841,8 @@ end
 for i, v in pairs(ScriptOptions.Settings) do
 	local Object = SettingsHolder:FindFirstChild(i)
 	if Object then
-		if Object:FindFirstChild("Button") then
-			SetupToggle(i)
-		elseif Object:FindFirstChild("Value") then
-			SetupTextBox(i)
-		end
+		if Object:FindFirstChild("Button") then SetupToggle(i)
+		elseif Object:FindFirstChild("Value") then SetupTextBox(i) end
 	end
 end
 
@@ -3282,7 +2869,6 @@ SettingsHolder.TPToNearestSpawn.Button.MouseButton1Click:Connect(function()
 	end
 end)
 
--- runservice connection
 local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 	if States.Input.Debounce then
 		StopAnim(Locust,Animations.Idle)
@@ -3296,13 +2882,9 @@ local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 		Humanoid.CameraOffset = Humanoid.CameraOffset:Lerp(Vector3.zero, 0.1)
 	end
 	if not States.Input.Debounce then
-		if States.Movement.Crouching then
-			SetWalkSpeed(3)
-		elseif States.Input.Shift then
-			SetWalkSpeed(24)
-		else
-			SetWalkSpeed(6)
-		end
+		if States.Movement.Crouching then SetWalkSpeed(3)
+		elseif States.Input.Shift then SetWalkSpeed(24)
+		else SetWalkSpeed(6) end
 	end
 	if ScriptOptions.Settings.FOVEffects then
 		Camera.FieldOfView = 80 + Theme.PlaybackLoudness / 100
@@ -3311,11 +2893,8 @@ local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 		Camera.FieldOfView = 70
 		Vignette.ImageTransparency = 1
 	end
-	if ScriptOptions.Settings.Music then
-		Theme.Playing = true
-	else
-		Theme.Playing = false
-	end
+	if ScriptOptions.Settings.Music then Theme.Playing = true
+	else Theme.Playing = false end
 	local RootPartOrigin = RootPart.Position
 	local Direction = Vector3.new(0, -1, 0) * 4
 	local Params = RaycastParams.new()
@@ -3374,7 +2953,7 @@ Empyrean.BindableEvent.Event:Once(function()
 	LOCUST.announce(false)
 end)
 
-    end) -- fim do pcall
+    end)
 
     LOCUST.busy = false
     if ok then
@@ -3401,7 +2980,7 @@ end
 
 -- ================== FLASH & AURA (REDE) ==================
 local FXNET = {
-    flash = {},   -- estado por nome de jogador
+    flash = {},
     aura  = {},
     actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
 }
@@ -3433,9 +3012,6 @@ do
         st.objs = {}
     end
 
-    ------------------------------------------------------------
-    -- RAIO PROCEDURAL
-    ------------------------------------------------------------
     local function bolt(p0, p1, thick, straight)
         local dist = (p1 - p0).Magnitude
         if dist < 0.5 then return end
@@ -3463,8 +3039,8 @@ do
 
         for i = 1, segs do
             for _, L in ipairs({
-                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 }, -- brilho
-                { Color3.new(1, 1, 1),          0.14 * thick, 0   }, -- nucleo
+                { Color3.fromRGB(255, 215, 40), 0.55 * thick, 0.6 },
+                { Color3.new(1, 1, 1),          0.14 * thick, 0   },
             }) do
                 local b = Instance.new("Beam")
                 b.Attachment0, b.Attachment1 = atts[i], atts[i + 1]
@@ -3479,9 +3055,6 @@ do
         Debris:AddItem(part, rr(0.07, 0.13))
     end
 
-    ------------------------------------------------------------
-    -- FLASH
-    ------------------------------------------------------------
     local function flashApply(plr, st)
         local char = plr.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -3494,7 +3067,6 @@ do
 
         if plr == LocalPlayer and hum then hum.WalkSpeed = 200 end
 
-        -- faiscas
         local att = keep(Instance.new("Attachment"))
         att.Parent = root
         local em = Instance.new("ParticleEmitter")
@@ -3510,7 +3082,6 @@ do
         em.LightEmission = 1
         em.Parent = att
 
-        -- rastro
         local top = keep(Instance.new("Attachment"))
         top.Position = Vector3.new(0, 2, 0)
         top.Parent = root
@@ -3528,7 +3099,6 @@ do
         trail.LightEmission, trail.Lifetime, trail.MinLength = 1, 0.3, 0.01
         trail.Parent = root
 
-        -- luz + aura
         local light = keep(Instance.new("PointLight"))
         light.Color, light.Brightness, light.Range = Color3.fromRGB(255, 220, 60), 3, 14
         light.Parent = root
@@ -3539,7 +3109,6 @@ do
         hl.DepthMode = Enum.HighlightDepthMode.Occluded
         hl.Parent = char
 
-        -- loop dos raios
         task.spawn(function()
             while FXNET.flash[plr.Name] == st and st.char == char and root.Parent do
                 local vel = root.AssemblyLinearVelocity
@@ -3553,7 +3122,6 @@ do
                     local velH = Vector3.new(vel.X, 0, vel.Z)
 
                     if velH.Magnitude > 20 then
-                        -- correndo: raios retos para tras
                         local dir = (-velH.Unit + rnd.Unit * 0.06).Unit
                         bolt(origem, origem + dir * rr(18, 36), rr(0.9, 1.3), true)
                     else
@@ -3595,9 +3163,6 @@ do
         end
     end
 
-    ------------------------------------------------------------
-    -- AURA
-    ------------------------------------------------------------
     local function column(groundPos, height, thick)
         local part = Instance.new("Part")
         part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
@@ -3655,7 +3220,6 @@ do
 
         local groundDist = hum.RigType == Enum.HumanoidRigType.R6 and 3 or (hum.HipHeight + root.Size.Y / 2)
 
-        -- brilho no corpo + luz
         local hl = keep(Instance.new("Highlight"))
         hl.FillColor, hl.OutlineColor = GOLD, BRIGHT
         hl.FillTransparency, hl.OutlineTransparency = 0.8, 0.1
@@ -3666,7 +3230,6 @@ do
         light.Color, light.Brightness, light.Range = GOLD, 4, 24
         light.Parent = root
 
-        -- chamas em cada parte do corpo
         local parts = {}
         for _, p in ipairs(char:GetChildren()) do
             if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then table.insert(parts, p) end
@@ -3697,7 +3260,6 @@ do
             fl.Parent = att
         end
 
-        -- nevoa + faiscas no centro
         local attRoot = keep(Instance.new("Attachment"))
         attRoot.Parent = root
 
@@ -3732,7 +3294,6 @@ do
         sp.LightEmission = 1
         sp.Parent = attRoot
 
-        -- aneis no chao (soldados ao personagem)
         local function ring(d, t, off)
             local a = keep(Instance.new("Part"))
             a.Shape = Enum.PartType.Cylinder
@@ -3747,14 +3308,12 @@ do
         end
         local r1, r2 = ring(6, 0.5, 0), ring(9, 0.7, 0.05)
 
-        -- bloom so para quem esta com a aura (efeito de tela local)
         if plr == LocalPlayer then
             local bloom = keep(Instance.new("BloomEffect"))
             bloom.Intensity, bloom.Size, bloom.Threshold = 0.8, 28, 0.85
             bloom.Parent = Lighting
         end
 
-        -- loop principal
         task.spawn(function()
             local tc, tw = 0, 0
             while FXNET.aura[plr.Name] == st and st.char == char and root.Parent do
@@ -3808,10 +3367,6 @@ do
         clearObjs(st)
     end
 
-    ------------------------------------------------------------
-    -- REDE
-    ------------------------------------------------------------
-    -- Executa a acao localmente (todo cliente com o hub desenha o efeito no alvo)
     function FXNET.run(action, name)
         if not name or name == "" then return end
         local isOn = action:sub(-3) == "_ON"
@@ -3838,7 +3393,6 @@ do
         end
     end
 
-    -- Executa aqui + envia pela rede (chat) para os outros usuarios do hub
     function FXNET.send(action, name)
         if not name or name == "" then return end
         FXNET.run(action, name)
@@ -3846,7 +3400,6 @@ do
         notify("Hub", action .. " → " .. name)
     end
 
-    -- limpeza quando alguem sai do servidor
     Players.PlayerRemoving:Connect(function(p)
         FXNET.flashOff(p.Name)
         FXNET.auraOff(p.Name)
@@ -3953,7 +3506,6 @@ function executeActionLocally(action, senderName, extraArg)
         task.spawn(function() pcall(LOCUST.start) end)
     elseif action == "LOCUST_OFF" then
         task.spawn(function() pcall(LOCUST.stop) end)
-    -- >>> FLASH & AURA (REDE) <<<
     elseif FXNET.actions[action] then
         FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
@@ -4122,7 +3674,6 @@ function executeActionLocally(action, senderName, extraArg)
 end
 
 -- ================== REDE (PREFIXO ;) ==================
--- Formato: ;ACAO ALVO [EXTRA]   ex.: ;KILL Fulano   ;FLASH_ON ALL   (também aceita "fhub ACAO ALVO")
 local recentNet = {}
 local function isMe(t)
     if not t then return false end
@@ -4132,7 +3683,6 @@ end
 
 function processNetMessage(msg, senderName)
     if not msg then return end
-    -- evita executar 2x a mesma mensagem (chat novo + antigo disparam os dois)
     do
         local now = os.clock()
         local key = tostring(senderName) .. ":" .. msg
@@ -4168,7 +3718,6 @@ function processNetMessage(msg, senderName)
         if pt and IS_ADMIN then applyOverheadTag(pt) end
     end
 
-    -- estado do Locust: só vale se o próprio jogador anunciar o seu (não dá pra forjar o de outro)
     if action == "LOCUST_STATE" then
         if target and senderName == target then
             LOCUST.setUser(target, extraArg == "ON")
@@ -4176,8 +3725,6 @@ function processNetMessage(msg, senderName)
         return
     end
 
-    -- >>> FLASH & AURA (REDE): todo cliente do hub desenha o efeito no personagem do alvo <<<
-    -- Segurança: comandos só valem se vierem de você ou de alguém da WHITELIST
     if action ~= "PING" and action ~= "PONG" then
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
@@ -4541,7 +4088,6 @@ else
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4550,7 +4096,6 @@ else
         sendNetCmd(";BACKROOMS_CLEAR ALL")
     end})
 
-    -- The Lifeform
     TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
         triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4559,7 +4104,6 @@ else
         sendNetCmd(";LIFEFORM_CLEAR ALL")
     end})
 
-    -- Poolrooms infinitas
     TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
         triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
     end})
@@ -4568,7 +4112,6 @@ else
         sendNetCmd(";POOLROOMS_CLEAR ALL")
     end})
 
-    -- Aba Say / Command
     local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
     TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
@@ -4600,7 +4143,6 @@ else
     local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
     TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
     TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
-    -- Locust em um só: aperta uma vez liga, aperta de novo desliga (vale pra rede toda do hub)
     local function toggleLocust(target)
         if not target or target == "" then return end
         local isOn
@@ -4628,8 +4170,7 @@ else
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    -- >>> FLASH & AURA (REDE): aperta uma vez liga, aperta de novo desliga <<<
-    local function toggleFX(kind) -- kind = "FLASH" ou "AURA"
+    local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
         local isOn = stateTable[LocalPlayer.Name] ~= nil
         FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
@@ -4713,22 +4254,69 @@ task.spawn(function()
     TabTroll:AddDropdown({ Name = "Método", Options = { "Bus", "Couch", "Couch BETA" }, Default = "Couch",
         Callback = function(v) methodKill = v end })
 
-    -- ===== COUCH (CORRIGIDO) =====
-    -- Procura o sofá no Backpack E no Character, por nome parecido
-    local function findCouch()
-        local chr = LocalPlayer.Character
-        for _, c in ipairs({ LocalPlayer:FindFirstChild("Backpack"), chr }) do
+    -- ===== COUCH (v3 - acha o sofá pelo CONTEÚDO, não só pelo nome) =====
+
+    local function allTools()
+        local list = {}
+        for _, c in ipairs({ LocalPlayer:FindFirstChild("Backpack"), LocalPlayer.Character }) do
             if c then
                 for _, t in ipairs(c:GetChildren()) do
-                    if t:IsA("Tool") then
-                        local n = t.Name:lower()
-                        if t.Name == "Couch" or t.Name == "Chaos.Couch" or n:find("couch") or n:find("sofa") then
-                            return t
-                        end
-                    end
+                    if t:IsA("Tool") then list[#list + 1] = t end
                 end
             end
         end
+        return list
+    end
+
+    local function findCouch(before)
+        for _, t in ipairs(allTools()) do
+            local n = t.Name:lower()
+            if n:find("couch") or n:find("sof") then return t end
+        end
+        for _, t in ipairs(allTools()) do
+            if t:FindFirstChild("Seat1") or t:FindFirstChildWhichIsA("Seat", true) then return t end
+        end
+        if before then
+            for _, t in ipairs(allTools()) do
+                if not before[t] then return t end
+            end
+        end
+    end
+
+    local function pickCouch(RE)
+        local before = {}
+        for _, t in ipairs(allTools()) do before[t] = true end
+
+        local remotes = {}
+        local r1 = RE:FindFirstChild("1Tool")
+        if r1 then table.insert(remotes, r1) end
+        for _, r in ipairs(RE:GetChildren()) do
+            if r ~= r1 and (r:IsA("RemoteFunction") or r:IsA("RemoteEvent")) and r.Name:lower():find("tool") then
+                table.insert(remotes, r)
+            end
+        end
+        if #remotes == 0 then return nil, "Remote de ferramentas não existe mais (RE)." end
+
+        for _, r in ipairs(remotes) do
+            for _, nome in ipairs({ "Couch", "Sofa", "Sofá" }) do
+                local ok, res = pcall(function()
+                    if r:IsA("RemoteFunction") then
+                        return r:InvokeServer("PickingTools", nome)
+                    else
+                        r:FireServer("PickingTools", nome)
+                    end
+                end)
+                if ok and typeof(res) == "Instance" and res:IsA("Tool") then return res end
+                local t0 = tick()
+                local c
+                repeat
+                    c = findCouch(before)
+                    task.wait(0.1)
+                until c or tick() - t0 > 1.2
+                if c then return c end
+            end
+        end
+        return nil, "O servidor não entregou o sofá."
     end
 
     local function KillPlayerCouch()
@@ -4742,21 +4330,26 @@ task.spawn(function()
         local RE = ReplicatedStorage:FindFirstChild("RE")
         if not RE then notify("Couch", "Remote RE não encontrado.") return end
 
-        -- limpa ferramentas e pede o sofá (com tentativas)
         pcall(function() RE:FindFirstChild("1ClearToolis"):FireServer("ClearAllTools") end)
-        task.wait(0.4)
+        task.wait(0.5)
 
-        local couch
-        for _ = 1, 5 do
-            pcall(function() RE:FindFirstChild("1Tool"):InvokeServer("PickingTools", "Couch") end)
-            local t0 = tick()
-            repeat
-                couch = findCouch()
-                task.wait(0.1)
-            until couch or tick() - t0 > 1.5
+        local couch, motivo
+        for _ = 1, 3 do
+            couch, motivo = pickCouch(RE)
             if couch then break end
+            task.wait(0.5)
         end
-        if not couch then notify("Couch", "Sofá não encontrado.") return end
+
+        if not couch then
+            notify("Couch", motivo or "Sofá não encontrado.")
+            local nomes = {}
+            for _, t in ipairs(allTools()) do nomes[#nomes + 1] = t.Name end
+            warn("[Couch] Tools que você tem: " .. (#nomes > 0 and table.concat(nomes, ", ") or "nenhuma"))
+            local rem = {}
+            for _, r in ipairs(RE:GetChildren()) do rem[#rem + 1] = r.Name .. "(" .. r.ClassName .. ")" end
+            warn("[Couch] Remotes em RE: " .. table.concat(rem, ", "))
+            return
+        end
 
         couch.Name = "Chaos.Couch"
         local s1 = couch:FindFirstChild("Seat1") or couch:FindFirstChildWhichIsA("Seat", true)
