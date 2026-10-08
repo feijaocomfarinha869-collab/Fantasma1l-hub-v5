@@ -2,6 +2,7 @@
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
     (v32: Couch v3 corrigido | Poolrooms Level 37 realista | Locust em rede)
+    (v33: FE HACK adicionado com sistema de rede)
     ==========================================================
 ]]--
 
@@ -1448,6 +1449,185 @@ do
     end
 end
 
+-- ================== FE HACK ==================
+do
+    local FeHack = {
+        active = false,
+        folder = nil,
+        conns = {},
+        memes = {},
+        baseMemeId = "rbxassetid://125942142531354",
+        soundId = "rbxassetid://7248198077"
+    }
+
+    local function cleanupFeHack()
+        for _, c in ipairs(FeHack.conns) do
+            pcall(function() c:Disconnect() end)
+        end
+        FeHack.conns = {}
+        for _, m in ipairs(FeHack.memes) do
+            pcall(function() m:Destroy() end)
+        end
+        FeHack.memes = {}
+        if FeHack.folder then
+            pcall(function() FeHack.folder:Destroy() end)
+            FeHack.folder = nil
+        end
+        FeHack.active = false
+    end
+
+    local function applyToCharacter(plr, char)
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        -- Efeito visual "FE"
+        local tag = Instance.new("BillboardGui")
+        tag.Name = "FE_Tag"
+        tag.AlwaysOnTop = true
+        tag.Size = UDim2.new(4.5, 0, 1.1, 0)
+        tag.StudsOffset = Vector3.new(0, 3.5, 0)
+        tag.Adornee = hrp
+        local label = Instance.new("TextLabel", tag)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "FE HACK ACTIVED"
+        label.TextColor3 = Color3.fromRGB(0, 255, 0)
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        label.Font = Enum.Font.SourceSansBold
+        label.TextScaled = true
+        tag.Parent = char
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "FE_Highlight"
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+        highlight.FillColor = Color3.fromRGB(0, 255, 0)
+        highlight.FillTransparency = 0.8
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = char
+        highlight.Parent = char
+        table.insert(FeHack.memes, tag)
+        table.insert(FeHack.memes, highlight)
+
+        -- Som e efeito "FE" na tela
+        local s = Instance.new("Sound", hrp)
+        s.Name = "FE_Sound"
+        s.SoundId = FeHack.soundId
+        s.Volume = 2
+        s:Play()
+        task.delay(2, function() if s then s:Destroy() end end)
+        table.insert(FeHack.memes, s)
+
+        -- Partículas
+        local emitter = Instance.new("ParticleEmitter", hrp)
+        emitter.Name = "FE_Particles"
+        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        emitter.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 150, 0))
+        })
+        emitter.Size = NumberSequence.new(0.4)
+        emitter.Transparency = NumberSequence.new(0.3)
+        emitter.Lifetime = NumberRange.new(0.5, 1.5)
+        emitter.Rate = 30
+        emitter.Speed = NumberRange.new(2, 5)
+        emitter.SpreadAngle = Vector2.new(180, 180)
+        emitter.Enabled = true
+        table.insert(FeHack.memes, emitter)
+
+        -- Efeito "Meme" na cabeça
+        local memeModel = Instance.new("Model", char)
+        memeModel.Name = "FE_Meme"
+        local memePart = Instance.new("Part", memeModel)
+        memePart.Name = "MemePart"
+        memePart.Size = Vector3.new(4, 4, 4)
+        memePart.Transparency = 1
+        memePart.CanCollide = false
+        memePart.Anchored = false
+        memePart.Massless = true
+        memePart.CFrame = hrp.CFrame * CFrame.new(0, 4, 0)
+        local memeWeld = Instance.new("WeldConstraint", memePart)
+        memeWeld.Part0 = memePart
+        memeWeld.Part1 = hrp
+        local memeDecal = Instance.new("Decal", memePart)
+        memeDecal.Texture = FeHack.baseMemeId
+        table.insert(FeHack.memes, memeModel)
+    end
+
+    local function startFeHack()
+        if FeHack.active then
+            cleanupFeHack()
+            notify("Fe Hack", "Desativado.")
+            return
+        end
+
+        FeHack.active = true
+        notify("Fe Hack", "Ativado! Aplicando...")
+
+        local target = nil
+        if selectedPlayerName == "ALL" then
+            target = "ALL"
+        elseif selectedPlayerName ~= LocalPlayer.Name then
+            target = Players:FindFirstChild(selectedPlayerName)
+        end
+
+        local function applyToPlayer(plr)
+            if not plr or plr == LocalPlayer then return end
+            local char = plr.Character
+            if char then
+                applyToCharacter(plr, char)
+            end
+            table.insert(FeHack.conns, plr.CharacterAdded:Connect(function(c)
+                task.wait(1)
+                if FeHack.active then applyToCharacter(plr, c) end
+            end))
+        end
+
+        if target == "ALL" then
+            for _, p in ipairs(Players:GetPlayers()) do
+                applyToPlayer(p)
+            end
+            table.insert(FeHack.conns, Players.PlayerAdded:Connect(function(p)
+                task.wait(1.5)
+                if FeHack.active then applyToPlayer(p) end
+            end))
+        elseif target then
+            applyToPlayer(target)
+        else
+            -- Aplicar em si mesmo se ninguém estiver selecionado
+            local char = LocalPlayer.Character
+            if char then
+                applyToCharacter(LocalPlayer, char)
+            end
+            table.insert(FeHack.conns, LocalPlayer.CharacterAdded:Connect(function(c)
+                task.wait(1)
+                if FeHack.active then applyToCharacter(LocalPlayer, c) end
+            end))
+        end
+    end
+
+    -- Expõe a função para a rede
+    function FeHack.run(action, targetName)
+        if action == "FE_HACK_ON" then
+            if targetName == "ALL" then
+                -- Já tratado no startFeHack
+            else
+                selectedPlayerName = targetName
+            end
+            startFeHack()
+        elseif action == "FE_HACK_OFF" then
+            cleanupFeHack()
+            notify("Fe Hack", "Desativado.")
+        end
+    end
+    -- Adiciona no sistema de ações da rede
+    FXNET.actions.FE_HACK_ON = true
+    FXNET.actions.FE_HACK_OFF = true
+end
+
 -- ================== LOCUST (REANIMATE) + REDE ==================
 local LOCUST = { running = false, busy = false, stopFn = nil, fem = nil, users = {}, marks = {} }
 
@@ -1996,7 +2176,7 @@ do
 			if OptionsParentCharacter then Character.Parent = Rig end
 			for Index, Descendant in next, GetDescendants(Character) do taskspawn(DescendantAdded, Descendant) end
 			tableinsert(RBXScriptConnections, Connect(Character.DescendantAdded, DescendantAdded))
-			Humanoid = WaitForChildOfClass(Character, "Humanoid")
+				Humanoid = WaitForChildOfClass(Character, "Humanoid")
 			local HumanoidRootPart = WaitForChildOfClassAndName(Character, "BasePart", "HumanoidRootPart")
 			if IsFirst then
 				if OptionsApplyDescription and Humanoid then
@@ -2649,8 +2829,7 @@ local NewHitbox = function(Position, Size, HitSound)
 	Hitbox.Size = Size or Vector3.new(4, 4, 4)
 	Hitbox.Color = ScriptOptions.Customization.HitboxColor
 	Hitbox.Material = Enum.Material.ForceField
-	Hitbox.Transparency = 0.5
-	Hitbox.Anchored = true
+	Hitbox.Transparency = 0.5	Hitbox.Anchored = true
 	Hitbox.CanCollide = false
 	Hitbox.CanQuery = false
 	Hitbox.CanTouch = true
@@ -2982,7 +3161,7 @@ end
 local FXNET = {
     flash = {},
     aura  = {},
-    actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true },
+    actions = { FLASH_ON = true, FLASH_OFF = true, AURA_ON = true, AURA_OFF = true, FE_HACK_ON = true, FE_HACK_OFF = true },
 }
 
 do
@@ -3506,6 +3685,14 @@ function executeActionLocally(action, senderName, extraArg)
         task.spawn(function() pcall(LOCUST.start) end)
     elseif action == "LOCUST_OFF" then
         task.spawn(function() pcall(LOCUST.stop) end)
+    elseif action == "FE_HACK_ON" then
+        task.spawn(function() 
+            if _G.FeHackRun then _G.FeHackRun("ON", extraArg) end
+        end)
+    elseif action == "FE_HACK_OFF" then
+        task.spawn(function() 
+            if _G.FeHackRun then _G.FeHackRun("OFF", extraArg) end
+        end)
     elseif FXNET.actions[action] then
         FXNET.run(action, extraArg)
     elseif action == "KAMUI" then
@@ -3729,6 +3916,15 @@ function processNetMessage(msg, senderName)
         if REQUIRE_WHITELIST and senderName ~= LocalPlayer.Name and not WHITELIST[senderName] then return end
     end
 
+    if action == "FE_HACK_ON" or action == "FE_HACK_OFF" then
+        task.spawn(function()
+            if _G.FeHackRun then
+                _G.FeHackRun(action == "FE_HACK_ON" and "ON" or "OFF", target or LocalPlayer.Name)
+            end
+        end)
+        return
+    end
+
     if FXNET.actions[action] then
         if target then
             task.spawn(function() pcall(executeActionLocally, action, senderName, target) end)
@@ -3774,6 +3970,156 @@ task.spawn(function()
     task.wait(1)
     sendNetCmd(";PING ALL")
 end)
+
+-- ================== FE HACK (Rede) ==================
+do
+    local FeHack = {
+        active = false,
+        folder = nil,
+        conns = {},
+        memes = {},
+        baseMemeId = "rbxassetid://125942142531354",
+        soundId = "rbxassetid://7248198077"
+    }
+
+    local function cleanupFeHack()
+        for _, c in ipairs(FeHack.conns) do
+            pcall(function() c:Disconnect() end)
+        end
+        FeHack.conns = {}
+        for _, m in ipairs(FeHack.memes) do
+            pcall(function() m:Destroy() end)
+        end
+        FeHack.memes = {}
+        if FeHack.folder then
+            pcall(function() FeHack.folder:Destroy() end)
+            FeHack.folder = nil
+        end
+        FeHack.active = false
+    end
+
+    local function applyToCharacter(plr, char)
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local tag = Instance.new("BillboardGui")
+        tag.Name = "FE_Tag"
+        tag.AlwaysOnTop = true
+        tag.Size = UDim2.new(4.5, 0, 1.1, 0)
+        tag.StudsOffset = Vector3.new(0, 3.5, 0)
+        tag.Adornee = hrp
+        local label = Instance.new("TextLabel", tag)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "FE HACK ACTIVED"
+        label.TextColor3 = Color3.fromRGB(0, 255, 0)
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        label.Font = Enum.Font.SourceSansBold
+        label.TextScaled = true
+        tag.Parent = char
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "FE_Highlight"
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+        highlight.FillColor = Color3.fromRGB(0, 255, 0)
+        highlight.FillTransparency = 0.8
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = char
+        highlight.Parent = char
+
+        table.insert(FeHack.memes, tag)
+        table.insert(FeHack.memes, highlight)
+
+        local s = Instance.new("Sound", hrp)
+        s.Name = "FE_Sound"
+        s.SoundId = FeHack.soundId
+        s.Volume = 2
+        s:Play()
+        task.delay(2, function() if s then s:Destroy() end end)
+        table.insert(FeHack.memes, s)
+
+        local emitter = Instance.new("ParticleEmitter", hrp)
+        emitter.Name = "FE_Particles"
+        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        emitter.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 150, 0))
+        })
+        emitter.Size = NumberSequence.new(0.4)
+        emitter.Transparency = NumberSequence.new(0.3)
+        emitter.Lifetime = NumberRange.new(0.5, 1.5)
+        emitter.Rate = 30
+        emitter.Speed = NumberRange.new(2, 5)
+        emitter.SpreadAngle = Vector2.new(180, 180)
+        emitter.Enabled = true
+        table.insert(FeHack.memes, emitter)
+
+        local memeModel = Instance.new("Model", char)
+        memeModel.Name = "FE_Meme"
+        local memePart = Instance.new("Part", memeModel)
+        memePart.Name = "MemePart"
+        memePart.Size = Vector3.new(4, 4, 4)
+        memePart.Transparency = 1
+        memePart.CanCollide = false
+        memePart.Anchored = false
+        memePart.Massless = true
+        memePart.CFrame = hrp.CFrame * CFrame.new(0, 4, 0)
+        local memeWeld = Instance.new("WeldConstraint", memePart)
+        memeWeld.Part0 = memePart
+        memeWeld.Part1 = hrp
+        local memeDecal = Instance.new("Decal", memePart)
+        memeDecal.Texture = FeHack.baseMemeId
+        table.insert(FeHack.memes, memeModel)
+    end
+
+    local function startFeHack(targetName)
+        if FeHack.active then
+            cleanupFeHack()
+        end
+
+        FeHack.active = true
+        notify("Fe Hack", "Ativado!")
+
+        local targets = {}
+        if targetName == "ALL" then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then table.insert(targets, p) end
+            end
+            table.insert(FeHack.conns, Players.PlayerAdded:Connect(function(p)
+                if p ~= LocalPlayer then
+                    task.wait(1.5)
+                    if FeHack.active then applyToCharacter(p, p.Character) end
+                end
+            end))
+        elseif targetName == LocalPlayer.Name then
+            table.insert(targets, LocalPlayer)
+        else
+            local p = Players:FindFirstChild(targetName)
+            if p then table.insert(targets, p) end
+        end
+
+        for _, plr in ipairs(targets) do
+            if plr.Character then applyToCharacter(plr, plr.Character) end
+            table.insert(FeHack.conns, plr.CharacterAdded:Connect(function(c)
+                task.wait(1)
+                if FeHack.active then applyToCharacter(plr, c) end
+            end))
+        end
+    end
+
+    -- Expor função global para o receptor
+    _G.FeHackRun = function(cmd, targetName)
+        if cmd == "ON" then
+            startFeHack(targetName)
+        else
+            cleanupFeHack()
+            notify("Fe Hack", "Desativado.")
+        end
+    end
+end
 
 -- ================== ADM HUB ==================
 if IS_ADMIN then
@@ -4169,6 +4515,20 @@ else
     TabE:Button({ Title = "Meme na cara 3", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME3") end })
     TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
     TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
+
+    -- NOVA FUNÇÃO FE HACK
+    TabE:Button({ Title = "FE HACK (Ativar/Desativar)", Callback = function()
+        local isOn = _G.FeHackActive or false
+        if isOn then
+            _G.FeHackRun("OFF", LocalPlayer.Name)
+            _G.FeHackActive = false
+            sendNetCmd(";FE_HACK_OFF " .. LocalPlayer.Name)
+        else
+            _G.FeHackRun("ON", LocalPlayer.Name)
+            _G.FeHackActive = true
+            sendNetCmd(";FE_HACK_ON " .. LocalPlayer.Name)
+        end
+    end })
 
     local function toggleFX(kind)
         local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
