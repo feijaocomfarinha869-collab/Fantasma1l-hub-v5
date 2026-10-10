@@ -1,7 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v35: Couch | Poolrooms Level 37 | Locust c/ acessórios no servidor | XESTER em rede | ROUBE UM BRAINROT | anti-void)
+    (v36: Couch | Poolrooms Level 37 | Locust | XESTER em rede | ROUBE UM BRAINROT c/ bases reais, modelos e sons | anti-void)
     ==========================================================
 ]]--
 
@@ -7198,12 +7198,17 @@ end
 -- roubeUmBrainrot("ON") gera o mundo e te leva pra lá | ("OFF") remove | () alterna
 -- Rede: ;BRAINROT_SPAWN <alvo|ALL>   ;BRAINROT_CLEAR <alvo|ALL>
 -- Todo mundo que gerar o mundo cai nas MESMAS coordenadas, então se vêem lá dentro.
--- Campo verde com grama de studs, tapete vermelho no meio, 8 bases (4 de cada lado),
--- paredes de terra marrom com base de pedra, borda verde e dois portões escuros.
--- Jogo: brainrots andam pelo tapete -> segure E para comprar; bases dos outros -> segure E para roubar.
-local BRAIN = { token = 0, S = nil, saved = nil, hidden = {}, count = 0 }
+-- Campo verde com grama de studs, tapete vermelho no meio, 8 bases (4 de cada lado) iguais à referência
+-- (estrutura cinza de "lego", janelas com moldura branca, placa de madeira "Base de X", tapete vermelho,
+-- pads verdes e ZONA DE COLETA), paredes de terra marrom com base de pedra e dois portões escuros.
+-- Jogo: brainrots andam pelo tapete -> segure E para comprar; bases dos outros -> segure E para roubar;
+-- fique na ZONA DE COLETA (verde, na frente da sua base) para pegar o dinheiro que os brainrots rendem.
+-- Os modelos vêm dos assets originais (SEM mudar o tamanho). Se um asset não carregar, usa um boneco simples.
+local BRAIN = { token = 0, S = nil, saved = nil, hidden = {}, count = 0, cache = {} }
 
 do
+    local Debris = game:GetService("Debris")
+
     local GY, W, L           = 3000, 320, 460        -- altura do chão, largura (X) e comprimento (Z)
     local FEET               = GY + 0.4              -- topo do tapete (onde os brainrots pisam)
     local WALL_T, WALL_H     = 8, 34
@@ -7212,24 +7217,30 @@ do
     local BASE_X             = 100
     local BASE_Z             = { 150, 50, -50, -150 }
     local WALK_SPEED         = 11
+    -- dinheiro inicial: alto pra você conseguir comprar o Elefante ($750B) e ouvir os sons. Original do jogo: 500
+    local START_MONEY        = 2e12
 
     local C_GRASS  = Color3.fromRGB(58, 196, 72)
     local C_CARPET = Color3.fromRGB(226, 62, 62)
     local C_DIRT   = Color3.fromRGB(118, 78, 48)
     local C_STONE  = Color3.fromRGB(112, 116, 122)
-    local C_NAVY   = Color3.fromRGB(44, 56, 72)
-    local C_ROOF   = Color3.fromRGB(104, 108, 114)
+    local C_GRAY   = Color3.fromRGB(125, 132, 142)   -- cinza dos prédios (lego)
+    local C_FLOOR  = Color3.fromRGB(70, 76, 84)      -- piso escuro interno
+    local C_NAVY   = Color3.fromRGB(36, 46, 60)
+    local C_BROWN  = Color3.fromRGB(118, 80, 48)
+    local C_TAN    = Color3.fromRGB(222, 152, 96)    -- placa de madeira
     local C_WHITE  = Color3.fromRGB(245, 245, 245)
     local C_WOOD   = Color3.fromRGB(150, 100, 60)
     local C_GLASS  = Color3.fromRGB(150, 205, 235)
 
+    -- asset = modelo original | sound = som que toca quando você PEGA (compra/rouba) | yaw = girar se o modelo vier de costas
     local BRAINROTS = {
-        { name = "Noobini Pizzanini", rarity = "Common",    rc = Color3.fromRGB(90, 230, 90),   inc = 1,  price = 25,     w = 40, col = Color3.fromRGB(240, 225, 70),  col2 = Color3.fromRGB(70, 160, 255) },
-        { name = "Lirili Larila",     rarity = "Common",    rc = Color3.fromRGB(90, 230, 90),   inc = 3,  price = 250,    w = 28, col = Color3.fromRGB(120, 220, 90),  col2 = Color3.fromRGB(150, 150, 150) },
-        { name = "Gangster Footera",  rarity = "Rare",      rc = Color3.fromRGB(80, 150, 255),  inc = 8,  price = 1500,   w = 16, col = Color3.fromRGB(60, 60, 70),    col2 = Color3.fromRGB(235, 200, 160) },
-        { name = "Tric Trac Baraboom",rarity = "Diamond",   rc = Color3.fromRGB(80, 230, 255),  inc = 18, price = 9000,   w = 9,  col = Color3.fromRGB(70, 200, 230),  col2 = Color3.fromRGB(240, 240, 255) },
-        { name = "Trippi Troppi",     rarity = "Epic",      rc = Color3.fromRGB(190, 90, 255),  inc = 35, price = 25000,  w = 5,  col = Color3.fromRGB(170, 80, 230),  col2 = Color3.fromRGB(255, 160, 60) },
-        { name = "Bandito Bobrito",   rarity = "Legendary", rc = Color3.fromRGB(255, 200, 40),  inc = 90, price = 100000, w = 2,  col = Color3.fromRGB(230, 170, 30),  col2 = Color3.fromRGB(90, 60, 30) },
+        { name = "Noobini Pizzanini", rarity = "Common", rc = Color3.fromRGB(90, 230, 90), inc = 1, price = 25, w = 55,
+          asset = 88544724314302, sound = 110659131769092, yaw = 0, col = Color3.fromRGB(240, 225, 70), col2 = Color3.fromRGB(70, 160, 255) },
+        { name = "67", rarity = "Secret", rc = Color3.fromRGB(255, 70, 200), inc = 7.5e6, price = 1.25e9, w = 30,
+          asset = 189020661701506, sound = 106000088638410, yaw = 0, col = Color3.fromRGB(60, 60, 70), col2 = Color3.fromRGB(240, 240, 240) },
+        { name = "Strawberry Elephant", rarity = "Secret", rc = Color3.fromRGB(255, 70, 200), inc = 7.5e8, price = 7.5e11, w = 15,
+          asset = 248295212434663, sound = 89155583651513, yaw = 0, col = Color3.fromRGB(255, 120, 150), col2 = Color3.fromRGB(255, 190, 205) },
     }
     local NPC_NAMES = { "ttpitd", "Kaio_9", "Mimi", "Rafa2k", "Lunna", "Dudu", "Zeca" }
     local LIGHT_PROPS = {
@@ -7238,9 +7249,17 @@ do
         "EnvironmentDiffuseScale", "EnvironmentSpecularScale",
     }
 
+    -- 25 -> "25", 7.5e6 -> "7.5M", 1.25e9 -> "1.25B", 7.5e11 -> "750B"
     local function fmt(n)
-        if n >= 1e6 then return string.format("%.1fM", n / 1e6) end
-        if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+        local units = { { 1e12, "T" }, { 1e9, "B" }, { 1e6, "M" }, { 1e3, "K" } }
+        for _, u in ipairs(units) do
+            if n >= u[1] then
+                local s = string.format("%.2f", n / u[1])
+                s = (s:gsub("(%..-)0+$", "%1"))
+                s = (s:gsub("%.$", ""))
+                return s .. u[2]
+            end
+        end
         return tostring(math.floor(n))
     end
 
@@ -7433,123 +7452,281 @@ do
         }, UDim2.new(0, 230, 0, 70))
     end
 
+
     ----------------------------------------------------------------
-    -- BASES
+    -- BASES (iguais à referência)
     ----------------------------------------------------------------
-    -- side = -1 (esquerda, olha pra +X) ou 1 (direita, olha pra -X)
-    local function buildBase(f, cx, cz, side, label, red)
+    local function studs(p)
+        p.TopSurface = Enum.SurfaceType.Studs
+        p.FrontSurface = Enum.SurfaceType.Studs
+        p.BackSurface = Enum.SurfaceType.Studs
+        p.LeftSurface = Enum.SurfaceType.Studs
+        p.RightSurface = Enum.SurfaceType.Studs
+        return p
+    end
+
+    -- side = -1 (esquerda, olha pra +X) ou 1 (direita, olha pra -X). mine = sua base (SUA BASE + zona de coleta ativa)
+    local function buildBase(f, cx, cz, side, label, mine)
         local ang = (side < 0) and math.pi / 2 or -math.pi / 2
         local F = CFrame.new(cx, GY, cz) * CFrame.Angles(0, ang, 0)
         local function P(size, lx, ly, lz, color, mat, collide)
             return mk(f, size, F * CFrame.new(lx, ly, lz), color, mat, collide)
         end
-        local halfW, halfD, H1 = BASE_W / 2, BASE_D / 2, 15
+        local halfW, halfD, H = BASE_W / 2, BASE_D / 2, 18
+        local PL, SM = Enum.Material.Plastic, Enum.Material.SmoothPlastic
 
-        P(Vector3.new(BASE_W + 6, 1, BASE_D + 6), 0, 0.5, 0, Color3.fromRGB(135, 138, 142), Enum.Material.Concrete)
-        P(Vector3.new(BASE_W - 2, 0.4, BASE_D - 2), 0, 1.2, 0, Color3.fromRGB(200, 202, 206))
-        P(Vector3.new(BASE_W, H1, 2), 0, 1 + H1 / 2, -halfD + 1, C_NAVY)
-        P(Vector3.new(2, H1, BASE_D), -halfW + 1, 1 + H1 / 2, 0, C_NAVY)
-        P(Vector3.new(2, H1, BASE_D), halfW - 1, 1 + H1 / 2, 0, C_NAVY)
+        -- fundação e piso escuro
+        studs(P(Vector3.new(BASE_W + 4, 1, BASE_D + 4), 0, 0.5, 0, C_GRAY, PL))
+        P(Vector3.new(BASE_W - 6, 0.4, BASE_D - 6), 0, 1.2, 0, C_FLOOR, SM)
 
-        -- frente: pilares, janelas com moldura branca e porta no meio
-        local fz = halfD - 1
-        P(Vector3.new(6, H1, 2), -halfW + 3, 1 + H1 / 2, fz, C_STONE)
-        P(Vector3.new(6, H1, 2), halfW - 3, 1 + H1 / 2, fz, C_STONE)
-        local doorW = 12
-        local segW = (BASE_W - 12 - doorW) / 2
+        -- pilares dos cantos e telhado (com studs, igual ao original)
         for _, sx in ipairs({ -1, 1 }) do
-            local wx = sx * (doorW / 2 + segW / 2)
-            P(Vector3.new(segW, 4, 2), wx, 3, fz, C_NAVY)
-            local glass = P(Vector3.new(segW - 1, 7, 0.4), wx, 9, fz, C_GLASS, Enum.Material.Glass, false)
-            glass.Transparency = 0.5
-            P(Vector3.new(segW, 0.6, 2.4), wx, 12.6, fz, C_WHITE, Enum.Material.SmoothPlastic, false)
-            P(Vector3.new(segW, 0.6, 2.4), wx, 5.4, fz, C_WHITE, Enum.Material.SmoothPlastic, false)
-            P(Vector3.new(0.6, 7.2, 2.4), wx - segW / 2 + 0.3, 9, fz, C_WHITE, Enum.Material.SmoothPlastic, false)
-            P(Vector3.new(0.6, 7.2, 2.4), wx + segW / 2 - 0.3, 9, fz, C_WHITE, Enum.Material.SmoothPlastic, false)
-            P(Vector3.new(segW, H1 - 12.6, 2), wx, 1 + 12 + (H1 - 12) / 2 + 0.3, fz, C_NAVY)
-            if red then
-                for i = 0, 9 do
-                    P(Vector3.new(0.5, 11, 0.5), wx - segW / 2 + 1 + i * ((segW - 2) / 9), 7.5, fz + 1.6, Color3.fromRGB(235, 40, 40), Enum.Material.SmoothPlastic, false)
-                end
+            for _, sz in ipairs({ -1, 1 }) do
+                studs(P(Vector3.new(5, H, 5), sx * (halfW - 2.5), 1 + H / 2, sz * (halfD - 2.5), C_GRAY, PL))
             end
         end
-        P(Vector3.new(doorW, H1 - 10, 2), 0, 1 + 10 + (H1 - 10) / 2, fz, C_NAVY)
+        studs(P(Vector3.new(BASE_W + 4, 2, BASE_D + 4), 0, 1 + H + 1, 0, C_GRAY, PL))
 
-        -- teto e segundo andar
-        P(Vector3.new(BASE_W + 2, 1.2, BASE_D + 2), 0, 1 + H1 + 0.6, 0, C_ROOF, Enum.Material.Slate)
-        local UH = 12
-        local upW, upD, upZ = BASE_W - 14, 34, -10
-        local uy = 1 + H1 + 1.2
-        P(Vector3.new(upW, UH, 2), 0, uy + UH / 2, upZ - upD / 2 + 1, C_NAVY)
+        -- parede do fundo (azul escuro) com janela grande: moldura branca + painel marrom
+        P(Vector3.new(BASE_W - 10, H, 2), 0, 1 + H / 2, -halfD + 1, C_NAVY, SM)
+        local wy, ww, wh, th = 1 + 9.5, 34, 11, 1.2
+        P(Vector3.new(ww - th * 2, wh - th * 2, 0.3), 0, wy, -halfD + 2.2, C_BROWN, Enum.Material.Wood, false)
+        P(Vector3.new(ww, th, 1.4), 0, wy + wh / 2 - th / 2, -halfD + 2.6, C_WHITE, SM, false)
+        P(Vector3.new(ww, th, 1.4), 0, wy - wh / 2 + th / 2, -halfD + 2.6, C_WHITE, SM, false)
         for _, sx in ipairs({ -1, 1 }) do
-            P(Vector3.new(2, UH, upD), sx * (upW / 2 - 1), uy + UH / 2, upZ, C_NAVY)
-        end
-        P(Vector3.new(upW, 3, 2), 0, uy + 1.5, upZ + upD / 2 - 1, C_NAVY)
-        P(Vector3.new(upW, 2, 2), 0, uy + UH - 1, upZ + upD / 2 - 1, C_NAVY)
-        local ug = P(Vector3.new(upW - 2, UH - 5, 0.4), 0, uy + 3 + (UH - 5) / 2, upZ + upD / 2 - 1, C_GLASS, Enum.Material.Glass, false)
-        ug.Transparency = 0.5
-        P(Vector3.new(upW + 2, 1.2, upD + 2), 0, uy + UH + 0.6, upZ, C_ROOF, Enum.Material.Slate)
-
-        -- escada externa até o terraço
-        for i = 1, 15 do
-            local h = i * 1.15
-            P(Vector3.new(4, h, 2), halfW + 3, 1 + h / 2, halfD - 4 - (i - 1) * 2, Color3.fromRGB(125, 128, 134), Enum.Material.Concrete)
+            P(Vector3.new(th, wh, 1.4), sx * (ww / 2 - th / 2), wy, -halfD + 2.6, C_WHITE, SM, false)
         end
 
-        -- placa de madeira com o nome do dono
-        local sign = P(Vector3.new(26, 5, 1), 0, 1 + H1 + 3.8, halfD + 0.5, C_WOOD, Enum.Material.Wood, false)
-        textSurface(sign, Enum.NormalId.Back, { label .. "'s Base" }, Color3.fromRGB(255, 240, 220))
+        -- paredes laterais com janelão de moldura branca
+        local sideLen = BASE_D - 10
+        for _, sx in ipairs({ -1, 1 }) do
+            local x = sx * (halfW - 1)
+            studs(P(Vector3.new(2, 3, sideLen), x, 1 + 1.5, 0, C_GRAY, PL))
+            studs(P(Vector3.new(2, 3, sideLen), x, 1 + H - 1.5, 0, C_GRAY, PL))
+            local glass = P(Vector3.new(0.4, H - 6, sideLen - 2.4), x, 1 + 3 + (H - 6) / 2, 0, C_GLASS, Enum.Material.Glass, false)
+            glass.Transparency = 0.75
+            P(Vector3.new(1.4, 1.2, sideLen), x, 1 + 3 + 0.6, 0, C_WHITE, SM, false)
+            P(Vector3.new(1.4, 1.2, sideLen), x, 1 + H - 3 - 0.6, 0, C_WHITE, SM, false)
+            for _, sz in ipairs({ -1, 1 }) do
+                P(Vector3.new(1.4, H - 6, 1.2), x, 1 + 3 + (H - 6) / 2, sz * (sideLen / 2 - 0.6), C_WHITE, SM, false)
+            end
+        end
 
-        -- espaços (pads) para os brainrots
+        -- mureta baixa na frente (com a entrada no meio)
+        local gate = 16
+        local segW = (BASE_W - 10 - gate) / 2
+        for _, sx in ipairs({ -1, 1 }) do
+            studs(P(Vector3.new(segW, 3, 2), sx * (gate / 2 + segW / 2), 1 + 1.5, halfD - 1, C_GRAY, PL))
+        end
+
+        -- tapete vermelho do fundo até a entrada (e um pedaço pra fora)
+        local c1 = P(Vector3.new(12, 0.3, BASE_D + 2), 0, 1.55, 1, C_CARPET, PL)
+        c1.TopSurface = Enum.SurfaceType.Studs
+        local c2 = P(Vector3.new(12, 0.4, 9), 0, 0.4, halfD + 6.5, C_CARPET, PL)
+        c2.TopSurface = Enum.SurfaceType.Studs
+
+        -- ZONA DE COLETA (verde com borda branca, na frente da base)
+        local cz0 = halfD + 15
+        P(Vector3.new(16, 0.2, 16), 0, 0.1, cz0, C_WHITE, SM, false)
+        local pad = P(Vector3.new(14, 0.2, 14), 0, 0.3, cz0, Color3.fromRGB(40, 220, 70), SM, false)
+        textSurface(pad, Enum.NormalId.Top, { "COLLECT", "ZONE" }, C_WHITE)
+
+        -- pads: verdes (slots usáveis) junto do tapete; cinzas (bloqueados) mais pra fora
         local slots = {}
         local look = F:VectorToWorldSpace(Vector3.new(0, 0, 1))
-        for _, lz in ipairs({ -22, -6 }) do
-            for _, lx in ipairs({ -21, -7, 7, 21 }) do
-                P(Vector3.new(9, 0.2, 9), lx, 1.5, lz, C_WHITE, Enum.Material.SmoothPlastic, false)
-                P(Vector3.new(8, 0.3, 8), lx, 1.6, lz, Color3.fromRGB(70, 200, 90), Enum.Material.SmoothPlastic, false)
-                table.insert(slots, { pos = (F * CFrame.new(lx, 1.75, lz)).Position, look = look, model = nil })
+        for _, lz in ipairs({ 18, 6, -6, -18 }) do
+            for _, sx in ipairs({ -1, 1 }) do
+                P(Vector3.new(8, 0.3, 8), sx * 12, 1.55, lz, Color3.fromRGB(46, 214, 76), SM, false)
+                P(Vector3.new(8, 0.3, 8), sx * 23, 1.55, lz, Color3.fromRGB(122, 128, 136), SM, false)
+                table.insert(slots, { pos = (F * CFrame.new(sx * 12, 1.7, lz)).Position, look = look, model = nil })
             end
         end
-        return { slots = slots, label = label }
+
+        -- luzes retangulares no teto
+        for _, lx in ipairs({ -12, 12 }) do
+            for _, lz in ipairs({ -16, 0, 16 }) do
+                P(Vector3.new(5, 0.8, 2.6), lx, 1 + H - 0.4, lz, Color3.fromRGB(40, 44, 50), SM, false)
+                P(Vector3.new(4.2, 0.2, 2), lx, 1 + H - 0.9, lz, C_WHITE, Enum.Material.Neon, false)
+            end
+        end
+
+        -- orbe amarelo brilhante pendurado no fundo do tapete
+        P(Vector3.new(0.3, 6, 0.3), 0, 1 + H - 3, -halfD + 8, Color3.fromRGB(40, 44, 50), SM, false)
+        local orb = P(Vector3.new(3, 3, 3), 0, 1 + H - 6.5, -halfD + 8, Color3.fromRGB(255, 214, 64), Enum.Material.Neon, false)
+        orb.Shape = Enum.PartType.Ball
+        local pl = Instance.new("PointLight")
+        pl.Color = Color3.fromRGB(255, 214, 64)
+        pl.Range = 18
+        pl.Brightness = 1.5
+        pl.Parent = orb
+
+        -- "MULTI" no fundo do tapete
+        local mp = P(Vector3.new(0.2, 0.2, 0.2), 0, 8, -halfD + 12, C_WHITE, SM, false)
+        mp.Transparency = 1
+        billboardText(mp, mp, Vector3.new(0, 0, 0), { { "MULTI: 1", C_WHITE } }, UDim2.new(0, 160, 0, 36))
+
+        -- placa de madeira "Base de X" com borda de studs vermelhos
+        local sy = 1 + H - 3
+        local sign = P(Vector3.new(44, 7, 1.2), 0, sy, halfD + 1.4, C_TAN, PL, false)
+        textSurface(sign, Enum.NormalId.Back, { "Base de " .. label }, Color3.fromRGB(255, 244, 228))
+        local border = Color3.fromRGB(160, 66, 48)
+        studs(P(Vector3.new(45.6, 1.2, 1.8), 0, sy + 4.1, halfD + 1.4, border, PL, false))
+        studs(P(Vector3.new(45.6, 1.2, 1.8), 0, sy - 4.1, halfD + 1.4, border, PL, false))
+        for _, sx in ipairs({ -1, 1 }) do
+            studs(P(Vector3.new(1.2, 9.4, 1.8), sx * 22.8, sy, halfD + 1.4, border, PL, false))
+        end
+
+        local result = { slots = slots, label = label }
+
+        if mine then
+            -- "SUA BASE" + seta
+            local bb = Instance.new("BillboardGui")
+            bb.Size = UDim2.new(0, 360, 0, 150)
+            bb.StudsOffset = Vector3.new(0, 11, 0)
+            bb.AlwaysOnTop = true
+            bb.MaxDistance = 500
+            bb.Adornee = sign
+            bb.Parent = sign
+            local function t(text, y, h)
+                local l = Instance.new("TextLabel")
+                l.BackgroundTransparency = 1
+                l.Size = UDim2.new(1, 0, h, 0)
+                l.Position = UDim2.new(0, 0, y, 0)
+                l.Text = text
+                l.TextScaled = true
+                l.Font = Enum.Font.GothamBlack
+                l.TextColor3 = C_WHITE
+                l.TextStrokeTransparency = 0
+                l.Parent = bb
+            end
+            t("SUA BASE", 0, 0.62)
+            t("▼", 0.6, 0.4)
+
+            -- quanto dinheiro está esperando pra ser coletado
+            local gui = Instance.new("BillboardGui")
+            gui.Size = UDim2.new(0, 220, 0, 50)
+            gui.StudsOffset = Vector3.new(0, 5, 0)
+            gui.MaxDistance = 200
+            gui.Adornee = pad
+            gui.Parent = pad
+            local lbl = Instance.new("TextLabel")
+            lbl.BackgroundTransparency = 1
+            lbl.Size = UDim2.new(1, 0, 1, 0)
+            lbl.Text = "$0"
+            lbl.TextScaled = true
+            lbl.Font = Enum.Font.GothamBlack
+            lbl.TextColor3 = Color3.fromRGB(255, 225, 80)
+            lbl.TextStrokeTransparency = 0
+            lbl.Parent = gui
+            result.collectLabel = lbl
+            result.collectPos = pad.Position
+        end
+        return result
     end
 
     ----------------------------------------------------------------
-    -- BRAINROTS
+    -- BRAINROTS (modelos originais, sem mudar o tamanho)
     ----------------------------------------------------------------
+    local function playSound(id)
+        if not id then return end
+        pcall(function()
+            local s = Instance.new("Sound")
+            s.SoundId = "rbxassetid://" .. id
+            s.Volume = 2
+            s.Parent = workspace
+            s:Play()
+            Debris:AddItem(s, 20)
+        end)
+    end
+
+    -- baixa o modelo do asset uma vez só (depois só clona)
+    local function loadTemplate(def)
+        local c = BRAIN.cache[def.asset]
+        if c ~= nil then return c or nil end
+        local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. def.asset) end)
+        local tpl
+        if ok and objs and #objs > 0 then
+            local m = Instance.new("Model")
+            for _, o in ipairs(objs) do o.Parent = m end
+            for _, d in ipairs(m:GetDescendants()) do
+                if d:IsA("LuaSourceContainer") or d:IsA("Humanoid") or d:IsA("ProximityPrompt") then
+                    pcall(function() d:Destroy() end)
+                end
+            end
+            for _, d in ipairs(m:GetDescendants()) do
+                if d:IsA("BasePart") then tpl = m break end
+            end
+        end
+        if not tpl then notify("Brainrot", def.name .. ": asset não carregou, usando boneco simples.") end
+        BRAIN.cache[def.asset] = tpl or false
+        return tpl
+    end
+
+    -- todo modelo tem um "Root" invisível nos PÉS (centro da base): PivotTo(pos) põe o brainrot em pé em pos
     local function makeBrainrot(def, parent)
+        local tpl = loadTemplate(def)
         local m = Instance.new("Model")
         m.Name = def.name
-        local function part(sz, off, col)
-            local p = Instance.new("Part")
-            p.Anchored = true
-            p.CanCollide = false
-            p.Size = sz
-            p.Color = col
-            p.Material = Enum.Material.SmoothPlastic
-            p.TopSurface = Enum.SurfaceType.Smooth
-            p.BottomSurface = Enum.SurfaceType.Smooth
-            p.CFrame = CFrame.new(off)
-            p.Parent = m
-            return p
+        local root = Instance.new("Part")
+        root.Name = "Root"
+        root.Size = Vector3.new(1, 1, 1)
+        root.Transparency = 1
+        root.Anchored = true
+        root.CanCollide = false
+        root.CanTouch = false
+        root.Parent = m
+        m.PrimaryPart = root
+
+        local height
+        if tpl then
+            local clone = tpl:Clone()
+            for _, d in ipairs(clone:GetDescendants()) do
+                if d:IsA("BasePart") then
+                    d.Anchored = true
+                    d.CanCollide = false
+                end
+            end
+            clone.Parent = m
+            local cf, size = clone:GetBoundingBox()
+            root.CFrame = CFrame.new(cf.Position.X, cf.Position.Y - size.Y / 2, cf.Position.Z)
+            height = size.Y
+        else
+            local function part(sz, off, col)
+                local p = Instance.new("Part")
+                p.Anchored = true
+                p.CanCollide = false
+                p.Size = sz
+                p.Color = col
+                p.Material = Enum.Material.SmoothPlastic
+                p.TopSurface = Enum.SurfaceType.Smooth
+                p.BottomSurface = Enum.SurfaceType.Smooth
+                p.CFrame = CFrame.new(off)
+                p.Parent = m
+                return p
+            end
+            part(Vector3.new(3.2, 3.6, 2.2), Vector3.new(0, 3.2, 0), def.col)
+            part(Vector3.new(3.4, 3, 3), Vector3.new(0, 5.9, 0), def.col2)
+            for _, sx in ipairs({ -0.8, 0.8 }) do
+                part(Vector3.new(0.9, 0.9, 0.4), Vector3.new(sx, 6.2, -1.5), Color3.new(1, 1, 1))
+                part(Vector3.new(0.4, 0.4, 0.2), Vector3.new(sx, 6.2, -1.78), Color3.new(0, 0, 0))
+                part(Vector3.new(1, 2, 1), Vector3.new(sx, 1, 0), def.col2)
+            end
+            root.CFrame = CFrame.new(0, 0, 0)
+            height = 7.5
         end
-        local body = part(Vector3.new(3.2, 3.6, 2.2), Vector3.new(0, 3.2, 0), def.col)
-        body.Name = "Body"
-        local head = part(Vector3.new(3.4, 3, 3), Vector3.new(0, 5.9, 0), def.col2)
-        head.Name = "Head"
-        for _, sx in ipairs({ -0.8, 0.8 }) do
-            part(Vector3.new(0.9, 0.9, 0.4), Vector3.new(sx, 6.2, -1.5), Color3.new(1, 1, 1))
-            part(Vector3.new(0.4, 0.4, 0.2), Vector3.new(sx, 6.2, -1.78), Color3.new(0, 0, 0))
-            part(Vector3.new(1, 2, 1), Vector3.new(sx, 1, 0), def.col2)
-        end
-        m.PrimaryPart = body
+
+        local anchor = Instance.new("Attachment")
+        anchor.Name = "PromptAnchor"
+        anchor.Position = Vector3.new(0, height / 2, 0)
+        anchor.Parent = root
 
         local bb = Instance.new("BillboardGui")
         bb.Name = "Info"
         bb.Size = UDim2.new(0, 170, 0, 76)
-        bb.StudsOffset = Vector3.new(0, 3.6, 0)
-        bb.MaxDistance = 140
-        bb.Adornee = head
-        bb.Parent = head
+        bb.StudsOffset = Vector3.new(0, height + 2.5, 0)
+        bb.MaxDistance = 160
+        bb.Adornee = root
+        bb.Parent = root
         local function lab(name, text, color, y)
             local l = Instance.new("TextLabel")
             l.Name = name
@@ -7572,24 +7749,24 @@ do
     end
 
     local function setPrompt(model, action, hold, cb)
-        local body = model.PrimaryPart
-        local old = body:FindFirstChildOfClass("ProximityPrompt")
+        local root = model.PrimaryPart
+        local anchor = root:FindFirstChild("PromptAnchor") or root
+        local old = anchor:FindFirstChildOfClass("ProximityPrompt")
         if old then old:Destroy() end
         local pp = Instance.new("ProximityPrompt")
         pp.ActionText = action
         pp.ObjectText = model.Name
         pp.HoldDuration = hold
-        pp.MaxActivationDistance = 12
+        pp.MaxActivationDistance = 14
         pp.RequiresLineOfSight = false
-        pp.Parent = body
+        pp.Parent = anchor
         pp.Triggered:Connect(cb)
         return pp
     end
 
     local function setPriceText(model, text)
-        local head = model:FindFirstChild("Head")
-        local bb = head and head:FindFirstChild("Info")
-        local l = bb and bb:FindFirstChild("Price")
+        local info = model.PrimaryPart and model.PrimaryPart:FindFirstChild("Info")
+        local l = info and info:FindFirstChild("Price")
         if l then l.Text = text end
     end
 
@@ -7601,24 +7778,29 @@ do
         if S.hudInc then S.hudInc.Text = "  +$" .. fmt(S.income) .. "/s" end
     end
 
+    local function updateCollect(S)
+        if S.collectLabel then S.collectLabel.Text = "$" .. fmt(S.pending) end
+    end
+
     local function freeSlot(slots)
         for _, s in ipairs(slots) do
             if not s.model then return s end
         end
     end
 
-    local function placeModel(model, slot)
-        local p = slot.pos + Vector3.new(0, 3.2, 0)
-        model:PivotTo(CFrame.lookAt(p, p + slot.look))
+    local function placeModel(model, slot, def)
+        local p = slot.pos
+        model:PivotTo(CFrame.lookAt(p, p + slot.look) * CFrame.Angles(0, math.rad(def.yaw or 0), 0))
     end
 
     local function claimMine(S, model, def, slot)
         slot.model = model
         slot.def = def
-        placeModel(model, slot)
+        placeModel(model, slot, def)
         S.income += def.inc
         setPriceText(model, "Seu  |  vender $" .. fmt(math.floor(def.price / 2)))
         setMoney(S)
+        playSound(def.sound)
         setPrompt(model, "Vender", 0.8, function()
             if slot.model ~= model then return end
             slot.model, slot.def = nil, nil
@@ -7633,8 +7815,8 @@ do
         local model = makeBrainrot(def, S.folder)
         slot.model = model
         slot.def = def
-        placeModel(model, slot)
-        setPriceText(model, "Dono: " .. base.label)
+        placeModel(model, slot, def)
+        setPriceText(model, "Base de " .. base.label)
         setPrompt(model, "Roubar", 1.4, function()
             if slot.model ~= model then return end
             local mine = freeSlot(S.mySlots)
@@ -7645,8 +7827,8 @@ do
         end)
     end
 
-    local function addWalker(S, z)
-        local def = pickDef()
+    local function addWalker(S, z, forced)
+        local def = forced or pickDef()
         local model = makeBrainrot(def, S.folder)
         local w = { model = model, def = def, x = math.random(-8, 8), z = z, t = math.random() * 10, gone = false }
         table.insert(S.walkers, w)
@@ -7672,7 +7854,7 @@ do
         sg.Parent = pg
         local function box(y, size, color)
             local l = Instance.new("TextLabel")
-            l.Size = UDim2.new(0, 230, 0, y == 70 and 40 or 26)
+            l.Size = UDim2.new(0, 260, 0, y == 70 and 40 or 26)
             l.Position = UDim2.new(0, 12, 0, y)
             l.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
             l.BackgroundTransparency = 0.3
@@ -7728,7 +7910,7 @@ do
         BRAIN.count = 0
         local myToken = BRAIN.token
 
-        local S = { money = 500, income = 0, walkers = {}, mySlots = {}, npcBases = {} }
+        local S = { money = START_MONEY, pending = 0, income = 0, walkers = {}, mySlots = {}, npcBases = {} }
         BRAIN.S = S
         local f = Instance.new("Folder")
         f.Name = "RoubeUmBrainrot_World"
@@ -7774,10 +7956,12 @@ do
         safety.Transparency = 1
         safety.Name = "SafetyNet"
 
+        -- baixa os modelos originais dos brainrots (uma vez só)
+        for _, d in ipairs(BRAINROTS) do pcall(loadTemplate, d) end
+        if BRAIN.token ~= myToken then return end
+
         -- 8 bases: esquerda (olha pra +X) e direita (olha pra -X); a 1ª da esquerda perto do portão sul é a SUA
-        local names = {}
-        local ni = 0
-        local idx = 0
+        local ni, idx = 0, 0
         for _, side in ipairs({ -1, 1 }) do
             for _, bz in ipairs(BASE_Z) do
                 idx += 1
@@ -7788,30 +7972,34 @@ do
                     ni += 1
                     label = NPC_NAMES[ni] or ("Player" .. ni)
                 end
-                local base = buildBase(f, side * BASE_X, bz, side, label, idx % 2 == 0)
+                local base = buildBase(f, side * BASE_X, bz, side, label, idx == 1)
                 if idx == 1 then
                     S.mySlots = base.slots
+                    S.collectLabel = base.collectLabel
+                    S.collectPos = base.collectPos
                 else
                     table.insert(S.npcBases, base)
                 end
-                names[idx] = base
                 if BRAIN.token ~= myToken then return end
             end
         end
 
         makeHud(S)
 
-        -- bases dos outros já com brainrots (pra roubar)
+        -- bases dos outros já com brainrots (pra roubar): quase sempre Noobini, às vezes o 67
         for _, base in ipairs(S.npcBases) do
             for i = 1, math.random(2, 3) do
                 local slot = freeSlot(base.slots)
-                if slot then putNpc(S, base, pickDef(4), slot) end
+                if slot then putNpc(S, base, pickDef(2), slot) end
             end
         end
 
-        -- brainrots andando pelo tapete (do portão norte pro sul)
-        for i = 0, 5 do
-            addWalker(S, -L / 2 + 20 + i * 60)
+        -- brainrots andando pelo tapete (do portão norte pro sul); os 3 tipos já aparecem perto de você
+        addWalker(S, L / 2 - 150, BRAINROTS[1])
+        addWalker(S, L / 2 - 105, BRAINROTS[2])
+        addWalker(S, L / 2 - 60, BRAINROTS[3])
+        for i = 0, 2 do
+            addWalker(S, -L / 2 + 30 + i * 70)
         end
 
         -- teleporte
@@ -7837,14 +8025,27 @@ do
             end
         end)
 
-        -- movimento dos brainrots no tapete
+        -- movimento dos brainrots no tapete + proteção anti-void + coleta de dinheiro
         S.conn = RunService.Heartbeat:Connect(function(dt)
-            -- atravessou o chão: volta pro portão sul
             local pc = LocalPlayer.Character
             local ph = pc and pc:FindFirstChild("HumanoidRootPart")
-            if ph and ph.Position.Y < GY - 40 and ph.Position.Y > GY - 400 then
-                ph.AssemblyLinearVelocity = Vector3.zero
-                ph.CFrame = startCF
+            if ph then
+                -- atravessou o chão: volta pro portão sul
+                if ph.Position.Y < GY - 40 and ph.Position.Y > GY - 400 then
+                    ph.AssemblyLinearVelocity = Vector3.zero
+                    ph.CFrame = startCF
+                end
+                -- em cima da ZONA DE COLETA: pega o dinheiro acumulado
+                if S.collectPos and S.pending > 0 then
+                    local d = ph.Position - S.collectPos
+                    if math.abs(d.X) < 8 and math.abs(d.Z) < 8 and math.abs(d.Y) < 8 then
+                        S.money += S.pending
+                        notify("Brainrot", "Coletou $" .. fmt(S.pending))
+                        S.pending = 0
+                        updateCollect(S)
+                        setMoney(S)
+                    end
+                end
             end
             for i = #S.walkers, 1, -1 do
                 local w = S.walkers[i]
@@ -7859,37 +8060,36 @@ do
                         table.remove(S.walkers, i)
                     else
                         local bob = math.abs(math.sin(w.t * 8)) * 0.4
-                        local p = Vector3.new(w.x, FEET + 3.2 + bob, w.z)
-                        w.model:PivotTo(CFrame.lookAt(p, p + Vector3.new(0, 0, 1)))
+                        local p = Vector3.new(w.x, FEET + bob, w.z)
+                        w.model:PivotTo(CFrame.lookAt(p, p + Vector3.new(0, 0, 1)) * CFrame.Angles(0, math.rad(w.def.yaw or 0), 0))
                     end
                 end
             end
         end)
 
-        -- renda por segundo, novos brainrots no tapete e reposição nas bases dos outros
+        -- renda por segundo (acumula na zona de coleta), novos brainrots e reposição nas bases dos outros
         task.spawn(function()
-            local tick1, tick2, tick3 = 0, 0, 0
+            local t2, t3 = 0, 0
             while BRAIN.token == myToken do
                 task.wait(1)
-                tick1 += 1
-                tick2 += 1
-                tick3 += 1
-                S.money += S.income
-                setMoney(S)
-                if tick2 >= 4 then
-                    tick2 = 0
+                t2 += 1
+                t3 += 1
+                S.pending += S.income
+                updateCollect(S)
+                if t2 >= 4 then
+                    t2 = 0
                     if #S.walkers < 10 then addWalker(S, -L / 2 + 14) end
                 end
-                if tick3 >= 20 then
-                    tick3 = 0
+                if t3 >= 20 then
+                    t3 = 0
                     local base = S.npcBases[math.random(#S.npcBases)]
                     local slot = base and freeSlot(base.slots)
-                    if slot then putNpc(S, base, pickDef(4), slot) end
+                    if slot then putNpc(S, base, pickDef(2), slot) end
                 end
             end
         end)
 
-        notify("Brainrot", "Pronto! Segure E nos brainrots para comprar/roubar.")
+        notify("Brainrot", "Pronto! Segure E nos brainrots. Fique na ZONA DE COLETA pra pegar o dinheiro.")
         return true
     end
 end
