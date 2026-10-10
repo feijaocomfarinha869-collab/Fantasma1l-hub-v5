@@ -1,7 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v34: Couch | Poolrooms Level 37 | Locust c/ acessórios no servidor | XESTER em rede | ROUBE UM BRAINROT)
+    (v35: Couch | Poolrooms Level 37 | Locust c/ acessórios no servidor | XESTER em rede | ROUBE UM BRAINROT | anti-void)
     ==========================================================
 ]]--
 
@@ -1413,25 +1413,40 @@ do
             end
         end
 
-        -- se você morrer/respawnar, volta pro salão
+        -- se você morrer/respawnar, volta pro salão (reconstrói o chão do spawn antes, se tiver sumido)
         S.conn = LocalPlayer.CharacterAdded:Connect(function(c)
             local h = c:WaitForChild("HumanoidRootPart", 10)
             if h and POOL.token == myToken then
                 task.wait(0.5)
+                pcall(streamStep, S, 0, 0, 1)
+                if POOL.token ~= myToken then return end
+                h.AssemblyLinearVelocity = Vector3.zero
                 h.CFrame = spawnCF
             end
         end)
 
-        -- streaming infinito + gerenciador de luzes/sombras
+        -- streaming infinito + luzes/sombras + proteção contra cair no void
         task.spawn(function()
             while POOL.token == myToken do
                 local c = LocalPlayer.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
                 if h then
-                    local pcx = math.floor((h.Position.X + CH / 2) / CH)
-                    local pcz = math.floor((h.Position.Z + CH / 2) / CH)
+                    local y = h.Position.Y
+                    local inPool = y > POOL_Y - 40 and y < POOL_Y + 300
+                    -- fora do salão (ex.: respawn no mapa) o centro fica no spawn, pro chão dele nunca ser apagado
+                    local pcx, pcz = 0, 0
+                    if inPool then
+                        pcx = math.floor((h.Position.X + CH / 2) / CH)
+                        pcz = math.floor((h.Position.Z + CH / 2) / CH)
+                    end
                     pcall(streamStep, S, pcx, pcz, RADIUS)
-                    pcall(updateLights, S, h.Position)
+                    pcall(updateLights, S, inPool and h.Position or spawnCF.Position)
+                    -- atravessou o chão (caindo pro void): volta pro spawn
+                    if y < POOL_Y - 20 and y > POOL_Y - 600 then
+                        pcall(streamStep, S, 0, 0, 1)
+                        h.AssemblyLinearVelocity = Vector3.zero
+                        h.CFrame = spawnCF
+                    end
                 end
                 task.wait(0.35)
             end
@@ -1579,7 +1594,8 @@ local LOCUST_ACCESSORIES = {
 --   2) o que não conseguir pelo servidor entra só local (marcado F1L_Local)
 --   3) a cada respawn tudo é recolocado e as juntas são soltas pra os acessórios seguirem o rig
 -- Garantia total: deixe esses acessórios equipados no seu avatar do Roblox (aí já nascem no servidor).
-local WEAR_KEYS = { "wear", "accessor", "hat", "avatar", "outfit", "catalog", "equip", "item" }
+local WEAR_KEYS = { "wear", "accessor" }                                                   -- dispara automático
+local WIDE_KEYS = { "wear", "accessor", "hat", "avatar", "outfit", "catalog", "equip", "item" } -- só lista no diagnóstico
 
 local function locustAppliedIds()
     local have = {}
@@ -1603,7 +1619,7 @@ local function locustServerAccCount()
     return n
 end
 
-local function locustWearRemotes()
+local function locustWearRemotes(wide)
     local list, seen = {}, {}
     local function add(r)
         if not seen[r] then seen[r] = true table.insert(list, r) end
@@ -1618,7 +1634,7 @@ local function locustWearRemotes()
     for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
         if r:IsA("RemoteEvent") or r:IsA("RemoteFunction") then
             local n = r.Name:lower()
-            for _, key in ipairs(WEAR_KEYS) do
+            for _, key in ipairs(wide and WIDE_KEYS or WEAR_KEYS) do
                 if n:find(key, 1, true) then add(r) break end
             end
         end
@@ -1712,7 +1728,7 @@ end
 -- diagnóstico: mostra no console (F9) os remotes candidatos e o que está no personagem
 function LOCUST.diag()
     local names = {}
-    for _, r in ipairs(locustWearRemotes()) do
+    for _, r in ipairs(locustWearRemotes(true)) do
         table.insert(names, r.ClassName .. " " .. r:GetFullName())
     end
     local chr = LocalPlayer.Character
@@ -3449,6 +3465,7 @@ SettingsHolder.TPToNearestSpawn.Button.MouseButton1Click:Connect(function()
 end)
 
 -- runservice connection
+local LastSafeCF = nil
 local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 	if States.Input.Debounce then
 		StopAnim(Locust,Animations.Idle)
@@ -3493,6 +3510,13 @@ local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 	local HitPosition = Result and Result.Position
 	local TorsoVelocity = (RootPart.Velocity).Magnitude
 	local TorsoVerticalVelocity = RootPart.Velocity.Y
+	-- proteção: se o rig atravessar o chão, volta pro último ponto onde estava pisando
+	if HitFloor ~= nil then
+		LastSafeCF = RootPart.CFrame
+	elseif LastSafeCF and RootPart.Position.Y < LastSafeCF.Position.Y - 120 then
+		RootPart.AssemblyLinearVelocity = Vector3.zero
+		RootPart.CFrame = LastSafeCF + Vector3.new(0, 6, 0)
+	end
 	if TorsoVelocity < 0.001 and HitFloor ~= nil and not States.Input.Debounce then
 		if States.Movement.Crouching then
 			States.Movement.Crouching = true
@@ -7745,6 +7769,11 @@ do
         buildTerrain(f)
         if BRAIN.token ~= myToken then return end
 
+        -- rede de proteção invisível bem abaixo do chão (backup contra cair no void)
+        local safety = mk(f, Vector3.new(W + 600, 4, L + 600), CFrame.new(0, GY - 70, 0), C_GRASS, Enum.Material.Plastic)
+        safety.Transparency = 1
+        safety.Name = "SafetyNet"
+
         -- 8 bases: esquerda (olha pra +X) e direita (olha pra -X); a 1ª da esquerda perto do portão sul é a SUA
         local names = {}
         local ni = 0
@@ -7803,12 +7832,20 @@ do
             local h = c:WaitForChild("HumanoidRootPart", 10)
             if h and BRAIN.token == myToken then
                 task.wait(0.5)
+                h.AssemblyLinearVelocity = Vector3.zero
                 h.CFrame = startCF
             end
         end)
 
         -- movimento dos brainrots no tapete
         S.conn = RunService.Heartbeat:Connect(function(dt)
+            -- atravessou o chão: volta pro portão sul
+            local pc = LocalPlayer.Character
+            local ph = pc and pc:FindFirstChild("HumanoidRootPart")
+            if ph and ph.Position.Y < GY - 40 and ph.Position.Y > GY - 400 then
+                ph.AssemblyLinearVelocity = Vector3.zero
+                ph.CFrame = startCF
+            end
             for i = #S.walkers, 1, -1 do
                 local w = S.walkers[i]
                 if w.gone then
@@ -8563,6 +8600,28 @@ else
     TabADM:Button({ Title = "Visible",           Callback = function() triggerCommand("VISIBLE", selectedPlayerName) end })
     TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
     TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
+
+    -- emergência: some com os mundos e te leva pra um spawn do mapa
+    TabADM:Button({ Title = "Sair dos mundos (voltar ao spawn)", Callback = function()
+        pcall(POOL.clear, true)
+        pcall(roubeUmBrainrot, "OFF")
+        if workspace:FindFirstChild("Backrooms_Level0") then pcall(clearBackrooms) end
+        task.wait(0.3)
+        local chr = LocalPlayer.Character
+        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+        local best, bestD
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("SpawnLocation") then
+                local dist = hrp and (d.Position - hrp.Position).Magnitude or 0
+                if not best or dist < bestD then best, bestD = d, dist end
+            end
+        end
+        if hrp and best then
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.CFrame = best.CFrame + Vector3.new(0, 5, 0)
+        end
+        notify("ADM", best and "De volta ao spawn." or "Sem SpawnLocation no mapa; use reset.")
+    end})
 
     -- Backrooms
     TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
