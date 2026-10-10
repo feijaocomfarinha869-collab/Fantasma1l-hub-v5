@@ -1,7 +1,7 @@
 --[[
     ==========================================================
     FANTASMA1L HUB - COMPLETO UNIFICADO v31 (+ LOCUST COM REDE | POOLROOMS | PREFIXO ;)
-    (v33: Couch | Poolrooms Level 37 | Locust c/ acessórios | XESTER em rede | ROUBE UM BRAINROT)
+    (v34: Couch | Poolrooms Level 37 | Locust c/ acessórios no servidor | XESTER em rede | ROUBE UM BRAINROT)
     ==========================================================
 ]]--
 
@@ -1572,17 +1572,109 @@ local LOCUST_ACCESSORIES = {
     71673828053110, 18626055142, 18625377030, 17314457081, 17606680159,
 }
 
--- equipa os acessórios do Locust no seu personagem antes de iniciar (quem tem o hub também passa por aqui via rede)
-local function equipLocustAccessories()
-    local chr = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hum = chr:WaitForChild("Humanoid", 10)
-    if not hum then return false end
+-- ACESSÓRIOS DO LOCUST
+-- Acessório colocado só pelo cliente (GetObjects + AddAccessory) é LOCAL: só você vê e some quando o servidor
+-- troca o personagem (respawn). Pra TODO MUNDO ver, o servidor precisa registrar o acessório. Por isso:
+--   1) tenta vestir pelo remote de roupa/acessório do próprio jogo (o servidor registra -> todos veem)
+--   2) o que não conseguir pelo servidor entra só local (marcado F1L_Local)
+--   3) a cada respawn tudo é recolocado e as juntas são soltas pra os acessórios seguirem o rig
+-- Garantia total: deixe esses acessórios equipados no seu avatar do Roblox (aí já nascem no servidor).
+local WEAR_KEYS = { "wear", "accessor", "hat", "avatar", "outfit", "catalog", "equip", "item" }
+
+local function locustAppliedIds()
     local have = {}
     pcall(function()
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         for _, a in ipairs(hum:GetAppliedDescription():GetAccessories(true)) do
             have[a.AssetId] = true
         end
     end)
+    return have
+end
+
+local function locustServerAccCount()
+    local n = 0
+    local chr = LocalPlayer.Character
+    if chr then
+        for _, a in ipairs(chr:GetChildren()) do
+            if a:IsA("Accoutrement") and not a:GetAttribute("F1L_Local") then n += 1 end
+        end
+    end
+    return n
+end
+
+local function locustWearRemotes()
+    local list, seen = {}, {}
+    local function add(r)
+        if not seen[r] then seen[r] = true table.insert(list, r) end
+    end
+    pcall(function()
+        local R = ReplicatedStorage:FindFirstChild("Remotes")
+        for _, n in ipairs({ "Wear", "WearItem", "WearAccessory", "Equip", "EquipItem" }) do
+            local r = R and R:FindFirstChild(n)
+            if r and (r:IsA("RemoteEvent") or r:IsA("RemoteFunction")) then add(r) end
+        end
+    end)
+    for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
+        if r:IsA("RemoteEvent") or r:IsA("RemoteFunction") then
+            local n = r.Name:lower()
+            for _, key in ipairs(WEAR_KEYS) do
+                if n:find(key, 1, true) then add(r) break end
+            end
+        end
+    end
+    return list
+end
+
+local function locustCallRemote(r, id)
+    pcall(function()
+        if r:IsA("RemoteFunction") then r:InvokeServer(id) else r:FireServer(id) end
+    end)
+end
+
+function LOCUST.wear()
+    local chr = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum = chr:WaitForChild("Humanoid", 10)
+    if not hum then return false end
+
+    local have = locustAppliedIds()
+    local missing = {}
+    for _, id in ipairs(LOCUST_ACCESSORIES) do
+        if not have[id] then table.insert(missing, id) end
+    end
+    if #missing == 0 then
+        notify("Locust", "Acessórios já estão no seu avatar (todos veem).")
+        return true
+    end
+
+    -- 1) pelo remote do jogo
+    local viaServer = 0
+    local remotes = LOCUST.wearRemote and { LOCUST.wearRemote } or locustWearRemotes()
+    for _, r in ipairs(remotes) do
+        local before = locustServerAccCount()
+        local first = missing[1]
+        locustCallRemote(r, first)
+        local t0, worked = os.clock(), false
+        repeat
+            task.wait(0.15)
+            if locustAppliedIds()[first] or locustServerAccCount() > before then worked = true end
+        until worked or os.clock() - t0 > 1.6
+        if worked then
+            LOCUST.wearRemote = r
+            for i = 2, #missing do
+                locustCallRemote(r, missing[i])
+                task.wait(0.35)
+            end
+            task.wait(0.6)
+            break
+        end
+    end
+    have = locustAppliedIds()
+    for _, id in ipairs(LOCUST_ACCESSORIES) do
+        if have[id] then viaServer += 1 end
+    end
+
+    -- 2) o que faltou entra só local
     local added, failed = 0, {}
     for _, id in ipairs(LOCUST_ACCESSORIES) do
         if not have[id] then
@@ -1596,6 +1688,7 @@ local function equipLocustAccessories()
                 end
             end
             if acc then
+                acc:SetAttribute("F1L_Local", true)
                 local done = pcall(function() hum:AddAccessory(acc) end)
                 if not done or acc.Parent ~= chr then pcall(function() acc.Parent = chr end) end
                 added += 1
@@ -1604,9 +1697,37 @@ local function equipLocustAccessories()
             end
         end
     end
-    task.wait(1)
-    notify("Locust", "Acessórios: +" .. added .. (#failed > 0 and (" | falhou: " .. table.concat(failed, ", ")) or " (ok)"))
+    task.wait(0.8)
+
+    if added == 0 and #failed == 0 then
+        notify("Locust", "Acessórios: " .. viaServer .. " pelo servidor (todos veem).")
+    elseif viaServer == 0 and LOCUST.wearRemote == nil then
+        notify("Locust", "Nenhum remote de acessório do jogo achado: só VOCÊ vê. Pra todos verem, equipe esses acessórios no avatar do Roblox.")
+    else
+        notify("Locust", "Acessórios: " .. viaServer .. " servidor (todos veem) | " .. added .. " só local" .. (#failed > 0 and (" | falhou: " .. table.concat(failed, ", ")) or ""))
+    end
     return #failed == 0
+end
+
+-- diagnóstico: mostra no console (F9) os remotes candidatos e o que está no personagem
+function LOCUST.diag()
+    local names = {}
+    for _, r in ipairs(locustWearRemotes()) do
+        table.insert(names, r.ClassName .. " " .. r:GetFullName())
+    end
+    local chr = LocalPlayer.Character
+    local srv, loc = 0, 0
+    if chr then
+        for _, a in ipairs(chr:GetChildren()) do
+            if a:IsA("Accoutrement") then
+                if a:GetAttribute("F1L_Local") then loc += 1 else srv += 1 end
+            end
+        end
+    end
+    print("[Locust] remotes candidatos (" .. #names .. "):")
+    for _, n in ipairs(names) do print("   " .. n) end
+    print("[Locust] acessórios no personagem: servidor=" .. srv .. " | local=" .. loc .. " | remote usado=" .. tostring(LOCUST.wearRemote and LOCUST.wearRemote:GetFullName()))
+    notify("Locust", "Diag: " .. #names .. " remotes | servidor " .. srv .. " | local " .. loc .. " (veja o console F9)")
 end
 
 function LOCUST.start()
@@ -2730,7 +2851,7 @@ end
 local Rad = math.rad
 
 -- equipa os acessórios do Locust antes de iniciar
-pcall(equipLocustAccessories)
+pcall(LOCUST.wear)
 
 Empyrean = Start({
 	Accessories = {
@@ -3410,6 +3531,16 @@ local RunServiceConnection = Services.RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 table.insert(ScriptCache.ActiveConnections, RunServiceConnection)
+
+-- a cada respawn recoloca os acessórios (senão somem quando o servidor troca o personagem)
+-- e solta as juntas pra os acessórios seguirem o rig do Locust
+table.insert(ScriptCache.ActiveConnections, LocalPlayer.CharacterAdded:Connect(function()
+	if not LOCUST.running then return end
+	task.wait(0.8)
+	pcall(LOCUST.wear)
+	local c = LocalPlayer.Character
+	if c then pcall(function() c:BreakJoints() end) end
+end))
 
 Empyrean.BindableEvent.Event:Once(function()
 	print("Resetting.")
@@ -8508,6 +8639,7 @@ else
     TabE:Button({ Title = "Locust (Eu)",     Callback = function() toggleLocust(LocalPlayer.Name) end })
     TabE:Button({ Title = "Locust (Alvo)",   Callback = function() toggleLocust(selectedPlayerName) end })
     TabE:Button({ Title = "Locust (Todos)",  Callback = function() toggleLocust("ALL") end })
+    TabE:Button({ Title = "Locust: diagnóstico dos acessórios", Callback = function() LOCUST.diag() end })
 
     -- Xester (The Card Master) em rede: aperta uma vez liga, de novo desliga
     local function toggleXester(target)
