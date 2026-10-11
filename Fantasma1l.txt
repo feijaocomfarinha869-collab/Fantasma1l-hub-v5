@@ -4934,173 +4934,6 @@ local function roubeUmBrainrot(modo)
 end
 
 --==============================================================
--- TORNADO REALISTA - LOCALSCRIPT (tudo em um)
--- Coloque em StarterPlayer > StarterPlayerScripts como LocalScript
--- Inicia sozinho. Depois: tornado("OFF") / tornado("ON") / tornado()
---==============================================================
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-
-local LocalPlayer = Players.LocalPlayer
-local TORNADO = { token = 0, S = nil }
-
---==============================================================
--- CONFIG
---==============================================================
-local HEIGHT = 1100
-local FUNNEL_LAYERS = 40
-local POINTS_PER_LAYER = 7
-local CLOUD_LAYERS = 6
-local CLOUD_POINTS = 11
-
-local DEBRIS_SKIRT = 16
-local DEBRIS_PLUME = 22
-local DEBRIS_GRIT  = 14
-
-local MOVE_SPEED = 13
-local MAX_KMH = 556
-
-local SUCK_RADIUS = 160
-local SUCK_FORCE  = 1.2
-local ORBIT_FORCE = 2.5
-local LIFT_FORCE  = 0.8
-local PULL_PLAYER = true
-local PULL_PARTS  = true
-
-local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
-
-local FUNNEL_BOTTOM = Color3.fromRGB(120, 128, 140)
-local FUNNEL_MID    = Color3.fromRGB(180, 188, 200)
-local FUNNEL_TOP    = Color3.fromRGB(235, 240, 245)
-local CLOUD_COLOR   = Color3.fromRGB(225, 230, 238)
-
-local DIRT_DARK  = Color3.fromRGB(48, 36, 26)
-local DIRT_MID   = Color3.fromRGB(86, 64, 44)
-local DIRT_LIGHT = Color3.fromRGB(128, 99, 70)
-
---==============================================================
--- UTIL
---==============================================================
-local function randf(a, b) return a + (b - a) * math.random() end
-local function lerp(a, b, t) return a + (b - a) * t end
-local function smooth(t) t = math.clamp(t, 0, 1) return t * t * (3 - 2 * t) end
-
-local function notify(title, text)
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = title, Text = text, Duration = 4
-        })
-    end)
-end
-
-local function funnelRadius(S, height)
-    local n = math.clamp(height / HEIGHT, 0, 1)
-    return S.groundRadius + (S.topRadius - S.groundRadius) * (n ^ 1.18)
-end
-
-local function funnelOffset(S, height)
-    local n = math.clamp(height / HEIGHT, 0, 1)
-    local forward = -S.direction * 170 * (n ^ 1.3)
-    local sideDir = Vector3.new(-S.direction.Z, 0, S.direction.X)
-    local side = sideDir * math.sin(S.time * 0.32 + n * 4) * 45 * n
-    return forward + side
-end
-
-local function createParticlePoint(S)
-    local part = Instance.new("Part")
-    part.Name = "TornadoParticlePoint"
-    part.Size = Vector3.new(1, 1, 1)
-    part.Transparency = 1
-    part.Anchored = true
-    part.CanCollide = false
-    part.CanTouch = false
-    part.CanQuery = false
-    part.CastShadow = false
-    part.Parent = S.folder
-
-    local e = Instance.new("ParticleEmitter")
-    e.Texture = SMOKE_TEXTURE
-    e.Rate = 0
-    e.Speed = NumberRange.new(1, 6)
-    e.Lifetime = NumberRange.new(2.2, 4.2)
-    e.SpreadAngle = Vector2.new(180, 180)
-    e.Rotation = NumberRange.new(0, 360)
-    e.RotSpeed = NumberRange.new(-45, 45)
-    e.Acceleration = Vector3.new(0, 5, 0)
-    e.LightInfluence = 1
-    e.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.5),
-        NumberSequenceKeypoint.new(0.45, 0.68),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    e.Enabled = false
-    e.Parent = part
-
-    return { part = part, emitter = e, angle = math.random() * math.pi * 2 }
-end
-
---==============================================================
--- FUNIL
---==============================================================
-local function updateFunnel(S, dt)
-    for _, layer in ipairs(S.funnel) do
-        local height = S.baseHeight + (HEIGHT - S.baseHeight) * layer.normalizedHeight
-        local radius = funnelRadius(S, height)
-        local offset = funnelOffset(S, height)
-        layer.angle += (55 / math.max(radius, 20)) * dt
-
-        local n = math.clamp(height / HEIGHT, 0, 1)
-        local color
-        if n < 0.5 then color = FUNNEL_BOTTOM:Lerp(FUNNEL_MID, n * 2)
-        else color = FUNNEL_MID:Lerp(FUNNEL_TOP, (n - 0.5) * 2) end
-
-        local size = math.clamp(radius * 0.9, 25, 200)
-
-        for i, point in ipairs(layer.points) do
-            local angle = layer.angle + (i - 1) * math.pi * 2 / #layer.points
-            point.part.Position = Vector3.new(
-                S.center.X + offset.X + math.cos(angle) * radius,
-                S.groundY + height,
-                S.center.Z + offset.Z + math.sin(angle) * radius
-            )
-            local e = point.emitter
-            e.Enabled = true
-            e.Color = ColorSequence.new(color)
-            e.Size = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, size * 0.55),
-                NumberSequenceKeypoint.new(1, size * 1.35)
-            })
-            e.Rate = 10 + 20 * S.intensity
-        end
-    end
-end
-
-local function updateClouds(S, dt)
-    for _, layer in ipairs(S.cloudLayers) do
-        local height = HEIGHT + 20 + layer.offset
-        local radius = S.topRadius * (0.85 + layer.scale)
-        layer.angle += 0.35 * dt
-        for i, point in ipairs(layer.points) do
-            local angle = layer.angle + (i - 1) * math.pi * 2 / #layer.points
-            point.part.Position = Vector3.new(
-                S.center.X + math.cos(angle) * radius,
-                S.groundY + height,
-                S.center.Z + math.sin(angle) * radius
-            )
-            point.emitter.Enabled = true
-            point.emitter.Color = ColorSequence.new(CLOUD_COLOR)
-            point.emitter.Size = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, radius * 0.35),
-                NumberSequenceKeypoint.new(1, radius * 0.75)
-            })
-            point.emitter.Rate = 3 + S.intensity * 4
-        end
-    end
-end
-
---==============================================================
 -- TORNADO REALISTA V2 - LOCALSCRIPT
 -- Coloque em StarterPlayer > StarterPlayerScripts (LocalScript)
 -- Inicia sozinho. Comandos: tornado("OFF") / tornado("ON") / tornado()
@@ -5134,7 +4967,17 @@ local MAX_KMH = 556
 
 local PULL_PLAYER = true
 local PULL_PARTS  = true
-local MAX_PULLED_PARTS = 120
+local MAX_PULLED_PARTS = 400   -- máximo de peças soltas ao mesmo tempo
+
+-- 💥 DESTRUIÇÃO + 🌬️ VENTO
+local DESTROY_FROM_AFAR = true   -- destrói/solta casas e blocos de longe
+local WIND_ENABLED = true        -- vento empurra você, peças e cria rajadas na tela
+local MAX_PART_SIZE = 160        -- maior peça que o tornado consegue arrancar
+
+-- 🔊 ÁUDIO DO VENTO (mais perto = mais alto / mais longe = mais baixo)
+local WIND_SOUND_ID   = "rbxassetid://1102548016"
+local WIND_MAX_VOLUME = 3      -- volume máximo (colado/dentro do tornado)
+local WIND_HEAR_RANGE = 1500   -- distância (studs) em que o som some por completo
 
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
@@ -5184,6 +5027,20 @@ local function axisAt(S, y)
     local h = math.clamp(y - S.groundY, 0, HEIGHT)
     local off = funnelOffset(S, h)
     return Vector3.new(S.center.X + off.X, y, S.center.Z + off.Z), h
+end
+
+-- força do vento (0 a 1) a uma distância d do eixo; mult>1 = alcance maior (brisa)
+local function windStrength(S, d, R, mult)
+    if not S.touched then return 0 end
+    local zone = (R * 2.5 + 150) * (0.5 + 0.5 * S.intensity) * (mult or 1)
+    return (math.clamp(1 - d / zone, 0, 1) ^ 0.8) * (0.3 + 0.7 * S.intensity)
+end
+
+-- direção do vento: gira em volta + entra em direção ao centro
+local function windDirection(rel, d)
+    local out = rel / d
+    local tangent = Vector3.new(-out.Z, 0, out.X)
+    return (tangent * 0.85 - out * 0.5).Unit
 end
 
 local function funnelColor(n, core)
@@ -5527,6 +5384,15 @@ local function updatePlayer(S, dt)
 
     if not inRange then
         releasePlayer(S, hum)
+        if WIND_ENABLED then
+            local f = windStrength(S, d, R, 1)
+            if f > 0.02 then
+                local dir = windDirection(rel, d)
+                local push = dir * (160 * f) * dt
+                hrp.AssemblyLinearVelocity = hrp.AssemblyLinearVelocity
+                    + Vector3.new(push.X, 0, push.Z)
+            end
+        end
         return
     end
 
@@ -5563,11 +5429,40 @@ local function updatePlayer(S, dt)
         math.sin(S.time * 3) * 3, 5 + 8 * I, math.cos(S.time * 2.4) * 3)
 end
 
-local function updateParts(S, dt)
+local function eligiblePart(p)
+    if not p:IsA("BasePart") or p:IsA("Terrain") or p:IsA("SpawnLocation") then return false end
+    if p.Name == "TornadoParticlePoint" or p.Name == "TornadoSand" then return false end
+    local sz = p.Size
+    if math.max(sz.X, sz.Y, sz.Z) > MAX_PART_SIZE then return false end
+    -- ignora chão/baseplate (placas finas e enormes)
+    if sz.Y < 6 and math.max(sz.X, sz.Z) > 60 then return false end
+    if p.Parent and p.Parent:FindFirstChildOfClass("Humanoid") then return false end
+    return true
+end
+
+-- solta a peça da construção (quebra soldas) e destrava
+local function loosen(p)
+    pcall(function()
+        for _, j in ipairs(p:GetJoints()) do
+            if j:IsA("JointInstance") or j:IsA("WeldConstraint") then j:Destroy() end
+        end
+        p:BreakJoints()
+    end)
+    p.Anchored = false
+end
+
+local function countLoose(S)
+    local c = 0
+    for _ in pairs(S.pulledSet) do c += 1 end
+    return c
+end
+
+-- procura peças no alcance do vento e arranca (quanto mais perto, mais rápido)
+local function scanParts(S)
     local I = S.intensity
     if I < 0.03 then return end
 
-    local pullRadius = (funnelRadius(S, 40) * 1.6 + 45) * (0.5 + 0.5 * I)
+    local scanR = (funnelRadius(S, 40) * 2.5 + 150) * (0.5 + 0.5 * I)
 
     local params = OverlapParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
@@ -5576,49 +5471,111 @@ local function updateParts(S, dt)
         if plr.Character then table.insert(ex, plr.Character) end
     end
     params.FilterDescendantsInstances = ex
-    params.MaxParts = 120
+    params.MaxParts = 500
 
-    local count = 0
-    for _ in pairs(S.pulledSet) do count += 1 end
+    local parts = workspace:GetPartBoundsInRadius(
+        Vector3.new(S.center.X, S.groundY + 40, S.center.Z), scanR, params)
 
-    if count < MAX_PULLED_PARTS then
-        local parts = workspace:GetPartBoundsInRadius(
-            Vector3.new(S.center.X, S.groundY + 30, S.center.Z), pullRadius, params)
-        local added = 0
-        for _, p in ipairs(parts) do
-            if added >= 20 or count >= MAX_PULLED_PARTS then break end
-            if p:IsA("BasePart") and not p:IsA("Terrain") and not p:IsA("SpawnLocation")
-                and not S.pulledSet[p]
-                and p.Size.Magnitude < 40
-                and not (p.Parent and p.Parent:FindFirstChildOfClass("Humanoid")) then
-                S.pulledSet[p] = { om = randf(0.6, 1.3), lift = randf(0.8, 1.4) }
-                p.Anchored = false
-                p.CanCollide = false
+    local count = countLoose(S)
+    local added = 0
+
+    for _, p in ipairs(parts) do
+        if added >= 30 or count >= MAX_PULLED_PARTS then break end
+        if not S.pulledSet[p] and not (S.ignore[p] and S.ignore[p] > S.time) and eligiblePart(p) then
+            local pos = p.Position
+            local axis, h = axisAt(S, pos.Y)
+            local rel = Vector3.new(pos.X - axis.X, 0, pos.Z - axis.Z)
+            local d = math.max(rel.Magnitude, 0.5)
+            local R = funnelRadius(S, h)
+            local pullR = R * 1.3 + 30
+            local f = windStrength(S, d, R, 1)
+
+            local chance = 0
+            if d < pullR then
+                chance = 1
+            elseif DESTROY_FROM_AFAR and f > 0 then
+                chance = (f ^ 1.4) * (0.1 + 0.9 * I) * 0.6
+            end
+
+            if math.random() < chance then
+                loosen(p)
+                S.pulledSet[p] = {
+                    om = randf(0.6, 1.3),
+                    lift = randf(0.8, 1.4),
+                    spin = Vector3.new(randf(-5, 5), randf(-5, 5), randf(-5, 5)),
+                    fling = randf(180, 520),
+                    mode = nil,
+                }
                 added += 1
                 count += 1
             end
         end
     end
+end
+
+local function updateParts(S, dt)
+    local I = S.intensity
+    if I < 0.03 then return end
+
+    S.scanTimer += dt
+    if S.scanTimer >= 0.3 then
+        S.scanTimer = 0
+        scanParts(S)
+    end
 
     for p, info in pairs(S.pulledSet) do
         if p and p.Parent then
-            local axis, h = axisAt(S, p.Position.Y)
-            local rel = Vector3.new(p.Position.X - axis.X, 0, p.Position.Z - axis.Z)
+            local pos = p.Position
+            local axis, h = axisAt(S, pos.Y)
+            local rel = Vector3.new(pos.X - axis.X, 0, pos.Z - axis.Z)
             local d = math.max(rel.Magnitude, 0.5)
             local R = funnelRadius(S, h)
-            if d < R * 3 + 80 then
-                local outward = rel / d
-                local tangent = Vector3.new(-outward.Z, 0, outward.X)
-                local orbitR = math.max(R * 0.9 * info.om, 12)
-                local radial = math.clamp((orbitR - d) * 0.7, -60, 40)
-                local target = outward * radial
-                    + tangent * (35 + 70 * I) * info.om
-                    + Vector3.new(0, (15 + 25 * I) * info.lift, 0)
-                p.AssemblyLinearVelocity = p.AssemblyLinearVelocity:Lerp(target, 1 - math.exp(-3 * dt))
-                p.AssemblyAngularVelocity = Vector3.new(
-                    math.random(-6, 6), math.random(-6, 6), math.random(-6, 6))
-            else
+            local zone = (R * 2.5 + 150) * (0.5 + 0.5 * I)
+            local pullR = R * 1.3 + 30
+            local outward = rel / d
+            local tangent = Vector3.new(-outward.Z, 0, outward.X)
+
+            if d > zone * 1.15 then
+                -- saiu do alcance: cai
+                pcall(function() p.CanCollide = true end)
                 S.pulledSet[p] = nil
+
+            elseif d < pullR then
+                -- DENTRO DA SUCÇÃO: órbita + sobe
+                if info.mode ~= "orbit" then
+                    info.mode = "orbit"
+                    p.CanCollide = false
+                end
+
+                -- arremessa quando sobe bastante (detritos voando pra fora)
+                if h > info.fling * (0.5 + I) then
+                    p.AssemblyLinearVelocity = outward * (90 + 120 * I)
+                        + tangent * (60 + 80 * I) + Vector3.new(0, 20, 0)
+                    p.CanCollide = true
+                    S.ignore[p] = S.time + 8
+                    S.pulledSet[p] = nil
+                else
+                    local orbitR = math.max(R * 0.9 * info.om, 12)
+                    local radial = math.clamp((orbitR - d) * 0.7, -60, 40)
+                    local target = outward * radial
+                        + tangent * (35 + 70 * I) * info.om
+                        + Vector3.new(0, (15 + 25 * I) * info.lift, 0)
+                    p.AssemblyLinearVelocity = p.AssemblyLinearVelocity:Lerp(target, 1 - math.exp(-3 * dt))
+                    p.AssemblyAngularVelocity = info.spin * (0.6 + I)
+                end
+
+            else
+                -- ZONA DE VENTO: empurra, arrasta e levanta (casas desmontando)
+                if info.mode ~= "wind" then
+                    info.mode = "wind"
+                    p.CanCollide = true
+                end
+                local f = windStrength(S, d, R, 1)
+                local dir = windDirection(rel, d)
+                local target = dir * (25 + 95 * I) * f
+                    + Vector3.new(0, (6 + 30 * I) * f * info.lift, 0)
+                p.AssemblyLinearVelocity = p.AssemblyLinearVelocity:Lerp(target, 1 - math.exp(-2.5 * dt))
+                p.AssemblyAngularVelocity = info.spin * f
             end
         else
             S.pulledSet[p] = nil
@@ -5747,11 +5704,18 @@ end
 --==============================================================
 -- SPAWN
 --==============================================================
-function TORNADO.spawn()
+-- refName: nome de quem enviou o comando (rede) -> o tornado nasce na frente dele,
+-- assim todo mundo vê o tornado no mesmo lugar. Sem refName: nasce na sua frente.
+function TORNADO.spawn(refName)
     TORNADO.clear(true)
 
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart", 10)
+    local refPlayer = (refName and refName ~= LocalPlayer.Name) and Players:FindFirstChild(refName) or nil
+    local character = refPlayer and refPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        hrp = character:WaitForChild("HumanoidRootPart", 10)
+    end
     if not hrp then
         notify("Tornado", "Personagem não encontrado.")
         return
@@ -5782,6 +5746,9 @@ function TORNADO.spawn()
         saved = {},
         playerPulled = false,
         refreshTimer = 0,
+        scanTimer = 0,
+        ignore = setmetatable({}, { __mode = "k" }),
+        windF = 0,
     }
     TORNADO.S = S
 
@@ -5902,12 +5869,73 @@ function TORNADO.spawn()
     S.rainPart = rainPart
     S.rain = rain
 
+    -- 🌬️ vento: rajadas e poeira voando ao redor da câmera
+    local windPart = Instance.new("Part")
+    windPart.Name = "TornadoWindPart"
+    windPart.Size = Vector3.new(110, 60, 110)
+    windPart.Transparency = 1
+    windPart.Anchored = true
+    windPart.CanCollide = false
+    windPart.CanTouch = false
+    windPart.CanQuery = false
+    windPart.CastShadow = false
+    windPart.Parent = S.folder
+
+    local streak = Instance.new("ParticleEmitter")
+    streak.Texture = SMOKE_TEXTURE
+    streak.Rate = 0
+    streak.Lifetime = NumberRange.new(0.6, 1.1)
+    streak.Speed = NumberRange.new(90, 160)
+    streak.SpreadAngle = Vector2.new(4, 4)
+    streak.Orientation = Enum.ParticleOrientation.VelocityParallel
+    streak.Size = NumberSequence.new(2.2)
+    streak.LightInfluence = 1
+    streak.Color = ColorSequence.new(Color3.fromRGB(205, 210, 218))
+    streak.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.2, 0.8),
+        NumberSequenceKeypoint.new(0.8, 0.8),
+        NumberSequenceKeypoint.new(1, 1) })
+    streak.Parent = windPart
+
+    local specks = Instance.new("ParticleEmitter")
+    specks.Texture = SMOKE_TEXTURE
+    specks.Rate = 0
+    specks.Lifetime = NumberRange.new(0.5, 1.0)
+    specks.Speed = NumberRange.new(80, 150)
+    specks.SpreadAngle = Vector2.new(6, 6)
+    specks.Orientation = Enum.ParticleOrientation.VelocityParallel
+    specks.Size = NumberSequence.new(0.7)
+    specks.LightInfluence = 1
+    specks.Color = ColorSequence.new(DIRT_MID, DIRT_LIGHT)
+    specks.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.2),
+        NumberSequenceKeypoint.new(0.7, 0.4),
+        NumberSequenceKeypoint.new(1, 1) })
+    specks.Parent = windPart
+
+    S.windPart = windPart
+    S.windStreak = streak
+    S.windSpecks = specks
+
     pcall(function()
         local wind = Instance.new("Sound")
-        wind.SoundId = "rbxassetid://72195163486195"
+        wind.Name = "TornadoWindSound"
+        wind.SoundId = WIND_SOUND_ID
         wind.Looped = true
         wind.Volume = 0
         wind.Parent = S.folder
+
+        -- longe = som abafado (menos agudo)
+        pcall(function()
+            local eq = Instance.new("EqualizerSoundEffect")
+            eq.HighGain = -25
+            eq.MidGain = -6
+            eq.LowGain = 0
+            eq.Parent = wind
+            S.windEQ = eq
+        end)
+
         wind:Play()
         S.wind = wind
     end)
@@ -6003,14 +6031,44 @@ function TORNADO.spawn()
         S.rain.Rate = 100 + 500 * formation
 
         if S.wind then
-            S.wind.Volume = 0.1 + S.intensity * 1.7
-            S.wind.PlaybackSpeed = 0.8 + S.intensity * 0.45
+            local near = 0
+            if camera then
+                local cp = camera.CFrame.Position
+                local axis, h = axisAt(S, cp.Y)
+                local dx, dz = cp.X - axis.X, cp.Z - axis.Z
+                local dd = math.sqrt(dx * dx + dz * dz)
+                local edge = math.max(dd - funnelRadius(S, h), 0)  -- distância até a parede do funil
+                near = (1 - math.clamp(edge / WIND_HEAR_RANGE, 0, 1)) ^ 1.5
+            end
+            local targetVol = WIND_MAX_VOLUME * near * (0.4 + 0.6 * S.intensity)
+            S.windVol = lerp(S.windVol or 0, targetVol, math.clamp(dt * 3, 0, 1))
+            S.wind.Volume = S.windVol
+            S.wind.PlaybackSpeed = 0.85 + S.intensity * 0.3 + near * 0.15
+            if S.windEQ then
+                S.windEQ.HighGain = -25 * (1 - near)
+                S.windEQ.MidGain = -6 * (1 - near)
+            end
         end
 
         -- atualiza cor/tamanho/rate só a cada 0.2s (performance)
         S.refreshTimer += dt
         local refresh = S.refreshTimer >= 0.2
         if refresh then S.refreshTimer = 0 end
+
+        -- 🌬️ vento na câmera (rajadas + som)
+        if WIND_ENABLED and camera and S.windPart then
+            local cp = camera.CFrame.Position
+            local axis, h = axisAt(S, cp.Y)
+            local rel = Vector3.new(cp.X - axis.X, 0, cp.Z - axis.Z)
+            local d = math.max(rel.Magnitude, 0.5)
+            local R = funnelRadius(S, h)
+            local f = windStrength(S, d, R, 3)
+            local dir = windDirection(rel, d)
+            S.windPart.CFrame = CFrame.fromMatrix(cp, Vector3.yAxis, dir)
+            S.windStreak.Rate = 170 * f
+            S.windSpecks.Rate = 130 * f
+            S.windF = f
+        end
 
         updateFunnel(S, dt, refresh)
         updateClouds(S, dt, refresh)
@@ -6046,10 +6104,106 @@ function TORNADO.spawn()
 end
 
 --==============================================================
--- COMANDO + AUTO START
+-- 🌐 REDE (via chat)
+--   ;TORNADO_SPAWN <alvo|ALL>     ;TORNADO_CLEAR <alvo|ALL>
+-- Quem estiver com este script rodando reage ao comando:
+--   ALL  -> todos veem o tornado no mesmo lugar (na frente de quem enviou)
+--   nome -> só esse jogador (nome ou apelido, aceita começo do nome)
 --==============================================================
-function tornado(mode)
+local NET_ENABLED = true
+local NET_ACCEPT_FROM_ALL = true   -- false = só aceita de quem estiver em NET_TRUSTED
+local NET_TRUSTED = {              -- ex: NET_TRUSTED["SeuNome"] = true
+}
+
+local netSeen = {}
+
+local function matchesTarget(arg)
+    arg = string.lower(arg or "")
+    if arg == "" or arg == "all" or arg == "todos" then return true, true end
+    local n = string.lower(LocalPlayer.Name)
+    local dn = string.lower(LocalPlayer.DisplayName)
+    if string.sub(n, 1, #arg) == arg or string.sub(dn, 1, #arg) == arg then
+        return true, false
+    end
+    return false, false
+end
+
+local function handleNet(senderName, msg)
+    if not NET_ENABLED or type(msg) ~= "string" then return end
+    local cmd, arg = string.match(msg, "^;%s*(%S+)%s*(.-)%s*$")
+    if not cmd then return end
+    cmd = string.upper(cmd)
+    if cmd ~= "TORNADO_SPAWN" and cmd ~= "TORNADO_CLEAR" then return end
+
+    -- evita executar 2x a mesma mensagem (chat antigo + novo)
+    local key = senderName .. "|" .. msg
+    local now = os.clock()
+    if netSeen[key] and now - netSeen[key] < 1.5 then return end
+    netSeen[key] = now
+
+    if senderName ~= LocalPlayer.Name and not NET_ACCEPT_FROM_ALL and not NET_TRUSTED[senderName] then
+        return
+    end
+
+    local ok, isAll = matchesTarget(arg)
+    if not ok then return end
+
+    if cmd == "TORNADO_SPAWN" then
+        task.spawn(function() TORNADO.spawn(isAll and senderName or nil) end)
+    else
+        TORNADO.clear()
+    end
+end
+
+local function hookPlayer(plr)
+    plr.Chatted:Connect(function(msg) handleNet(plr.Name, msg) end)
+end
+for _, p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
+Players.PlayerAdded:Connect(hookPlayer)
+
+-- chat novo (TextChatService) como reforço
+pcall(function()
+    local TCS = game:GetService("TextChatService")
+    TCS.MessageReceived:Connect(function(m)
+        local src = m.TextSource
+        if src then
+            local plr = Players:GetPlayerByUserId(src.UserId)
+            if plr then handleNet(plr.Name, m.Text) end
+        end
+    end)
+end)
+
+-- envia o comando pro chat (os outros com o script recebem)
+local function netSend(cmd, target)
+    local text = ";" .. cmd .. " " .. (target or "ALL")
+    local sent = false
+    pcall(function()
+        local TCS = game:GetService("TextChatService")
+        local ch = TCS.TextChannels:FindFirstChild("RBXGeneral")
+        if ch then ch:SendAsync(text) sent = true end
+    end)
+    if not sent then
+        pcall(function()
+            local ev = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+            ev.SayMessageRequest:FireServer(text, "All")
+            sent = true
+        end)
+    end
+    if not sent then handleNet(LocalPlayer.Name, text) end  -- sem chat: roda só aqui
+end
+
+--==============================================================
+-- COMANDO
+--   tornado("ON") / tornado("OFF") / tornado()      -> só pra você
+--   tornado("ON", "ALL") / tornado("OFF", "ALL")    -> rede (todos com o script)
+--   tornado("ON", "NomeDoJogador")                  -> rede (só esse jogador)
+--==============================================================
+function tornado(mode, target)
     mode = mode and string.upper(mode) or (TORNADO.S and "OFF" or "ON")
+    if target then
+        netSend(mode == "OFF" and "TORNADO_CLEAR" or "TORNADO_SPAWN", target)
+        return
+    end
     if mode == "OFF" then
         TORNADO.clear()
     else
