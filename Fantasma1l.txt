@@ -4936,7 +4936,7 @@ end
 -- ================== TORNADO EF5 (EL RENO) ==================
 -- tornado("ON") | tornado("OFF") | tornado()
 -- Rede: ;TORNADO_SPAWN <alvo|ALL>   ;TORNADO_CLEAR <alvo|ALL>
--- Visual baseado na referência: funil escuro (chumbo) contrastando com parede de nuvem clara
+-- Funil: CINZA (mesma família das nuvens) - destaca por ser mais escuro que a parede branca
 local TORNADO = { token = 0, S = nil }
 
 do
@@ -4968,7 +4968,6 @@ do
 
     local function funnelR(S, h)
         local hn = math.clamp(h / H, 0, 1)
-        -- formato de "V" (cunha): estreito embaixo, largo em cima
         return S.rG + (S.rT - S.rG) * hn ^ 1.6
     end
     local function funnelOffset(S, h)
@@ -5006,7 +5005,7 @@ do
     end
 
     ----------------------------------------------------------------
-    -- CAMADAS - funil ESCURO vs parede de nuvem CLARA (contraste)
+    -- CAMADAS: funil CINZA, parede de nuvem CINZA CLARO (contraste sutil)
     ----------------------------------------------------------------
     local function updateLayers(S, dt, refresh)
         for _, L in ipairs(S.layers) do
@@ -5016,11 +5015,11 @@ do
                 R = funnelR(S, h)
                 on = S.t > 7
                 sz = math.clamp(R * 0.75, 14, 120)
-                -- 🌀 FUNIL: EMBaixo ESCURO (chumbo) -> em cima mais claro
-                -- como na imagem: base escura e topo claro
+                -- 🌀 FUNIL: CINZA uniforme (do escuro em baixo pro claro em cima)
+                -- Cinza chumbo (90) em baixo -> cinza claro (180) em cima
                 local hn = math.clamp(h / H, 0, 1)
-                local baseCol = Color3.fromRGB(45, 50, 60)    -- chumbo escuro em baixo
-                local topCol  = Color3.fromRGB(130, 135, 145) -- cinza claro em cima
+                local baseCol = Color3.fromRGB(85, 90, 100)    -- cinza escuro (base)
+                local topCol  = Color3.fromRGB(180, 185, 195)  -- cinza claro (topo)
                 col = baseCol:Lerp(topCol, ease(hn))
                 rate = 5 + 7 * S.I
             elseif L.kind == "cap" then
@@ -5028,16 +5027,16 @@ do
                 R = S.rT * (0.9 + 0.25 * L.c)
                 on = true
                 sz = math.clamp(S.rT * 0.6, 110, 260)
-                -- ☁️ PAREDE DE NUVEM: quase BRANCA pra dar contraste com o funil escuro
-                col = Color3.fromRGB(205, 210, 218)
+                -- ☁️ PAREDE DE NUVEM: cinza claro
+                col = Color3.fromRGB(215, 218, 225)
                 rate = 2.5
             else -- dust
                 h = 4
                 R = S.rG * 1.3 + 12
                 on = S.touched
                 sz = math.clamp(S.rG * 0.9, 20, 120)
-                -- 🌾 POEIRA do chão: bege claro (aquela nuvem de terra da imagem)
-                col = Color3.fromRGB(185, 170, 145)
+                -- 🌾 POEIRA: cinza claro/bege
+                col = Color3.fromRGB(190, 190, 195)
                 rate = 6 + 10 * S.I
             end
 
@@ -5252,40 +5251,38 @@ do
     end
 
     ----------------------------------------------------------------
-    -- CÉU / LUZ - CLARO com paredes de nuvem destacadas
+    -- CÉU / LUZ - CLARO, CINZA
     ----------------------------------------------------------------
     local function applyLighting(S, a)
         local sv = S.saved
-        -- ☁️ ambiente cinza claro (como na imagem, o céu está nublado mas claro)
-        local cloudGray = Color3.fromRGB(150, 155, 165)
-        local cloudFog  = Color3.fromRGB(155, 160, 170)
+        local cloudGray = Color3.fromRGB(165, 170, 178)
+        local cloudFog  = Color3.fromRGB(170, 175, 182)
 
         pcall(function()
             Lighting.Ambient = sv.Ambient:Lerp(cloudGray, a)
             Lighting.OutdoorAmbient = sv.OutdoorAmbient:Lerp(cloudGray, a)
-            Lighting.Brightness = lerp(sv.Brightness, 1.6, a) + S.flash * 3
-            Lighting.ExposureCompensation = lerp(sv.ExposureCompensation, 0.15, a) + S.flash * 1.2
+            Lighting.Brightness = lerp(sv.Brightness, 1.8, a) + S.flash * 3
+            Lighting.ExposureCompensation = lerp(sv.ExposureCompensation, 0.2, a) + S.flash * 1.2
             Lighting.FogColor = sv.FogColor:Lerp(cloudFog, a)
-            Lighting.FogStart = lerp(sv.FogStart, 100, a)
-            Lighting.FogEnd = lerp(math.min(sv.FogEnd, 20000), 5000, a)
+            Lighting.FogStart = lerp(sv.FogStart, 120, a)
+            Lighting.FogEnd = lerp(math.min(sv.FogEnd, 20000), 6000, a)
         end)
         if S.cc then
-            S.cc.Saturation = -0.1 * a
-            S.cc.Contrast = 0.05 * a
-            S.cc.Brightness = 0.05 * a
+            S.cc.Saturation = -0.05 * a
+            S.cc.Contrast = 0.04 * a
+            S.cc.Brightness = 0.06 * a
             S.cc.TintColor = Color3.new(1, 1, 1):Lerp(cloudGray, a)
         end
         if S.atm then
-            S.atm.Density = 0.12 + 0.12 * a
-            S.atm.Haze = 1.2 * a
+            S.atm.Density = 0.1 + 0.1 * a
+            S.atm.Haze = 1 * a
             S.atm.Color = cloudGray
             S.atm.Decay = cloudGray
         end
         if S.clouds then
-            S.clouds.Cover = 0.92 * a
-            S.clouds.Density = 0.88 * a
-            -- ☁️ nuvens CLARAS (não escuras)
-            S.clouds.Color = Color3.fromRGB(160, 165, 175)
+            S.clouds.Cover = 0.9 * a
+            S.clouds.Density = 0.85 * a
+            S.clouds.Color = Color3.fromRGB(175, 180, 188)
         end
     end
 
@@ -5411,9 +5408,9 @@ do
         pcall(function()
             local atm = Instance.new("Atmosphere")
             atm.Name = "Tornado_Atmosphere"
-            atm.Color = Color3.fromRGB(160, 165, 175)
-            atm.Decay = Color3.fromRGB(100, 105, 115)
-            atm.Density, atm.Offset, atm.Glare, atm.Haze = 0.12, 0.25, 0, 0
+            atm.Color = Color3.fromRGB(170, 175, 182)
+            atm.Decay = Color3.fromRGB(120, 125, 132)
+            atm.Density, atm.Offset, atm.Glare, atm.Haze = 0.1, 0.25, 0, 0
             atm.Parent = Lighting
             S.atm = atm
             local cc = Instance.new("ColorCorrectionEffect")
@@ -5432,8 +5429,7 @@ do
                 S.cloudsNew = true
             end
             cl.Enabled = true
-            -- ☁️ NUVENS CLARAS
-            cl.Color = Color3.fromRGB(160, 165, 175)
+            cl.Color = Color3.fromRGB(175, 180, 188)
             cl.Cover, cl.Density = 0, 0
             S.clouds = cl
         end)
@@ -5470,8 +5466,8 @@ do
         rain.EmissionDirection = Enum.NormalId.Bottom
         rain.SpreadAngle = Vector2.new(6, 6)
         rain.Size = NumberSequence.new(0.15)
-        rain.Transparency = NumberSequence.new(0.55)
-        rain.Color = ColorSequence.new(Color3.fromRGB(210, 220, 230))
+        rain.Transparency = NumberSequence.new(0.6)
+        rain.Color = ColorSequence.new(Color3.fromRGB(215, 220, 230))
         rain.Parent = rainPart
 
         local wind
