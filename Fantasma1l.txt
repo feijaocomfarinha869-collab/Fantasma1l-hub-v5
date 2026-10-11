@@ -4097,7 +4097,7 @@ do
         { name = "67", rarity = "Secret", rc = Color3.fromRGB(255, 70, 200), inc = 7.5e6, price = 1.25e9, w = 30,
           asset = 189020661701506, sound = 106000088638410, yaw = 0, col = Color3.fromRGB(60, 60, 70), col2 = Color3.fromRGB(240, 240, 240) },
         { name = "Strawberry Elephant", rarity = "Secret", rc = Color3.fromRGB(255, 70, 200), inc = 7.5e8, price = 7.5e11, w = 15,
-          asset = 248295212434663, sound = 89155583651513, yaw = 0, col = Color3.fromRGB(255, 120, 150), col2 = Color3.fromRGB(255, 190, 205) },
+          asset = 97466878054786, sound = 89155583651513, yaw = 0, col = Color3.fromRGB(255, 120, 150), col2 = Color3.fromRGB(255, 190, 205) },
     }
     local NPC_NAMES = { "ttpitd", "Kaio_9", "Mimi", "Rafa2k", "Lunna", "Dudu", "Zeca" }
     local LIGHT_PROPS = {
