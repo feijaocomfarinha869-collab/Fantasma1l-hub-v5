@@ -4933,66 +4933,1325 @@ local function roubeUmBrainrot(modo)
     if modo == "OFF" then BRAIN.clear() else BRAIN.spawn() end
 end
 
--- ================================================================
--- TORNADO EF5 — ESTILO REALISTA / FUNIL LARGO
--- tornado("ON") | tornado("OFF") | tornado()
--- ;TORNADO_SPAWN <alvo|ALL>
--- ;TORNADO_CLEAR <alvo|ALL>
--- ================================================================
+--==============================================================
+-- TORNADO REALISTA - FUNIL + DEBRIS CLOUD
+-- LocalScript / efeito visual
+--
+-- tornado("ON")
+-- tornado("OFF")
+-- tornado()
+--
+-- VISUAL:
+-- • Funil branco/cinza-claro
+-- • Nuvens volumosas
+-- • Base larga
+-- • Debris cloud escura no chão
+-- • Poeira girando
+-- • Pequenos detritos girando rente ao solo
+-- • Chuva
+-- • Relâmpagos
+-- • Névoa
+-- • Movimento do tornado
+--==============================================================
 
-local TORNADO = { token = 0, S = nil }
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
 
-do
-    -- ============================================================
-    -- CONFIGURAÇÃO
-    -- ============================================================
+local LocalPlayer = Players.LocalPlayer
 
-    local H            = 1100
-    local N_LAYERS     = 30
-    local PER_LAYER    = 4
-    local MOVE_SPEED   = 16
-    local MAX_DEBRIS   = 320
-    local HURT_PLAYERS = true
-    local MAX_KMH      = 556
+local TORNADO = {
+    token = 0,
+    S = nil
+}
 
-    local WIND_SND = "rbxassetid://72195163486195"
-    local SMOKE    = "rbxasset://textures/particles/smoke_main.dds"
+--==============================================================
+-- CONFIGURAÇÃO
+--==============================================================
 
-    -- CORES CLARAS, BASEADAS NA REFERÊNCIA
-    local TORNADO_CLOUD_COLOR = Color3.fromRGB(204, 213, 221)
-    local TORNADO_DUST_COLOR  = Color3.fromRGB(204, 213, 221)
-    local TORNADO_FOG_COLOR   = Color3.fromRGB(198, 207, 216)
+local HEIGHT = 1100
 
-    local rand = math.random
+local FUNNEL_LAYERS = 34
+local POINTS_PER_LAYER = 5
 
-    local function rr(a, b)
-        return a + (b - a) * rand()
+local CLOUD_LAYERS = 5
+local CLOUD_POINTS = 9
+
+local DEBRIS_COUNT = 75
+local DUST_POINTS = 14
+
+local MOVE_SPEED = 13
+
+local MAX_KMH = 556
+
+local SMOKE_TEXTURE =
+    "rbxasset://textures/particles/smoke_main.dds"
+
+--==============================================================
+-- CORES
+--==============================================================
+
+-- FUNIL:
+-- branco/cinza-claro, como um tornado iluminado pelo sol
+local FUNNEL_BOTTOM =
+    Color3.fromRGB(165, 170, 178)
+
+local FUNNEL_TOP =
+    Color3.fromRGB(225, 230, 235)
+
+-- NUVENS
+local CLOUD_COLOR =
+    Color3.fromRGB(220, 225, 230)
+
+-- NUVEM DE DETRITOS:
+-- escura, formada por poeira e objetos levantados do solo
+local DEBRIS_DARK =
+    Color3.fromRGB(25, 25, 27)
+
+local DEBRIS_GRAY =
+    Color3.fromRGB(55, 53, 50)
+
+local DUST_COLOR =
+    Color3.fromRGB(35, 34, 32)
+
+--==============================================================
+-- UTILITÁRIOS
+--==============================================================
+
+local function randf(a, b)
+    return a + (b - a) * math.random()
+end
+
+local function lerp(a, b, t)
+    return a + (b - a) * t
+end
+
+local function smooth(t)
+    t = math.clamp(t, 0, 1)
+    return t * t * (3 - 2 * t)
+end
+
+local function randomUnitXZ()
+    local a = math.random() * math.pi * 2
+
+    return Vector3.new(
+        math.cos(a),
+        0,
+        math.sin(a)
+    )
+end
+
+--==============================================================
+-- NOTIFICAÇÃO
+--==============================================================
+
+local function notify(title, text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore(
+            "SendNotification",
+            {
+                Title = title,
+                Text = text,
+                Duration = 4
+            }
+        )
+    end)
+end
+
+--==============================================================
+-- RAIO DO FUNIL
+--==============================================================
+
+local function funnelRadius(S, height)
+
+    local n =
+        math.clamp(
+            height / HEIGHT,
+            0,
+            1
+        )
+
+    -- Funil largo, mas mais estreito no topo
+    local shape =
+        n ^ 1.18
+
+    local radius =
+        S.groundRadius
+        +
+        (
+            S.topRadius
+            -
+            S.groundRadius
+        )
+        *
+        shape
+
+    return radius
+end
+
+--==============================================================
+-- DESLOCAMENTO DO FUNIL
+--==============================================================
+
+local function funnelOffset(S, height)
+
+    local n =
+        math.clamp(
+            height / HEIGHT,
+            0,
+            1
+        )
+
+    -- Inclinação suave
+    local forward =
+        -S.direction
+        *
+        170
+        *
+        n
+        ^ 1.3
+
+    -- Oscilação lateral natural
+    local sideDirection =
+        Vector3.new(
+            -S.direction.Z,
+            0,
+            S.direction.X
+        )
+
+    local side =
+        sideDirection
+        *
+        math.sin(
+            S.time * 0.32
+            +
+            n * 4
+        )
+        *
+        45
+        *
+        n
+
+    return forward + side
+end
+
+--==============================================================
+-- CRIA PONTO DE PARTÍCULA
+--==============================================================
+
+local function createParticlePoint(S)
+
+    local part =
+        Instance.new("Part")
+
+    part.Name =
+        "TornadoParticlePoint"
+
+    part.Size =
+        Vector3.new(
+            1,
+            1,
+            1
+        )
+
+    part.Transparency = 1
+
+    part.Anchored = true
+
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+
+    part.CastShadow = false
+
+    part.Parent =
+        S.folder
+
+    local emitter =
+        Instance.new(
+            "ParticleEmitter"
+        )
+
+    emitter.Texture =
+        SMOKE_TEXTURE
+
+    emitter.Rate = 0
+
+    emitter.Speed =
+        NumberRange.new(
+            1,
+            6
+        )
+
+    emitter.Lifetime =
+        NumberRange.new(
+            2.2,
+            4.2
+        )
+
+    emitter.SpreadAngle =
+        Vector2.new(
+            180,
+            180
+        )
+
+    emitter.Rotation =
+        NumberRange.new(
+            0,
+            360
+        )
+
+    emitter.RotSpeed =
+        NumberRange.new(
+            -45,
+            45
+        )
+
+    emitter.Acceleration =
+        Vector3.new(
+            0,
+            5,
+            0
+        )
+
+    emitter.LightInfluence = 1
+
+    emitter.Transparency =
+        NumberSequence.new({
+            NumberSequenceKeypoint.new(
+                0,
+                0.58
+            ),
+
+            NumberSequenceKeypoint.new(
+                0.45,
+                0.72
+            ),
+
+            NumberSequenceKeypoint.new(
+                1,
+                1
+            )
+        })
+
+    emitter.Enabled = false
+
+    emitter.Parent =
+        part
+
+    return {
+        part = part,
+        emitter = emitter,
+        angle = math.random() * math.pi * 2
+    }
+end
+
+--==============================================================
+-- CONFIGURAÇÃO DO FUNIL
+--==============================================================
+
+local function updateFunnel(S, dt, refresh)
+
+    for _, layer in ipairs(S.funnel) do
+
+        local height =
+            S.baseHeight
+            +
+            (
+                HEIGHT
+                -
+                S.baseHeight
+            )
+            *
+            layer.normalizedHeight
+
+        local radius =
+            funnelRadius(
+                S,
+                height
+            )
+
+        local offset =
+            funnelOffset(
+                S,
+                height
+            )
+
+        -- rotação diferente em cada altura
+        layer.angle +=
+            (
+                55
+                /
+                math.max(
+                    radius,
+                    20
+                )
+            )
+            *
+            dt
+
+        local n =
+            math.clamp(
+                height / HEIGHT,
+                0,
+                1
+            )
+
+        -- Branco em cima / cinza-claro embaixo
+        local color =
+            FUNNEL_BOTTOM:Lerp(
+                FUNNEL_TOP,
+                smooth(n)
+            )
+
+        local size =
+            math.clamp(
+                radius * 0.82,
+                20,
+                170
+            )
+
+        for i, point in ipairs(layer.points) do
+
+            local angle =
+                layer.angle
+                +
+                (
+                    i - 1
+                )
+                *
+                math.pi
+                *
+                2
+                /
+                #layer.points
+
+            point.part.Position =
+                Vector3.new(
+
+                    S.center.X
+                    +
+                    offset.X
+                    +
+                    math.cos(angle)
+                    *
+                    radius,
+
+                    S.groundY
+                    +
+                    height,
+
+                    S.center.Z
+                    +
+                    offset.Z
+                    +
+                    math.sin(angle)
+                    *
+                    radius
+                )
+
+            if refresh then
+
+                local e =
+                    point.emitter
+
+                e.Enabled = true
+
+                e.Color =
+                    ColorSequence.new(
+                        color
+                    )
+
+                e.Size =
+                    NumberSequence.new({
+                        NumberSequenceKeypoint.new(
+                            0,
+                            size * 0.55
+                        ),
+
+                        NumberSequenceKeypoint.new(
+                            1,
+                            size * 1.25
+                        )
+                    })
+
+                e.Rate =
+                    6
+                    +
+                    12
+                    *
+                    S.intensity
+            end
+        end
+    end
+end
+
+--==============================================================
+-- NUVEM SUPERIOR
+--==============================================================
+
+local function updateClouds(S, dt, refresh)
+
+    for _, layer in ipairs(S.cloudLayers) do
+
+        local height =
+            HEIGHT
+            +
+            20
+            +
+            layer.offset
+
+        local radius =
+            S.topRadius
+            *
+            (
+                0.85
+                +
+                layer.scale
+            )
+
+        layer.angle +=
+            0.35 * dt
+
+        for i, point in ipairs(layer.points) do
+
+            local angle =
+                layer.angle
+                +
+                (
+                    i - 1
+                )
+                *
+                math.pi
+                *
+                2
+                /
+                #layer.points
+
+            point.part.Position =
+                Vector3.new(
+
+                    S.center.X
+                    +
+                    math.cos(angle)
+                    *
+                    radius,
+
+                    S.groundY
+                    +
+                    height,
+
+                    S.center.Z
+                    +
+                    math.sin(angle)
+                    *
+                    radius
+                )
+
+            if refresh then
+
+                point.emitter.Enabled =
+                    true
+
+                point.emitter.Color =
+                    ColorSequence.new(
+                        CLOUD_COLOR
+                    )
+
+                point.emitter.Size =
+                    NumberSequence.new({
+                        NumberSequenceKeypoint.new(
+                            0,
+                            radius * 0.35
+                        ),
+
+                        NumberSequenceKeypoint.new(
+                            1,
+                            radius * 0.7
+                        )
+                    })
+
+                point.emitter.Rate =
+                    2.5
+                    +
+                    S.intensity * 3
+            end
+        end
+    end
+end
+
+--==============================================================
+-- DEBRIS CLOUD
+--
+-- A parte importante:
+-- Poeira + detritos ficam girando MUITO PERTO DO CHÃO.
+--==============================================================
+
+local function createDebrisCloud(S)
+
+    for i = 1, DUST_POINTS do
+
+        local p =
+            Instance.new("Part")
+
+        p.Name =
+            "DebrisDust"
+
+        p.Size =
+            Vector3.new(
+                1,
+                1,
+                1
+            )
+
+        p.Transparency = 1
+
+        p.Anchored = true
+
+        p.CanCollide = false
+        p.CanTouch = false
+        p.CanQuery = false
+
+        p.CastShadow = false
+
+        p.Parent =
+            S.debrisFolder
+
+        local emitter =
+            Instance.new(
+                "ParticleEmitter"
+            )
+
+        emitter.Texture =
+            SMOKE_TEXTURE
+
+        emitter.Rate = 0
+
+        emitter.Speed =
+            NumberRange.new(
+                4,
+                16
+            )
+
+        emitter.Lifetime =
+            NumberRange.new(
+                1.5,
+                3.5
+            )
+
+        emitter.SpreadAngle =
+            Vector2.new(
+                180,
+                180
+            )
+
+        emitter.Rotation =
+            NumberRange.new(
+                0,
+                360
+            )
+
+        emitter.RotSpeed =
+            NumberRange.new(
+                -90,
+                90
+            )
+
+        emitter.Acceleration =
+            Vector3.new(
+                0,
+                3,
+                0
+            )
+
+        emitter.LightInfluence = 1
+
+        emitter.Color =
+            ColorSequence.new(
+                DUST_COLOR
+            )
+
+        emitter.Transparency =
+            NumberSequence.new({
+                NumberSequenceKeypoint.new(
+                    0,
+                    0.3
+                ),
+
+                NumberSequenceKeypoint.new(
+                    0.6,
+                    0.65
+                ),
+
+                NumberSequenceKeypoint.new(
+                    1,
+                    1
+                )
+            })
+
+        emitter.Enabled = true
+
+        emitter.Parent =
+            p
+
+        table.insert(
+            S.dust,
+            {
+                part = p,
+                emitter = emitter,
+                angle =
+                    math.random()
+                    *
+                    math.pi
+                    *
+                    2,
+                radius =
+                    randf(
+                        S.groundRadius * 0.55,
+                        S.groundRadius * 1.35
+                    ),
+                height =
+                    randf(
+                        2,
+                        14
+                    ),
+                speed =
+                    randf(
+                        0.8,
+                        2.2
+                    )
+            }
+        )
+    end
+end
+
+--==============================================================
+-- DETRITOS PEQUENOS
+--==============================================================
+
+local function createFlyingDebris(S)
+
+    for i = 1, DEBRIS_COUNT do
+
+        local size =
+            randf(
+                0.35,
+                2.5
+            )
+
+        local part =
+            Instance.new("Part")
+
+        part.Name =
+            "TornadoDebris"
+
+        part.Size =
+            Vector3.new(
+                size,
+                size
+                *
+                randf(
+                    0.5,
+                    1.5
+                ),
+                size
+                *
+                randf(
+                    0.5,
+                    1.5
+                )
+            )
+
+        -- Variação natural dos detritos
+        if math.random() < 0.65 then
+
+            part.Color =
+                DEBRIS_DARK
+
+        else
+
+            part.Color =
+                DEBRIS_GRAY
+        end
+
+        part.Material =
+            Enum.Material.Slate
+
+        part.Anchored = true
+
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+
+        part.CastShadow = true
+
+        part.Parent =
+            S.debrisFolder
+
+        table.insert(
+            S.flyingDebris,
+            {
+                part = part,
+
+                angle =
+                    math.random()
+                    *
+                    math.pi
+                    *
+                    2,
+
+                radius =
+                    randf(
+                        8,
+                        S.groundRadius
+                        *
+                        1.15
+                    ),
+
+                height =
+                    randf(
+                        2,
+                        22
+                    ),
+
+                speed =
+                    randf(
+                        0.7,
+                        2.4
+                    ),
+
+                vertical =
+                    randf(
+                        -0.5,
+                        1.2
+                    ),
+
+                rotation =
+                    Vector3.new(
+                        randf(-5, 5),
+                        randf(-7, 7),
+                        randf(-5, 5)
+                    )
+            }
+        )
+    end
+end
+
+--==============================================================
+-- ATUALIZA DEBRIS CLOUD
+--==============================================================
+
+local function updateDebrisCloud(S, dt)
+
+    -- Poeira
+    for _, d in ipairs(S.dust) do
+
+        d.angle +=
+            d.speed
+            *
+            (
+                1
+                +
+                S.intensity
+            )
+            *
+            dt
+
+        -- raio varia para parecer turbulência
+        local turbulence =
+            math.sin(
+                S.time * 1.7
+                +
+                d.angle * 2
+            )
+            *
+            8
+
+        local radius =
+            math.max(
+                3,
+                d.radius
+                +
+                turbulence
+            )
+
+        d.part.Position =
+            Vector3.new(
+
+                S.center.X
+                +
+                math.cos(d.angle)
+                *
+                radius,
+
+                S.groundY
+                +
+                d.height
+                +
+                math.sin(
+                    S.time * 2
+                    +
+                    d.angle
+                )
+                *
+                2,
+
+                S.center.Z
+                +
+                math.sin(d.angle)
+                *
+                radius
+            )
+
+        d.emitter.Rate =
+            25
+            +
+            60
+            *
+            S.intensity
     end
 
-    local function lerp(a, b, t)
-        return a + (b - a) * t
+    -- Detritos
+    for _, d in ipairs(
+        S.flyingDebris
+    ) do
+
+        -- mais rápido quando chega ao máximo
+        local angularSpeed =
+            d.speed
+            *
+            (
+                1
+                +
+                S.intensity
+                *
+                1.5
+            )
+
+        d.angle +=
+            angularSpeed
+            *
+            dt
+
+        -- detritos sobem e descem
+        local verticalWave =
+            math.sin(
+                S.time * 1.3
+                +
+                d.angle
+            )
+
+        local height =
+            d.height
+            +
+            verticalWave
+            *
+            4
+
+        -- turbulência radial
+        local radialWave =
+            math.sin(
+                S.time * 1.1
+                +
+                d.angle * 1.7
+            )
+            *
+            6
+
+        local radius =
+            math.max(
+                4,
+                d.radius
+                +
+                radialWave
+            )
+
+        d.part.CFrame =
+            CFrame.new(
+
+                S.center.X
+                +
+                math.cos(d.angle)
+                *
+                radius,
+
+                S.groundY
+                +
+                height,
+
+                S.center.Z
+                +
+                math.sin(d.angle)
+                *
+                radius
+            )
+            *
+            CFrame.Angles(
+                S.time
+                *
+                d.rotation.X,
+
+                S.time
+                *
+                d.rotation.Y,
+
+                S.time
+                *
+                d.rotation.Z
+            )
+    end
+end
+
+--==============================================================
+-- ILUMINAÇÃO / TEMPESTADE
+--==============================================================
+
+local function updateLighting(S, amount)
+
+    if not S.saved then
+        return
     end
 
-    local function ease(t)
-        t = math.clamp(t, 0, 1)
-        return t * t * (3 - 2 * t)
+    local stormGray =
+        Color3.fromRGB(
+            155,
+            165,
+            175
+        )
+
+    pcall(function()
+
+        Lighting.Ambient =
+            S.saved.Ambient:Lerp(
+                stormGray,
+                amount
+            )
+
+        Lighting.OutdoorAmbient =
+            S.saved.OutdoorAmbient:Lerp(
+                stormGray,
+                amount
+            )
+
+        Lighting.Brightness =
+            lerp(
+                S.saved.Brightness,
+                1.6,
+                amount
+            )
+
+        Lighting.FogColor =
+            S.saved.FogColor:Lerp(
+                stormGray,
+                amount
+            )
+
+        Lighting.FogStart =
+            lerp(
+                S.saved.FogStart,
+                100,
+                amount
+            )
+
+        Lighting.FogEnd =
+            lerp(
+                S.saved.FogEnd,
+                5500,
+                amount
+            )
+
+        Lighting.ExposureCompensation =
+            lerp(
+                S.saved.ExposureCompensation,
+                0,
+                amount
+            )
+    end)
+
+    if S.colorCorrection then
+
+        S.colorCorrection.Saturation =
+            -0.08 * amount
+
+        S.colorCorrection.Contrast =
+            0.08 * amount
+
+        S.colorCorrection.Brightness =
+            0.03 * amount
     end
 
-    -- ============================================================
-    -- SERVIÇOS
-    -- ============================================================
+    if S.atmosphere then
 
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local Lighting = game:GetService("Lighting")
+        S.atmosphere.Density =
+            0.1
+            +
+            amount * 0.08
 
-    local LocalPlayer = Players.LocalPlayer
+        S.atmosphere.Haze =
+            amount * 1.2
 
-    -- ============================================================
-    -- LIGHTING
-    -- ============================================================
+        S.atmosphere.Color =
+            Color3.fromRGB(
+                180,
+                188,
+                198
+            )
+    end
+end
 
-    local LP = {
+--==============================================================
+-- ESCALA EF
+--==============================================================
+
+local function getRating(kmh)
+
+    if kmh < 105 then
+        return "--"
+    elseif kmh < 138 then
+        return "EF0"
+    elseif kmh < 178 then
+        return "EF1"
+    elseif kmh < 218 then
+        return "EF2"
+    elseif kmh < 267 then
+        return "EF3"
+    elseif kmh < 322 then
+        return "EF4"
+    else
+        return "EF5"
+    end
+end
+
+--==============================================================
+-- LIMPAR
+--==============================================================
+
+function TORNADO.clear(silent)
+
+    TORNADO.token += 1
+
+    local S =
+        TORNADO.S
+
+    TORNADO.S = nil
+
+    if not S then
+        return
+    end
+
+    if S.connection then
+
+        pcall(function()
+            S.connection:Disconnect()
+        end)
+    end
+
+    if S.folder then
+
+        pcall(function()
+            S.folder:Destroy()
+        end)
+    end
+
+    if S.debrisFolder then
+
+        pcall(function()
+            S.debrisFolder:Destroy()
+        end)
+    end
+
+    if S.gui then
+
+        pcall(function()
+            S.gui:Destroy()
+        end)
+    end
+
+    if S.colorCorrection then
+
+        pcall(function()
+            S.colorCorrection:Destroy()
+        end)
+    end
+
+    if S.atmosphere then
+
+        pcall(function()
+            S.atmosphere:Destroy()
+        end)
+    end
+
+    -- Restaura iluminação
+    if S.saved then
+
+        for key, value in pairs(
+            S.saved
+        ) do
+
+            pcall(function()
+                Lighting[key] = value
+            end)
+        end
+    end
+
+    if not silent then
+
+        notify(
+            "Tornado",
+            "O tornado dissipou."
+        )
+    end
+end
+
+--==============================================================
+-- SPAWN
+--==============================================================
+
+function TORNADO.spawn()
+
+    TORNADO.clear(true)
+
+    local character =
+        LocalPlayer.Character
+
+    local hrp =
+        character
+        and character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if not hrp then
+
+        notify(
+            "Tornado",
+            "Personagem não encontrado."
+        )
+
+        return
+    end
+
+    --==========================================================
+    -- DIREÇÃO
+    --==========================================================
+
+    local look =
+        hrp.CFrame.LookVector
+
+    look =
+        Vector3.new(
+            look.X,
+            0,
+            look.Z
+        )
+
+    if look.Magnitude < 0.1 then
+
+        look =
+            Vector3.new(
+                0,
+                0,
+                -1
+            )
+    else
+
+        look =
+            look.Unit
+    end
+
+    local direction =
+        -look
+
+    -- começa distante
+    local startPosition =
+        hrp.Position
+        +
+        look * 650
+
+    --==========================================================
+    -- ESTADO
+    --==========================================================
+
+    local S = {
+
+        time = 0,
+
+        center =
+            Vector3.new(
+                startPosition.X,
+                0,
+                startPosition.Z
+            ),
+
+        groundY =
+            hrp.Position.Y,
+
+        direction =
+            direction,
+
+        intensity = 0,
+
+        topRadius = 90,
+
+        groundRadius = 10,
+
+        baseHeight = 5,
+
+        kmh = 0,
+
+        touched = false,
+
+        flash = 0,
+
+        nextFlash = 5,
+
+        funnel = {},
+
+        cloudLayers = {},
+
+        dust = {},
+
+        flyingDebris = {},
+
+        saved = {},
+
+        gui = nil
+    }
+
+    TORNADO.S = S
+
+    --==========================================================
+    -- FOLDER PRINCIPAL
+    --==========================================================
+
+    S.folder =
+        Instance.new("Folder")
+
+    S.folder.Name =
+        "REALISTIC_TORNADO"
+
+    S.folder.Parent =
+        workspace
+
+    --==========================================================
+    -- FOLDER DE DETRITOS
+    --==========================================================
+
+    S.debrisFolder =
+        Instance.new("Folder")
+
+    S.debrisFolder.Name =
+        "DEBRIS_CLOUD"
+
+    S.debrisFolder.Parent =
+        S.folder
+
+    --==========================================================
+    -- SALVA LIGHTING
+    --==========================================================
+
+    local lightingProperties = {
+
         "Ambient",
         "OutdoorAmbient",
         "Brightness",
@@ -5003,2489 +6262,644 @@ do
         "ClockTime"
     }
 
-    -- ============================================================
-    -- VERIFICAÇÃO DE PERSONAGEM
-    -- ============================================================
+    for _, property in ipairs(
+        lightingProperties
+    ) do
 
-    local function isCharacterPart(part)
-        local m = part.Parent
+        pcall(function()
 
-        while m and m ~= workspace do
-            if m:FindFirstChildOfClass("Humanoid") then
-                return true
-            end
-
-            m = m.Parent
-        end
-
-        return false
+            S.saved[property] =
+                Lighting[property]
+        end)
     end
 
-    -- ============================================================
-    -- FORMATO DO FUNIL
-    -- Funil muito mais largo, principalmente na base.
-    -- ============================================================
+    --==========================================================
+    -- COLOR CORRECTION
+    --==========================================================
 
-    local function funnelR(S, h)
+    pcall(function()
 
-        local hn = math.clamp(h / H, 0, 1)
-
-        -- Base MUITO maior
-        local base = S.rG
-
-        -- Topo grande
-        local top = S.rT
-
-        -- Mantém o tornado largo
-        local shape = hn ^ 1.25
-
-        return base + (top - base) * shape
-    end
-
-    -- ============================================================
-    -- MOVIMENTO DO FUNIL
-    -- ============================================================
-
-    local function funnelOffset(S, h)
-
-        local hn = math.clamp(h / H, 0, 1)
-
-        -- Inclinação do funil
-        local back = -S.dir * 180 * hn ^ 1.35
-
-        -- Oscilação lateral
-        local side =
-            Vector3.new(-S.dir.Z, 0, S.dir.X)
-            *
-            (
-                math.sin(S.t * 0.35 + hn * 3)
-                *
-                55
-                *
-                hn
+        local cc =
+            Instance.new(
+                "ColorCorrectionEffect"
             )
 
-        return back + side
-    end
+        cc.Name =
+            "TornadoColorCorrection"
 
-    -- ============================================================
-    -- CRIA PONTO DE PARTÍCULA
-    -- ============================================================
+        cc.Parent =
+            Lighting
 
-    local function newPoint(S)
+        S.colorCorrection =
+            cc
+    end)
 
-        local p = Instance.new("Part")
+    --==========================================================
+    -- ATMOSFERA
+    --==========================================================
 
-        p.Anchored = true
-        p.CanCollide = false
-        p.CanQuery = false
-        p.CanTouch = false
-        p.CastShadow = false
+    pcall(function()
 
-        p.Transparency = 1
-        p.Size = Vector3.new(1, 1, 1)
+        local atmosphere =
+            Instance.new(
+                "Atmosphere"
+            )
 
-        p.Parent = S.folder
+        atmosphere.Name =
+            "TornadoAtmosphere"
 
-        local e = Instance.new("ParticleEmitter")
+        atmosphere.Color =
+            Color3.fromRGB(
+                180,
+                188,
+                198
+            )
 
-        e.Texture = SMOKE
+        atmosphere.Decay =
+            Color3.fromRGB(
+                125,
+                130,
+                138
+            )
 
-        e.LightInfluence = 1
-        e.LightEmission = 0
+        atmosphere.Density = 0.1
+        atmosphere.Haze = 0
+        atmosphere.Glare = 0
+        atmosphere.Offset = 0.25
 
-        e.Rate = 0
+        atmosphere.Parent =
+            Lighting
 
-        e.Speed = NumberRange.new(1, 5)
+        S.atmosphere =
+            atmosphere
+    end)
 
-        e.SpreadAngle = Vector2.new(180, 180)
+    --==========================================================
+    -- CAMADAS DO FUNIL
+    --==========================================================
 
-        e.Rotation = NumberRange.new(0, 360)
+    for i = 1, FUNNEL_LAYERS do
 
-        e.RotSpeed = NumberRange.new(-35, 35)
+        local layer = {
 
-        e.Acceleration = Vector3.new(0, 8, 0)
+            normalizedHeight =
+                (i - 1)
+                /
+                (
+                    FUNNEL_LAYERS - 1
+                ),
 
-        e.Lifetime = NumberRange.new(2.5, 4)
-
-        e.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.55),
-            NumberSequenceKeypoint.new(0.65, 0.78),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-
-        e.Enabled = false
-        e.Parent = p
-
-        return {
-            part = p,
-            e = e
-        }
-    end
-
-    -- ============================================================
-    -- CAMADAS DO TORNADO
-    -- ============================================================
-
-    local function updateLayers(S, dt, refresh)
-
-        for _, L in ipairs(S.layers) do
-
-            local h
-            local R
-            local on
-            local sz
-            local col
-            local rate
-
-            -- ====================================================
-            -- FUNIL
-            -- ====================================================
-
-            if L.kind == "funnel" then
-
-                h =
-                    S.hb
-                    +
-                    (H - S.hb) * L.hn
-
-                R = funnelR(S, h)
-
-                on = S.t > 7
-
-                -- FUNIL GRANDE
-                sz = math.clamp(
-                    R * 0.95,
-                    25,
-                    190
-                )
-
-                -- MESMA COR DAS NUVENS
-                col = TORNADO_CLOUD_COLOR
-
-                rate = 7 + 9 * S.I
-
-            -- ====================================================
-            -- NUVEM / PAREDE
-            -- ====================================================
-
-            elseif L.kind == "cap" then
-
-                h =
-                    H
-                    +
-                    25
-                    +
-                    L.c * 45
-
-                R =
-                    S.rT
-                    *
-                    (
-                        0.9
-                        +
-                        0.25 * L.c
-                    )
-
-                on = true
-
-                -- NUVEM BEM GRANDE
-                sz = math.clamp(
-                    S.rT * 0.75,
-                    140,
-                    330
-                )
-
-                -- MESMA COR CLARA
-                col = TORNADO_CLOUD_COLOR
-
-                rate = 3.5
-
-            -- ====================================================
-            -- POEIRA
-            -- ====================================================
-
-            else
-
-                h = 4
-
-                R =
-                    S.rG * 1.3
-                    +
-                    12
-
-                on = S.touched
-
-                -- BASE / POEIRA GRANDE
-                sz = math.clamp(
-                    S.rG * 1.15,
-                    30,
-                    150
-                )
-
-                -- MESMA COR DO FUNIL
-                col = TORNADO_DUST_COLOR
-
-                rate = 8 + 12 * S.I
-            end
-
-            -- ====================================================
-            -- POSIÇÃO
-            -- ====================================================
-
-            local off =
-                funnelOffset(
-                    S,
-                    math.min(h, H)
-                )
-
-            local tang
-
-            if L.kind == "cap" then
-                tang = 55
-            else
-                tang =
-                    lerp(
-                        60,
-                        150,
-                        S.I
-                    )
-            end
-
-            L.ang +=
-                math.clamp(
-                    tang / math.max(R, 8),
-                    0.2,
-                    5
-                )
+            angle =
+                math.random()
                 *
-                dt
+                math.pi
+                *
+                2,
 
-            local K = #L.pts
-
-            for k, pt in ipairs(L.pts) do
-
-                local a =
-                    L.ang
-                    +
-                    (k - 1)
-                    *
-                    6.2832
-                    /
-                    K
-
-                pt.part.Position =
-                    Vector3.new(
-                        S.cx
-                        +
-                        off.X
-                        +
-                        math.cos(a) * R,
-
-                        S.gy + h,
-
-                        S.cz
-                        +
-                        off.Z
-                        +
-                        math.sin(a) * R
-                    )
-
-                if refresh then
-
-                    local e = pt.e
-
-                    e.Enabled = on
-
-                    if on then
-
-                        e.Size =
-                            NumberSequence.new({
-                                NumberSequenceKeypoint.new(
-                                    0,
-                                    sz * 0.6
-                                ),
-
-                                NumberSequenceKeypoint.new(
-                                    1,
-                                    sz * 1.4
-                                )
-                            })
-
-                        e.Color =
-                            ColorSequence.new(col)
-
-                        e.Rate = rate
-                    end
-                end
-            end
-        end
-    end
-
-    -- ============================================================
-    -- DETRITOS
-    -- ============================================================
-
-    local function captureOriginal(part)
-
-        return {
-            Parent = part.Parent,
-            CFrame = part.CFrame,
-            Anchored = part.Anchored,
-            CanCollide = part.CanCollide,
-            Transparency = part.Transparency
-        }
-    end
-
-    local function addDebris(S, part, orig)
-
-        local pos = part.Position
-
-        local dx =
-            pos.X - S.cx
-
-        local dz =
-            pos.Z - S.cz
-
-        local item = {
-
-            part = part,
-
-            orig = orig,
-
-            ang =
-                math.atan2(
-                    dz,
-                    dx
-                ),
-
-            rad =
-                math.sqrt(
-                    dx * dx
-                    +
-                    dz * dz
-                ),
-
-            h =
-                math.max(
-                    pos.Y - S.gy,
-                    1
-                ),
-
-            k = rr(0.35, 1.0),
-
-            life = rr(7, 15),
-
-            age = 0,
-
-            sx = rr(-4, 4),
-            sy = rr(-4, 4),
-            sz = rr(-4, 4),
-
-            rot = part.CFrame.Rotation,
-
-            fling = false,
-
-            vel = Vector3.zero,
-
-            pos = pos,
-
-            t2 = 0
+            points = {}
         }
 
-        part.Anchored = true
-        part.CanCollide = false
+        for j = 1, POINTS_PER_LAYER do
 
-        table.insert(
-            S.debris,
-            item
-        )
-
-        if orig then
             table.insert(
-                S.all,
-                item
+                layer.points,
+                createParticlePoint(S)
             )
         end
-    end
-
-    -- ============================================================
-    -- QUEBRA DE OBJETOS
-    -- ============================================================
-
-    local function shatter(S, part)
 
         table.insert(
-            S.hiddenParts,
-            {
-                part = part,
-                orig = captureOriginal(part)
-            }
+            S.funnel,
+            layer
         )
-
-        local cf = part.CFrame
-        local sz = part.Size
-
-        part.Transparency = 1
-        part.CanCollide = false
-
-        for _ = 1, 6 do
-
-            local c = Instance.new("Part")
-
-            c.Size =
-                Vector3.new(
-                    math.max(
-                        sz.X * rr(0.2, 0.45),
-                        1
-                    ),
-
-                    math.max(
-                        sz.Y * rr(0.2, 0.45),
-                        1
-                    ),
-
-                    math.max(
-                        sz.Z * rr(0.2, 0.45),
-                        1
-                    )
-                )
-
-            c.CFrame =
-                cf
-                *
-                CFrame.new(
-                    rr(-0.5, 0.5) * sz.X,
-                    rr(-0.5, 0.5) * sz.Y,
-                    rr(-0.5, 0.5) * sz.Z
-                )
-
-            c.Color = part.Color
-            c.Material = part.Material
-            c.Reflectance = part.Reflectance
-
-            c.Anchored = true
-            c.CanCollide = false
-            c.CanQuery = false
-            c.CanTouch = false
-
-            c.TopSurface = Enum.SurfaceType.Smooth
-            c.BottomSurface = Enum.SurfaceType.Smooth
-
-            c.Parent = S.folder
-
-            addDebris(
-                S,
-                c,
-                nil
-            )
-        end
     end
 
-    -- ============================================================
-    -- SCAN DE OBJETOS
-    -- ============================================================
+    --==========================================================
+    -- CAMADAS DE NUVEM
+    --==========================================================
 
-    local function scan(S)
+    for i = 1, CLOUD_LAYERS do
 
-        if not S.touched
-            or #S.debris >= MAX_DEBRIS then
-            return
-        end
+        local layer = {
 
-        local reach =
-            math.clamp(
-                S.rG * 2.3 + 40,
-                60,
-                480
-            )
+            angle =
+                math.random()
+                *
+                math.pi
+                *
+                2,
 
-        local params =
-            OverlapParams.new()
+            offset =
+                (i - 1) * 45,
 
-        params.FilterType =
-            Enum.RaycastFilterType.Exclude
+            scale =
+                (i - 1) * 0.08,
 
-        local ex = {
-            S.folder
+            points = {}
         }
 
-        for _, p in ipairs(
-            Players:GetPlayers()
-        ) do
+        for j = 1, CLOUD_POINTS do
 
-            if p.Character then
-                table.insert(
-                    ex,
-                    p.Character
-                )
-            end
-        end
-
-        params.FilterDescendantsInstances =
-            ex
-
-        params.MaxParts = 500
-
-        local parts =
-            workspace:GetPartBoundsInRadius(
-                Vector3.new(
-                    S.cx,
-                    S.gy + 30,
-                    S.cz
-                ),
-                reach,
-                params
+            table.insert(
+                layer.points,
+                createParticlePoint(S)
             )
-
-        local made = 0
-
-        for _, part in ipairs(parts) do
-
-            if made >= 18
-                or #S.debris >= MAX_DEBRIS then
-                break
-            end
-
-            if
-                part:IsA("BasePart")
-                and not part:IsA("Terrain")
-                and not part:IsA("SpawnLocation")
-                and not S.seen[part]
-                and part.Transparency < 0.95
-            then
-
-                local sz =
-                    part.Size
-
-                local mx =
-                    math.max(
-                        sz.X,
-                        sz.Y,
-                        sz.Z
-                    )
-
-                if mx <= 200 then
-
-                    local dx =
-                        part.Position.X
-                        -
-                        S.cx
-
-                    local dz =
-                        part.Position.Z
-                        -
-                        S.cz
-
-                    local d =
-                        math.sqrt(
-                            dx * dx
-                            +
-                            dz * dz
-                        )
-
-                    local prob =
-                        (
-                            1
-                            -
-                            math.clamp(
-                                d / reach,
-                                0,
-                                1
-                            )
-                        )
-                        ^ 1.4
-                        *
-                        (
-                            0.25
-                            +
-                            0.75 * S.I
-                        )
-
-                    if
-                        rand()
-                        <
-                        prob * 0.35 + 0.02
-                        and not isCharacterPart(part)
-                    then
-
-                        S.seen[part] = true
-
-                        if mx > 28 then
-
-                            shatter(
-                                S,
-                                part
-                            )
-
-                            made += 3
-
-                        else
-
-                            addDebris(
-                                S,
-                                part,
-                                captureOriginal(part)
-                            )
-
-                            made += 1
-                        end
-                    end
-                end
-            end
         end
+
+        table.insert(
+            S.cloudLayers,
+            layer
+        )
     end
 
-    -- ============================================================
-    -- ATUALIZA DETRITOS
-    -- ============================================================
+    --==========================================================
+    -- DEBRIS CLOUD
+    --==========================================================
 
-    local function updateDebris(S, dt)
+    createDebrisCloud(S)
 
-        local chr =
-            LocalPlayer.Character
+    createFlyingDebris(S)
 
-        local hrp =
-            chr
-            and chr:FindFirstChild(
-                "HumanoidRootPart"
-            )
+    --==========================================================
+    -- CHUVA
+    --==========================================================
 
-        local hum =
-            chr
-            and chr:FindFirstChildOfClass(
-                "Humanoid"
-            )
+    local rainPart =
+        Instance.new("Part")
 
-        S.hitCd -= dt
+    rainPart.Name =
+        "TornadoRain"
 
-        for i =
-            #S.debris,
+    rainPart.Anchored = true
+
+    rainPart.CanCollide = false
+    rainPart.CanTouch = false
+    rainPart.CanQuery = false
+
+    rainPart.Transparency = 1
+
+    rainPart.Size =
+        Vector3.new(
+            180,
             1,
-            -1
-        do
+            180
+        )
 
-            local d =
-                S.debris[i]
+    rainPart.Parent =
+        S.folder
 
-            local part =
-                d.part
+    local rain =
+        Instance.new(
+            "ParticleEmitter"
+        )
 
-            local remove = false
+    rain.Texture =
+        "rbxasset://textures/particles/sparkles_main.dds"
 
-            if not part
-                or not part.Parent then
+    rain.Rate = 0
 
-                remove = true
+    rain.Lifetime =
+        NumberRange.new(
+            0.5,
+            0.8
+        )
 
-            else
+    rain.Speed =
+        NumberRange.new(
+            130,
+            190
+        )
 
-                d.age += dt
+    rain.SpreadAngle =
+        Vector2.new(
+            8,
+            8
+        )
 
-                if not d.fling then
+    rain.Size =
+        NumberSequence.new(
+            0.12
+        )
 
-                    local R =
-                        funnelR(
-                            S,
-                            d.h
-                        )
-                        *
-                        d.k
-                        +
-                        6
+    rain.Transparency =
+        NumberSequence.new(
+            0.65
+        )
 
-                    d.rad +=
-                        (
-                            R
-                            -
-                            d.rad
-                        )
-                        *
-                        math.min(
-                            1,
-                            dt * 0.5
-                        )
+    rain.Color =
+        ColorSequence.new(
+            Color3.fromRGB(
+                200,
+                215,
+                230
+            )
+        )
 
-                    local tang =
-                        lerp(
-                            40,
-                            170,
-                            S.I
-                        )
-                        *
-                        (
-                            0.7
-                            +
-                            0.3 * d.k
-                        )
+    rain.Parent =
+        rainPart
 
-                    d.ang +=
-                        (
-                            tang
-                            /
-                            math.max(
-                                d.rad,
-                                14
-                            )
-                        )
-                        *
-                        dt
+    S.rainPart =
+        rainPart
 
-                    d.h +=
-                        lerp(
-                            10,
-                            70,
-                            S.I
-                        )
-                        *
-                        dt
-                        *
-                        (
-                            0.6
-                            +
-                            d.k
-                        )
+    S.rain =
+        rain
 
-                    local off =
-                        funnelOffset(
-                            S,
-                            math.min(
-                                d.h,
-                                H
-                            )
-                        )
+    --==========================================================
+    -- SOM
+    --==========================================================
 
-                    d.pos =
-                        Vector3.new(
+    local wind =
+        Instance.new("Sound")
 
-                            S.cx
-                            +
-                            off.X
-                            +
-                            math.cos(d.ang)
-                            *
-                            d.rad,
+    wind.SoundId =
+        "rbxassetid://72195163486195"
 
-                            S.gy
-                            +
-                            d.h,
+    wind.Looped = true
 
-                            S.cz
-                            +
-                            off.Z
-                            +
-                            math.sin(d.ang)
-                            *
-                            d.rad
-                        )
+    wind.Volume = 0
 
-                    if
-                        d.age > d.life
-                        or d.h > H * 0.55
-                    then
+    wind.Parent =
+        S.folder
 
-                        d.fling = true
+    pcall(function()
+        wind:Play()
+    end)
 
-                        local tdir =
-                            Vector3.new(
-                                -math.sin(d.ang),
-                                0,
-                                math.cos(d.ang)
-                            )
+    S.wind =
+        wind
 
-                        local out =
-                            Vector3.new(
-                                math.cos(d.ang),
-                                0,
-                                math.sin(d.ang)
-                            )
+    --==========================================================
+    -- HUD
+    --==========================================================
 
-                        d.vel =
-                            tdir * rr(80, 170)
-                            +
-                            out * rr(40, 120)
-                            +
-                            Vector3.new(
-                                0,
-                                rr(-10, 60),
-                                0
-                            )
-                    end
+    pcall(function()
 
-                else
+        local gui =
+            Instance.new(
+                "ScreenGui"
+            )
 
-                    d.vel +=
-                        Vector3.new(
-                            0,
-                            -90,
-                            0
-                        )
-                        *
-                        dt
+        gui.Name =
+            "TornadoHUD"
 
-                    d.pos +=
-                        d.vel
-                        *
-                        dt
+        gui.ResetOnSpawn =
+            false
 
-                    d.t2 += dt
+        local label =
+            Instance.new(
+                "TextLabel"
+            )
 
-                    if d.t2 > 3 then
-                        remove = true
-                    end
-                end
+        label.Size =
+            UDim2.new(
+                0,
+                360,
+                0,
+                48
+            )
 
-                d.rot =
-                    d.rot
-                    *
-                    CFrame.Angles(
-                        d.sx * dt,
-                        d.sy * dt,
-                        d.sz * dt
-                    )
+        label.Position =
+            UDim2.new(
+                0.5,
+                -180,
+                0,
+                12
+            )
 
-                part.CFrame =
-                    CFrame.new(
-                        d.pos
-                    )
-                    *
-                    d.rot
+        label.BackgroundColor3 =
+            Color3.fromRGB(
+                10,
+                10,
+                12
+            )
+
+        label.BackgroundTransparency =
+            0.3
+
+        label.TextColor3 =
+            Color3.fromRGB(
+                240,
+                240,
+                240
+            )
+
+        label.Font =
+            Enum.Font.GothamBold
+
+        label.TextSize = 15
+
+        label.Text =
+            "TORNADO — FORMANDO"
+
+        label.Parent =
+            gui
+
+        Instance.new(
+            "UICorner",
+            label
+        ).CornerRadius =
+            UDim.new(
+                0,
+                8
+            )
+
+        gui.Parent =
+            LocalPlayer:WaitForChild(
+                "PlayerGui"
+            )
+
+        S.gui =
+            gui
+
+        S.label =
+            label
+    end)
+
+    --==========================================================
+    -- LOOP
+    --==========================================================
+
+    local token =
+        TORNADO.token
+
+    S.connection =
+        RunService.RenderStepped:Connect(
+            function(dt)
 
                 if
-                    HURT_PLAYERS
-                    and hrp
-                    and hum
-                    and S.hitCd <= 0
-                    and (
-                        d.pos
-                        -
-                        hrp.Position
-                    ).Magnitude < 5
+                    TORNADO.S ~= S
+                    or
+                    TORNADO.token
+                    ~= token
                 then
 
-                    S.hitCd = 0.35
-
-                    hum:TakeDamage(8)
-                end
-            end
-
-            if remove then
-
-                if part
-                    and part.Parent then
-
-                    if d.orig then
-                        part.Parent = nil
-                    else
-                        part:Destroy()
-                    end
+                    return
                 end
 
-                table.remove(
-                    S.debris,
-                    i
-                )
-            end
-        end
-    end
-
-    -- ============================================================
-    -- JOGADOR
-    -- ============================================================
-
-    local function updatePlayer(S, dt)
-
-        local chr =
-            LocalPlayer.Character
-
-        local hrp =
-            chr
-            and chr:FindFirstChild(
-                "HumanoidRootPart"
-            )
-
-        local hum =
-            chr
-            and chr:FindFirstChildOfClass(
-                "Humanoid"
-            )
-
-        if not hrp or not hum then
-            return
-        end
-
-        local dx =
-            hrp.Position.X
-            -
-            S.cx
-
-        local dz =
-            hrp.Position.Z
-            -
-            S.cz
-
-        local dist =
-            math.sqrt(
-                dx * dx
-                +
-                dz * dz
-            )
-
-        S.dist = dist
-
-        local reach =
-            S.rG * 3
-            +
-            140
-
-        local s = 0
-
-        if
-            S.touched
-            and dist < reach
-        then
-
-            s =
-                (
-                    1
-                    -
-                    dist / reach
-                )
-                ^ 1.4
-                *
-                (
-                    0.25
-                    +
-                    0.75 * S.I
-                )
-        end
-
-        if s > 0.02 then
-
-            local inv =
-                1
-                /
-                math.max(
-                    dist,
-                    1
-                )
-
-            local tdir =
-                Vector3.new(
-                    -dz,
-                    0,
-                    dx
-                )
-                *
-                inv
-
-            local inward =
-                Vector3.new(
-                    -dx,
-                    0,
-                    -dz
-                )
-                *
-                inv
-
-            local v =
-                hrp.AssemblyLinearVelocity
-                +
-                (
-                    tdir * 190
-                    +
-                    inward * 130
-                )
-                *
-                s
-                *
-                3
-                *
-                dt
-
-            local core =
-                S.rG * 1.25
-                +
-                10
-
-            if dist < core then
-
-                v +=
-                    Vector3.new(
-                        0,
-                        300
-                        *
-                        (
-                            1
-                            -
-                            dist / core
-                        )
-                        *
-                        dt,
-                        0
-                    )
-            end
-
-            if v.Magnitude > 280 then
-                v = v.Unit * 280
-            end
-
-            hrp.AssemblyLinearVelocity =
-                v
-
-            if
-                s > 0.3
-                and not S.ragdoll
-            then
-
-                hum.PlatformStand = true
-                S.ragdoll = true
-
-            elseif
-                s < 0.15
-                and S.ragdoll
-            then
-
-                hum.PlatformStand = false
-                S.ragdoll = false
-            end
-
-            hum.CameraOffset =
-                Vector3.new(
-                    rr(-1, 1),
-                    rr(-1, 1),
-                    0
-                )
-                *
-                s
-                *
-                1.5
-
-            S.shaken = true
-
-            if
-                HURT_PLAYERS
-                and dist < S.rG * 0.95
-                and S.I > 0.25
-            then
-
-                hum:TakeDamage(
-                    30 * dt
-                )
-            end
-
-        else
-
-            if S.ragdoll then
-
-                hum.PlatformStand = false
-                S.ragdoll = false
-            end
-
-            if S.shaken then
-
-                hum.CameraOffset =
-                    Vector3.zero
-
-                S.shaken = false
-            end
-        end
-
-        S.prox = s
-    end
-
-    -- ============================================================
-    -- CÉU / LUZ
-    -- ============================================================
-
-    local function applyLighting(S, a)
-
-        local sv = S.saved
-
-        local cloudGray =
-            TORNADO_FOG_COLOR
-
-        local cloudFog =
-            TORNADO_FOG_COLOR
-
-        pcall(function()
-
-            Lighting.Ambient =
-                sv.Ambient:Lerp(
-                    cloudGray,
-                    a
-                )
-
-            Lighting.OutdoorAmbient =
-                sv.OutdoorAmbient:Lerp(
-                    cloudGray,
-                    a
-                )
-
-            Lighting.Brightness =
-                lerp(
-                    sv.Brightness,
-                    1.8,
-                    a
-                )
-                +
-                S.flash * 3
-
-            Lighting.ExposureCompensation =
-                lerp(
-                    sv.ExposureCompensation,
-                    0.2,
-                    a
-                )
-                +
-                S.flash * 1.2
-
-            Lighting.FogColor =
-                sv.FogColor:Lerp(
-                    cloudFog,
-                    a
-                )
-
-            Lighting.FogStart =
-                lerp(
-                    sv.FogStart,
-                    120,
-                    a
-                )
-
-            Lighting.FogEnd =
-                lerp(
+                dt =
                     math.min(
-                        sv.FogEnd,
-                        20000
-                    ),
-                    6000,
-                    a
-                )
-        end)
-
-        if S.cc then
-
-            S.cc.Saturation =
-                -0.05 * a
-
-            S.cc.Contrast =
-                0.04 * a
-
-            S.cc.Brightness =
-                0.06 * a
-
-            S.cc.TintColor =
-                Color3.new(
-                    1,
-                    1,
-                    1
-                ):Lerp(
-                    cloudGray,
-                    a
-                )
-        end
-
-        if S.atm then
-
-            S.atm.Density =
-                0.1
-                +
-                0.1 * a
-
-            S.atm.Haze =
-                1 * a
-
-            S.atm.Color =
-                cloudGray
-
-            S.atm.Decay =
-                cloudGray
-        end
-
-        if S.clouds then
-
-            S.clouds.Cover =
-                0.9 * a
-
-            S.clouds.Density =
-                0.85 * a
-
-            S.clouds.Color =
-                TORNADO_CLOUD_COLOR
-        end
-    end
-
-    -- ============================================================
-    -- GROUND CHECK
-    -- ============================================================
-
-    local function groundCheck(S)
-
-        local ex = {
-            S.folder
-        }
-
-        for _, p in ipairs(
-            Players:GetPlayers()
-        ) do
-
-            if p.Character then
-                table.insert(
-                    ex,
-                    p.Character
-                )
-            end
-        end
-
-        local rp =
-            RaycastParams.new()
-
-        rp.FilterType =
-            Enum.RaycastFilterType.Exclude
-
-        rp.FilterDescendantsInstances =
-            ex
-
-        rp.RespectCanCollide = true
-
-        local res =
-            workspace:Raycast(
-                Vector3.new(
-                    S.cx,
-                    S.gy + 60,
-                    S.cz
-                ),
-                Vector3.new(
-                    0,
-                    -200,
-                    0
-                ),
-                rp
-            )
-
-        if res
-            and math.abs(
-                res.Position.Y
-                -
-                S.gy
-            ) < 40
-        then
-
-            S.gy +=
-                (
-                    res.Position.Y
-                    -
-                    S.gy
-                )
-                *
-                0.5
-        end
-    end
-
-    -- ============================================================
-    -- ESCALA EF
-    -- ============================================================
-
-    local function rating(kmh)
-
-        if kmh < 105 then
-            return "--"
-        end
-
-        if kmh < 138 then
-            return "EF0"
-        end
-
-        if kmh < 178 then
-            return "EF1"
-        end
-
-        if kmh < 218 then
-            return "EF2"
-        end
-
-        if kmh < 267 then
-            return "EF3"
-        end
-
-        if kmh < 322 then
-            return "EF4"
-        end
-
-        return "EF5"
-    end
-
-    -- ============================================================
-    -- CLEAR
-    -- ============================================================
-
-    function TORNADO.clear(silent)
-
-        TORNADO.token += 1
-
-        local S =
-            TORNADO.S
-
-        TORNADO.S = nil
-
-        if not S then
-            return true
-        end
-
-        if S.conn then
-
-            pcall(function()
-                S.conn:Disconnect()
-            end)
-        end
-
-        -- RESTAURA DETRITOS
-        for _, d in ipairs(S.all) do
-
-            pcall(function()
-
-                local o =
-                    d.orig
-
-                d.part.Parent =
-                    o.Parent
-
-                d.part.CFrame =
-                    o.CFrame
-
-                d.part.Anchored =
-                    o.Anchored
-
-                d.part.CanCollide =
-                    o.CanCollide
-
-                d.part.Transparency =
-                    o.Transparency
-            end)
-        end
-
-        -- RESTAURA PARTES ESCONDIDAS
-        for _, h in ipairs(
-            S.hiddenParts
-        ) do
-
-            pcall(function()
-
-                h.part.Transparency =
-                    h.orig.Transparency
-
-                h.part.CanCollide =
-                    h.orig.CanCollide
-            end)
-        end
-
-        if S.folder then
-
-            pcall(function()
-                S.folder:Destroy()
-            end)
-        end
-
-        if S.gui then
-
-            pcall(function()
-                S.gui:Destroy()
-            end)
-        end
-
-        if S.cc then
-
-            pcall(function()
-                S.cc:Destroy()
-            end)
-        end
-
-        if S.atm then
-
-            pcall(function()
-                S.atm:Destroy()
-            end)
-        end
-
-        for _, a in ipairs(
-            S.hiddenAtm
-        ) do
-
-            pcall(function()
-                a.Parent = Lighting
-            end)
-        end
-
-        if S.clouds then
-
-            if S.cloudsNew then
-
-                pcall(function()
-                    S.clouds:Destroy()
-                end)
-
-            elseif S.cloudsSaved then
-
-                pcall(function()
-
-                    for k, v in pairs(
-                        S.cloudsSaved
-                    ) do
-
-                        S.clouds[k] = v
-                    end
-                end)
-            end
-        end
-
-        -- RESTAURA LIGHTING
-        for k, v in pairs(
-            S.saved or {}
-        ) do
-
-            pcall(function()
-                Lighting[k] = v
-            end)
-        end
-
-        pcall(function()
-
-            local chr =
-                LocalPlayer.Character
-
-            local hum =
-                chr
-                and chr:FindFirstChildOfClass(
-                    "Humanoid"
-                )
-
-            if hum then
-
-                hum.PlatformStand =
-                    false
-
-                hum.CameraOffset =
-                    Vector3.zero
-            end
-        end)
-
-        if not silent then
-
-            notify(
-                "Tornado",
-                "Tornado dissipou. Tudo restaurado."
-            )
-        end
-
-        return true
-    end
-
-    -- ============================================================
-    -- SPAWN
-    -- ============================================================
-
-    function TORNADO.spawn(senderName)
-
-        notify(
-            "Tornado",
-            "Formando supercélula..."
-        )
-
-        TORNADO.clear(true)
-
-        local myToken =
-            TORNADO.token
-
-        local sp =
-            (
-                senderName
-                and Players:FindFirstChild(
-                    senderName
-                )
-            )
-            or LocalPlayer
-
-        local srcHrp =
-            sp.Character
-            and sp.Character:FindFirstChild(
-                "HumanoidRootPart"
-            )
-
-        if not srcHrp then
-
-            srcHrp =
-                LocalPlayer.Character
-                and LocalPlayer.Character:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-        end
-
-        if not srcHrp then
-
-            notify(
-                "Tornado",
-                "Personagem não encontrado."
-            )
-
-            return false
-        end
-
-        local lv =
-            srcHrp.CFrame.LookVector
-
-        local look =
-            Vector3.new(
-                lv.X,
-                0,
-                lv.Z
-            )
-
-        look =
-            look.Magnitude > 0.1
-            and look.Unit
-            or
-            Vector3.new(
-                0,
-                0,
-                -1
-            )
-
-        local dir =
-            (
-                CFrame.Angles(
-                    0,
-                    math.rad(20),
-                    0
-                )
-                *
-                -look
-            ).Unit
-
-        local start =
-            srcHrp.Position
-            +
-            look * 650
-
-        -- ========================================================
-        -- ESTADO
-        -- ========================================================
-
-        local S = {
-
-            t = 0,
-
-            cx = start.X,
-
-            cz = start.Z,
-
-            gy =
-                srcHrp.Position.Y
-                -
-                3,
-
-            dir = dir,
-
-            layers = {},
-
-            debris = {},
-
-            all = {},
-
-            hiddenParts = {},
-
-            hiddenAtm = {},
-
-            seen =
-                setmetatable(
-                    {},
-                    {
-                        __mode = "k"
-                    }
-                ),
-
-            hb = H,
-
-            I = 0,
-
-            -- BASE MUITO MAIOR
-            rG = 3,
-
-            -- TOPO GRANDE
-            rT = 90,
-
-            kmh = 0,
-
-            touched = false,
-
-            flash = 0,
-
-            nextFlash = 6,
-
-            hitCd = 0,
-
-            dist = 9999,
-
-            prox = 0,
-
-            tRef = 0,
-
-            tGround = 0,
-
-            tScan = 0,
-
-            tHud = 0
-        }
-
-        TORNADO.S = S
-
-        -- ========================================================
-        -- FOLDER
-        -- ========================================================
-
-        local folder =
-            Instance.new("Folder")
-
-        folder.Name =
-            "Tornado_FX"
-
-        folder.Parent =
-            workspace
-
-        S.folder =
-            folder
-
-        -- ========================================================
-        -- SALVA LIGHTING
-        -- ========================================================
-
-        S.saved = {}
-
-        for _, k in ipairs(LP) do
-
-            pcall(function()
-
-                S.saved[k] =
-                    Lighting[k]
-            end)
-        end
-
-        -- ========================================================
-        -- ATMOSFERAS
-        -- ========================================================
-
-        for _, c in ipairs(
-            Lighting:GetChildren()
-        ) do
-
-            if c:IsA("Atmosphere") then
-
-                table.insert(
-                    S.hiddenAtm,
-                    c
-                )
-
-                c.Parent = nil
-            end
-        end
-
-        -- ========================================================
-        -- NOVA ATMOSFERA
-        -- ========================================================
-
-        pcall(function()
-
-            local atm =
-                Instance.new(
-                    "Atmosphere"
-                )
-
-            atm.Name =
-                "Tornado_Atmosphere"
-
-            atm.Color =
-                TORNADO_FOG_COLOR
-
-            atm.Decay =
-                Color3.fromRGB(
-                    150,
-                    158,
-                    168
-                )
-
-            atm.Density = 0.1
-            atm.Offset = 0.25
-            atm.Glare = 0
-            atm.Haze = 0
-
-            atm.Parent =
-                Lighting
-
-            S.atm = atm
-
-            local cc =
-                Instance.new(
-                    "ColorCorrectionEffect"
-                )
-
-            cc.Name =
-                "Tornado_CC"
-
-            cc.Parent =
-                Lighting
-
-            S.cc = cc
-        end)
-
-        -- ========================================================
-        -- NUVENS
-        -- ========================================================
-
-        pcall(function()
-
-            local terrain =
-                workspace:FindFirstChildOfClass(
-                    "Terrain"
-                )
-
-            local cl =
-                terrain:FindFirstChildOfClass(
-                    "Clouds"
-                )
-
-            if cl then
-
-                S.cloudsSaved = {
-
-                    Cover = cl.Cover,
-
-                    Density = cl.Density,
-
-                    Color = cl.Color,
-
-                    Enabled = cl.Enabled
-                }
-
-            else
-
-                cl =
-                    Instance.new(
-                        "Clouds"
+                        dt,
+                        0.1
                     )
 
-                cl.Parent =
-                    terrain
+                S.time += dt
 
-                S.cloudsNew = true
-            end
+                local t =
+                    S.time
 
-            cl.Enabled = true
+                --================================================
+                -- FORMAÇÃO
+                --================================================
 
-            -- NUVEM DA MESMA COR DA FOTO
-            cl.Color =
-                TORNADO_CLOUD_COLOR
-
-            cl.Cover = 0
-            cl.Density = 0
-
-            S.clouds =
-                cl
-        end)
-
-        -- ========================================================
-        -- CAMADAS DO FUNIL
-        -- ========================================================
-
-        for i = 1, N_LAYERS do
-
-            local L = {
-
-                kind = "funnel",
-
-                hn =
-                    (i - 1)
-                    /
-                    (N_LAYERS - 1),
-
-                ang =
-                    rand()
-                    *
-                    6.283,
-
-                pts = {}
-            }
-
-            for k = 1, PER_LAYER do
-
-                L.pts[k] =
-                    newPoint(S)
-            end
-
-            table.insert(
-                S.layers,
-                L
-            )
-        end
-
-        -- ========================================================
-        -- NUVEM SUPERIOR
-        -- ========================================================
-
-        for c = 1, 3 do
-
-            local L = {
-
-                kind = "cap",
-
-                c = c,
-
-                hn = 1,
-
-                ang =
-                    rand()
-                    *
-                    6.283,
-
-                pts = {}
-            }
-
-            for k = 1, 8 do
-
-                L.pts[k] =
-                    newPoint(S)
-            end
-
-            table.insert(
-                S.layers,
-                L
-            )
-        end
-
-        -- ========================================================
-        -- POEIRA
-        -- ========================================================
-
-        do
-
-            local L = {
-
-                kind = "dust",
-
-                hn = 0,
-
-                ang =
-                    rand()
-                    *
-                    6.283,
-
-                pts = {}
-            }
-
-            for k = 1, 8 do
-
-                L.pts[k] =
-                    newPoint(S)
-
-                L.pts[k].e.Speed =
-                    NumberRange.new(
-                        8,
-                        18
+                local formation =
+                    math.clamp(
+                        t / 10,
+                        0,
+                        1
                     )
 
-                L.pts[k].e.Lifetime =
-                    NumberRange.new(
-                        3,
-                        5
+                --================================================
+                -- INTENSIDADE
+                --================================================
+
+                S.intensity =
+                    math.clamp(
+                        (t - 30)
+                        /
+                        75,
+                        0,
+                        1
                     )
-            end
 
-            table.insert(
-                S.layers,
-                L
-            )
-        end
+                --================================================
+                -- TOQUE NO CHÃO
+                --================================================
 
-        -- ========================================================
-        -- CHUVA
-        -- ========================================================
+                S.touched =
+                    t > 8
 
-        local rainPart =
-            Instance.new("Part")
+                --================================================
+                -- TAMANHO DO TOPO
+                --================================================
 
-        rainPart.Anchored = true
-        rainPart.CanCollide = false
-        rainPart.CanQuery = false
-        rainPart.CanTouch = false
-
-        rainPart.Transparency = 1
-
-        rainPart.Size =
-            Vector3.new(
-                160,
-                1,
-                160
-            )
-
-        rainPart.Parent =
-            folder
-
-        local rain =
-            Instance.new(
-                "ParticleEmitter"
-            )
-
-        rain.Rate = 0
-
-        rain.Lifetime =
-            NumberRange.new(
-                0.6,
-                0.8
-            )
-
-        rain.Speed =
-            NumberRange.new(
-                150,
-                190
-            )
-
-        rain.EmissionDirection =
-            Enum.NormalId.Bottom
-
-        rain.SpreadAngle =
-            Vector2.new(
-                6,
-                6
-            )
-
-        rain.Size =
-            NumberSequence.new(
-                0.15
-            )
-
-        rain.Transparency =
-            NumberSequence.new(
-                0.6
-            )
-
-        rain.Color =
-            ColorSequence.new(
-                Color3.fromRGB(
-                    215,
-                    220,
-                    230
-                )
-            )
-
-        rain.Parent =
-            rainPart
-
-        -- ========================================================
-        -- SOM
-        -- ========================================================
-
-        local wind
-
-        if WIND_SND ~= "" then
-
-            wind =
-                Instance.new("Sound")
-
-            wind.SoundId =
-                WIND_SND
-
-            wind.Looped = true
-
-            wind.Volume = 0
-
-            wind.Parent =
-                folder
-
-            pcall(function()
-                wind:Play()
-            end)
-        end
-
-        -- ========================================================
-        -- HUD
-        -- ========================================================
-
-        local label
-
-        pcall(function()
-
-            local sg =
-                Instance.new(
-                    "ScreenGui"
-                )
-
-            sg.Name =
-                "TornadoHUD"
-
-            sg.ResetOnSpawn =
-                false
-
-            local lb =
-                Instance.new(
-                    "TextLabel"
-                )
-
-            lb.Size =
-                UDim2.new(
-                    0,
-                    340,
-                    0,
-                    46
-                )
-
-            lb.Position =
-                UDim2.new(
-                    0.5,
-                    -170,
-                    0,
-                    12
-                )
-
-            lb.BackgroundColor3 =
-                Color3.fromRGB(
-                    18,
-                    20,
-                    24
-                )
-
-            lb.BackgroundTransparency =
-                0.35
-
-            lb.TextColor3 =
-                Color3.fromRGB(
-                    235,
-                    235,
-                    235
-                )
-
-            lb.Font =
-                Enum.Font.GothamBold
-
-            lb.TextSize = 16
-
-            lb.Text =
-                "TORNADO: formando..."
-
-            lb.Parent = sg
-
-            Instance.new(
-                "UICorner",
-                lb
-            ).CornerRadius =
-                UDim.new(
-                    0,
-                    8
-                )
-
-            sg.Parent =
-                LocalPlayer:WaitForChild(
-                    "PlayerGui"
-                )
-
-            S.gui = sg
-
-            label = lb
-        end)
-
-        -- ========================================================
-        -- CÂMERA
-        -- ========================================================
-
-        local cam =
-            workspace.CurrentCamera
-
-        -- ========================================================
-        -- LOOP PRINCIPAL
-        -- ========================================================
-
-        S.conn =
-            RunService.RenderStepped:Connect(
-                function(dt)
-
-                    if
-                        TORNADO.token
-                        ~= myToken
-                    then
-                        return
-                    end
-
-                    dt =
-                        math.min(
-                            dt,
-                            0.1
-                        )
-
-                    S.t += dt
-
-                    local t =
-                        S.t
-
-                    -- FORMAÇÃO
-                    local a =
-                        math.clamp(
-                            t / 10,
-                            0,
-                            1
-                        )
-
-                    -- DESCIDA
-                    local prog =
-                        math.clamp(
-                            (t - 8)
-                            /
-                            90,
-                            0,
-                            1
-                        )
-
-                    S.hb =
-                        (
-                            t < 8
-                            and H
-                        )
-                        or
-                        lerp(
-                            H,
-                            0,
-                            ease(
+                S.topRadius =
+                    lerp(
+                        90,
+                        480,
+                        smooth(
+                            math.clamp(
                                 (t - 8)
                                 /
-                                30
-                            )
-                        )
-
-                    S.touched =
-                        S.hb < 80
-
-                    -- INTENSIDADE
-                    S.I =
-                        math.clamp(
-                            (t - 36)
-                            /
-                            70,
-                            0,
-                            1
-                        )
-
-                    -- ==================================================
-                    -- TOPO MUITO MAIOR
-                    -- ==================================================
-
-                    S.rT =
-                        lerp(
-                            90,
-                            500,
-                            ease(prog)
-                        )
-
-                    -- ==================================================
-                    -- BASE / TANGA MUITO MAIOR
-                    -- ==================================================
-
-                    if S.touched then
-
-                        S.rG =
-                            lerp(
-                                20,
-                                220,
-                                ease(S.I)
-                            )
-
-                    else
-
-                        S.rG =
-                            lerp(
-                                5,
-                                14,
-                                math.clamp(
-                                    (t - 8)
-                                    /
-                                    30,
-                                    0,
-                                    1
-                                )
-                            )
-                    end
-
-                    -- VELOCIDADE
-                    S.kmh =
-                        S.touched
-                        and
-                        lerp(
-                            110,
-                            MAX_KMH,
-                            ease(S.I)
-                        )
-                        or
-                        0
-
-                    -- ==================================================
-                    -- MOVIMENTO
-                    -- ==================================================
-
-                    local spd =
-                        MOVE_SPEED
-                        *
-                        (
-                            0.4
-                            +
-                            0.6 * prog
-                        )
-
-                    local perp =
-                        Vector3.new(
-                            -S.dir.Z,
-                            0,
-                            S.dir.X
-                        )
-
-                    local vel =
-                        S.dir * spd
-                        +
-                        perp
-                        *
-                        math.cos(
-                            t * 0.25
-                        )
-                        *
-                        5
-
-                    S.cx +=
-                        vel.X
-                        *
-                        dt
-
-                    S.cz +=
-                        vel.Z
-                        *
-                        dt
-
-                    -- ==================================================
-                    -- RELÂMPAGO
-                    -- ==================================================
-
-                    S.flash =
-                        math.max(
-                            0,
-                            S.flash
-                            -
-                            dt * 2.5
-                        )
-
-                    if
-                        a > 0.5
-                        and
-                        t >= S.nextFlash
-                    then
-
-                        S.flash = 1
-
-                        S.nextFlash =
-                            t
-                            +
-                            rr(
-                                3,
-                                9
-                            )
-                    end
-
-                    -- ==================================================
-                    -- REFRESH
-                    -- ==================================================
-
-                    S.tRef += dt
-
-                    local refresh =
-                        S.tRef >= 0.25
-
-                    if refresh then
-                        S.tRef = 0
-                    end
-
-                    -- ==================================================
-                    -- GROUND
-                    -- ==================================================
-
-                    S.tGround += dt
-
-                    if S.tGround >= 0.6 then
-
-                        S.tGround = 0
-
-                        pcall(
-                            groundCheck,
-                            S
-                        )
-                    end
-
-                    -- ==================================================
-                    -- SCAN
-                    -- ==================================================
-
-                    S.tScan += dt
-
-                    if S.tScan >= 0.35 then
-
-                        S.tScan = 0
-
-                        pcall(
-                            scan,
-                            S
-                        )
-                    end
-
-                    -- ==================================================
-                    -- ATUALIZAÇÃO
-                    -- ==================================================
-
-                    applyLighting(
-                        S,
-                        a
-                    )
-
-                    updateLayers(
-                        S,
-                        dt,
-                        refresh
-                    )
-
-                    updateDebris(
-                        S,
-                        dt
-                    )
-
-                    updatePlayer(
-                        S,
-                        dt
-                    )
-
-                    -- ==================================================
-                    -- CHUVA
-                    -- ==================================================
-
-                    rainPart.CFrame =
-                        CFrame.new(
-                            cam.CFrame.Position
-                            +
-                            Vector3.new(
-                                0,
-                                70,
-                                0
-                            )
-                        )
-
-                    rain.Rate =
-                        250
-                        *
-                        a
-                        *
-                        (
-                            0.4
-                            +
-                            0.6
-                            *
-                            math.clamp(
-                                S.prox * 3
-                                +
-                                0.3,
+                                80,
                                 0,
                                 1
                             )
                         )
+                    )
 
-                    -- ==================================================
-                    -- SOM
-                    -- ==================================================
+                --================================================
+                -- TAMANHO DA BASE
+                --================================================
 
-                    if wind then
+                S.groundRadius =
+                    lerp(
+                        8,
+                        190,
+                        smooth(
+                            S.intensity
+                        )
+                    )
 
-                        wind.Volume =
-                            math.clamp(
-                                S.prox * 4
-                                +
-                                0.15,
-                                0,
-                                3
-                            )
-                            *
-                            a
+                --================================================
+                -- VELOCIDADE
+                --================================================
 
-                        wind.PlaybackSpeed =
-                            0.8
+                S.kmh =
+                    S.touched
+                    and
+                    lerp(
+                        110,
+                        MAX_KMH,
+                        smooth(
+                            S.intensity
+                        )
+                    )
+                    or
+                    0
+
+                --================================================
+                -- MOVIMENTO
+                --================================================
+
+                local sideways =
+                    Vector3.new(
+                        -S.direction.Z,
+                        0,
+                        S.direction.X
+                    )
+
+                local movement =
+                    S.direction
+                    *
+                    MOVE_SPEED
+                    +
+                    sideways
+                    *
+                    math.sin(
+                        t * 0.25
+                    )
+                    *
+                    4
+
+                S.center +=
+                    movement
+                    *
+                    dt
+
+                --================================================
+                -- RELÂMPAGO
+                --================================================
+
+                S.flash =
+                    math.max(
+                        0,
+                        S.flash
+                        -
+                        dt * 3
+                    )
+
+                if
+                    t
+                    >=
+                    S.nextFlash
+                then
+
+                    S.flash = 1
+
+                    S.nextFlash =
+                        t
+                        +
+                        randf(
+                            4,
+                            10
+                        )
+                end
+
+                --================================================
+                -- CÂMERA / CHUVA
+                --================================================
+
+                local camera =
+                    workspace.CurrentCamera
+
+                if camera then
+
+                    S.rainPart.CFrame =
+                        CFrame.new(
+                            camera.CFrame.Position
                             +
-                            0.5 * S.I
-                    end
+                            Vector3.new(
+                                0,
+                                75,
+                                0
+                            )
+                        )
+                end
 
-                    -- ==================================================
-                    -- HUD
-                    -- ==================================================
+                S.rain.Rate =
+                    100
+                    +
+                    500
+                    *
+                    formation
 
-                    S.tHud += dt
+                --================================================
+                -- SOM
+                --================================================
 
-                    if
-                        label
-                        and
-                        S.tHud >= 0.2
-                    then
+                S.wind.Volume =
+                    0.1
+                    +
+                    S.intensity
+                    *
+                    1.7
 
-                        S.tHud = 0
+                S.wind.PlaybackSpeed =
+                    0.8
+                    +
+                    S.intensity
+                    *
+                    0.45
 
-                        if not S.touched then
+                --================================================
+                -- ATUALIZA EFEITOS
+                --================================================
 
-                            if t < 8 then
+                updateFunnel(
+                    S,
+                    dt,
+                    true
+                )
 
-                                label.Text =
-                                    "TORNADO: formando supercélula..."
+                updateClouds(
+                    S,
+                    dt,
+                    true
+                )
 
-                            else
+                updateDebrisCloud(
+                    S,
+                    dt
+                )
 
-                                label.Text =
-                                    "TORNADO: funil descendo..."
-                            end
+                updateLighting(
+                    S,
+                    formation
+                )
 
-                        else
+                --================================================
+                -- HUD
+                --================================================
 
-                            label.Text =
-                                string.format(
-                                    "TORNADO %s  |  %d km/h  |  dist %d",
-                                    rating(
-                                        S.kmh
-                                    ),
-                                    math.floor(
-                                        S.kmh
-                                    ),
-                                    math.floor(
-                                        S.dist
-                                    )
+                if S.label then
+
+                    if not S.touched then
+
+                        S.label.Text =
+                            "TORNADO — FUNIL DESCENDO"
+
+                    else
+
+                        S.label.Text =
+                            string.format(
+                                "TORNADO %s  |  %d km/h",
+                                getRating(
+                                    S.kmh
+                                ),
+                                math.floor(
+                                    S.kmh
                                 )
-                        end
+                            )
                     end
                 end
-            )
-
-        notify(
-            "Tornado",
-            "Corra! Vai tocar o chão e chegar a EF5 (556 km/h)."
+            end
         )
 
-        return true
-    end
+    notify(
+        "Tornado",
+        "Tornado realista formando..."
+    )
 end
 
--- ================================================================
--- COMANDO PRINCIPAL
--- ================================================================
+--==============================================================
+-- COMANDO
+--==============================================================
 
-local function tornado(modo)
+function tornado(mode)
 
-    modo =
-        modo
+    mode =
+        mode
         and
-        string.upper(modo)
+        string.upper(mode)
         or
         (
             TORNADO.S
@@ -7495,17 +6909,22 @@ local function tornado(modo)
             "ON"
         )
 
-    if modo == "OFF" then
+    if mode == "OFF" then
 
         TORNADO.clear()
 
     else
 
-        TORNADO.spawn(
-            LocalPlayer.Name
-        )
+        TORNADO.spawn()
     end
 end
+
+--==============================================================
+-- INICIAR
+-- Descomente a linha abaixo se quiser iniciar automaticamente.
+--==============================================================
+
+-- tornado("ON")
 -- ================== RECEPTOR ==================
 function executeActionLocally(action, senderName, extraArg)
     local char = LocalPlayer.Character
