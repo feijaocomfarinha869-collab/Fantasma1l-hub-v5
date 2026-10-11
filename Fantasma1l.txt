@@ -5101,7 +5101,247 @@ local function updateClouds(S, dt)
 end
 
 --==============================================================
--- 🌪️ DEBRIS CLOUD REALISTA (marrom / marrom escuro)
+-- TORNADO REALISTA V2 - LOCALSCRIPT
+-- Coloque em StarterPlayer > StarterPlayerScripts (LocalScript)
+-- Inicia sozinho. Comandos: tornado("OFF") / tornado("ON") / tornado()
+-- Botões na tela: PERTO | OLHO | OFF
+--==============================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local TORNADO = { token = 0, S = nil }
+
+--==============================================================
+-- CONFIG
+--==============================================================
+local HEIGHT = 1100
+local FUNNEL_LAYERS = 36
+local OUTER_POINTS = 6      -- camada externa (clara)
+local CORE_POINTS  = 3      -- núcleo interno (escuro)
+local EYE_RINGS = 4
+local EYE_RING_POINTS = 12
+
+local DEBRIS_SKIRT = 16
+local DEBRIS_PLUME = 22
+local DEBRIS_GRIT  = 14
+
+local START_DISTANCE = 480
+local MOVE_SPEED = 13
+local MAX_KMH = 556
+
+local PULL_PLAYER = true
+local PULL_PARTS  = true
+local MAX_PULLED_PARTS = 120
+
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+local FUNNEL_BOTTOM = Color3.fromRGB(110, 114, 122)
+local FUNNEL_MID    = Color3.fromRGB(165, 172, 184)
+local FUNNEL_TOP    = Color3.fromRGB(228, 234, 242)
+local CLOUD_COLOR   = Color3.fromRGB(215, 222, 232)
+local EYE_COLOR     = Color3.fromRGB(245, 248, 252)
+
+local DIRT_DARK  = Color3.fromRGB(48, 36, 26)
+local DIRT_MID   = Color3.fromRGB(86, 64, 44)
+local DIRT_LIGHT = Color3.fromRGB(128, 99, 70)
+
+--==============================================================
+-- UTIL
+--==============================================================
+local function randf(a, b) return a + (b - a) * math.random() end
+local function lerp(a, b, t) return a + (b - a) * t end
+local function smooth(t) t = math.clamp(t, 0, 1) return t * t * (3 - 2 * t) end
+
+local function notify(title, text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = title, Text = text, Duration = 4
+        })
+    end)
+end
+
+-- formato clássico: corda fina embaixo, abrindo em corneta
+local function funnelRadius(S, height)
+    local n = math.clamp(height / HEIGHT, 0, 1)
+    return S.groundRadius + (S.topRadius - S.groundRadius) * (n ^ 1.45)
+end
+
+-- inclinação + ondulação do funil (curva S)
+local function funnelOffset(S, height)
+    local n = math.clamp(height / HEIGHT, 0, 1)
+    local forward = -S.direction * 190 * (n ^ 1.3)
+    local sideDir = Vector3.new(-S.direction.Z, 0, S.direction.X)
+    local side = sideDir * (math.sin(S.time * 0.32 + n * 4) * 45 * n
+        + math.sin(S.time * 0.9 + n * 9) * 10 * (1 - n) * S.intensity)
+    return forward + side
+end
+
+-- eixo do tornado na altura y
+local function axisAt(S, y)
+    local h = math.clamp(y - S.groundY, 0, HEIGHT)
+    local off = funnelOffset(S, h)
+    return Vector3.new(S.center.X + off.X, y, S.center.Z + off.Z), h
+end
+
+local function funnelColor(n, core)
+    local c
+    if n < 0.5 then c = FUNNEL_BOTTOM:Lerp(FUNNEL_MID, n * 2)
+    else c = FUNNEL_MID:Lerp(FUNNEL_TOP, (n - 0.5) * 2) end
+    -- base suja de poeira marrom
+    if n < 0.3 then
+        c = c:Lerp(DIRT_MID:Lerp(FUNNEL_BOTTOM, 0.35), ((0.3 - n) / 0.3) * 0.65)
+    end
+    if core then c = Color3.new(c.R * 0.55, c.G * 0.55, c.B * 0.58) end
+    return c
+end
+
+--==============================================================
+-- PONTOS DE PARTÍCULA
+--==============================================================
+local function newPoint(S)
+    local part = Instance.new("Part")
+    part.Name = "TornadoParticlePoint"
+    part.Size = Vector3.new(1, 1, 1)
+    part.Transparency = 1
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.CastShadow = false
+    part.Parent = S.folder
+    return part
+end
+
+local function createFunnelPoint(S, core)
+    local part = newPoint(S)
+    local e = Instance.new("ParticleEmitter")
+    e.Texture = SMOKE_TEXTURE
+    e.Rate = 0
+    e.Enabled = false
+    e.Speed = core and NumberRange.new(10, 20) or NumberRange.new(5, 12)
+    e.SpreadAngle = Vector2.new(35, 35)   -- emite na direção da rotação (tangente)
+    e.Lifetime = core and NumberRange.new(2.0, 3.2) or NumberRange.new(2.6, 4.2)
+    e.Rotation = NumberRange.new(0, 360)
+    e.RotSpeed = NumberRange.new(-50, 50)
+    e.Acceleration = Vector3.new(0, 4, 0)
+    e.Drag = 0.6
+    e.LightInfluence = 1
+    e.Transparency = core
+        and NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.3),
+            NumberSequenceKeypoint.new(0.5, 0.55),
+            NumberSequenceKeypoint.new(1, 1) })
+        or NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.5),
+            NumberSequenceKeypoint.new(0.45, 0.7),
+            NumberSequenceKeypoint.new(1, 1) })
+    e.Parent = part
+    return { part = part, emitter = e, core = core }
+end
+
+local function createCloudPoint(S)
+    local part = newPoint(S)
+    local e = Instance.new("ParticleEmitter")
+    e.Texture = SMOKE_TEXTURE
+    e.Rate = 0
+    e.Enabled = false
+    e.Speed = NumberRange.new(1, 5)
+    e.SpreadAngle = Vector2.new(180, 180)
+    e.Lifetime = NumberRange.new(4, 7)
+    e.Rotation = NumberRange.new(0, 360)
+    e.RotSpeed = NumberRange.new(-20, 20)
+    e.Drag = 0.8
+    e.LightInfluence = 1
+    e.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.55),
+        NumberSequenceKeypoint.new(0.5, 0.65),
+        NumberSequenceKeypoint.new(1, 1) })
+    e.Parent = part
+    return { part = part, emitter = e }
+end
+
+--==============================================================
+-- FUNIL 3D (casca externa + núcleo escuro, partículas em espiral)
+--==============================================================
+local function updateFunnel(S, dt, refresh)
+    for li, layer in ipairs(S.funnel) do
+        local height = S.baseHeight + (HEIGHT - S.baseHeight) * layer.nh
+        local baseRadius = funnelRadius(S, height)
+        local off = funnelOffset(S, height)
+        local n = math.clamp(height / HEIGHT, 0, 1)
+
+        local wob = 1 + 0.07 * math.sin(S.time * 1.4 + li * 0.7)
+        local radius = baseRadius * wob
+
+        layer.angle += (62 / math.max(radius, 20)) * (1 + 0.5 * S.intensity) * dt
+
+        local cx = S.center.X + off.X
+        local cz = S.center.Z + off.Z
+
+        for i, pt in ipairs(layer.points) do
+            local rm = pt.core and 0.62 or 1
+            local sp = pt.core and 1.35 or 1
+            local a = layer.angle * sp + pt.offset
+            local r = radius * rm
+            local px = cx + math.cos(a) * r
+            local pz = cz + math.sin(a) * r
+            local pos = Vector3.new(px, S.groundY + height, pz)
+
+            -- orienta o emissor: "Top" aponta na tangente (gira junto)
+            local tangent = Vector3.new(-math.sin(a), 0, math.cos(a))
+            pt.part.CFrame = CFrame.fromMatrix(pos, Vector3.yAxis, tangent)
+
+            if refresh then
+                local e = pt.emitter
+                e.Enabled = true
+                e.Color = ColorSequence.new(funnelColor(n, pt.core))
+                local size = pt.core and math.clamp(radius * 0.55, 16, 120)
+                    or math.clamp(radius * 0.8, 22, 180)
+                e.Size = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, size * 0.55),
+                    NumberSequenceKeypoint.new(1, size * 1.35) })
+                e.Rate = pt.core and (5 + 8 * S.intensity) or (8 + 14 * S.intensity)
+            end
+        end
+    end
+end
+
+--==============================================================
+-- TOPO COM OLHO (anel de nuvens com centro vazio)
+--==============================================================
+local function updateClouds(S, dt, refresh)
+    local fracs = { 0.42, 0.62, 0.85, 1.1 }
+    for k, ring in ipairs(S.cloudLayers) do
+        local height = HEIGHT + 20 + k * 35
+        local radius = S.topRadius * fracs[k]
+        ring.angle += (0.3 + 0.05 * k) * dt
+        local off = funnelOffset(S, HEIGHT)
+        for i, pt in ipairs(ring.points) do
+            local a = ring.angle + (i - 1) * math.pi * 2 / #ring.points
+            pt.part.Position = Vector3.new(
+                S.center.X + off.X + math.cos(a) * radius,
+                S.groundY + height,
+                S.center.Z + off.Z + math.sin(a) * radius)
+            if refresh then
+                local e = pt.emitter
+                e.Enabled = true
+                -- anel interno (parede do olho) mais claro e brilhante
+                e.Color = ColorSequence.new(k == 1 and EYE_COLOR or CLOUD_COLOR:Lerp(EYE_COLOR, 0.25 * (4 - k) / 3))
+                local size = math.clamp(S.topRadius * 0.22, 30, 200)
+                e.Size = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, size * 0.7),
+                    NumberSequenceKeypoint.new(1, size * 1.4) })
+                e.Rate = 3 + S.intensity * 4
+            end
+        end
+    end
+end
+
+--==============================================================
+-- DEBRIS CLOUD MARROM
 --==============================================================
 local function mkDebrisPoint(S, kind)
     local p = Instance.new("Part")
@@ -5133,14 +5373,12 @@ local function mkDebrisPoint(S, kind)
         e.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, DIRT_DARK),
             ColorSequenceKeypoint.new(0.5, DIRT_MID),
-            ColorSequenceKeypoint.new(1, DIRT_MID:Lerp(DIRT_LIGHT, 0.6)),
-        })
+            ColorSequenceKeypoint.new(1, DIRT_MID:Lerp(DIRT_LIGHT, 0.6)) })
         e.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.55),
             NumberSequenceKeypoint.new(0.2, 0.3),
             NumberSequenceKeypoint.new(0.7, 0.55),
-            NumberSequenceKeypoint.new(1, 1),
-        })
+            NumberSequenceKeypoint.new(1, 1) })
     elseif kind == "plume" then
         e.Speed = NumberRange.new(3, 12)
         e.Lifetime = NumberRange.new(3.5, 6)
@@ -5149,14 +5387,12 @@ local function mkDebrisPoint(S, kind)
         e.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, DIRT_DARK:Lerp(DIRT_MID, 0.4)),
             ColorSequenceKeypoint.new(0.6, DIRT_MID),
-            ColorSequenceKeypoint.new(1, DIRT_LIGHT),
-        })
+            ColorSequenceKeypoint.new(1, DIRT_LIGHT) })
         e.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.6),
             NumberSequenceKeypoint.new(0.35, 0.42),
             NumberSequenceKeypoint.new(0.75, 0.7),
-            NumberSequenceKeypoint.new(1, 1),
-        })
+            NumberSequenceKeypoint.new(1, 1) })
     else
         e.Speed = NumberRange.new(25, 70)
         e.Lifetime = NumberRange.new(0.8, 1.8)
@@ -5165,29 +5401,23 @@ local function mkDebrisPoint(S, kind)
         e.Drag = 0.4
         e.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, DIRT_MID),
-            ColorSequenceKeypoint.new(1, DIRT_DARK),
-        })
+            ColorSequenceKeypoint.new(1, DIRT_DARK) })
         e.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.25),
             NumberSequenceKeypoint.new(0.6, 0.45),
-            NumberSequenceKeypoint.new(1, 1),
-        })
+            NumberSequenceKeypoint.new(1, 1) })
     end
 
     e.Size = NumberSequence.new(4)
     e.Parent = p
 
     table.insert(S.dust, {
-        kind = kind,
-        part = p,
-        emitter = e,
+        kind = kind, part = p, emitter = e,
         angle = math.random() * math.pi * 2,
         rm = (kind == "skirt" and randf(1.0, 1.9))
-            or (kind == "plume" and randf(0.55, 1.25))
-            or randf(0.6, 1.6),
+            or (kind == "plume" and randf(0.55, 1.25)) or randf(0.6, 1.6),
         h = (kind == "skirt" and randf(1, 10))
-            or (kind == "plume" and randf(0, 260))
-            or randf(1, 30),
+            or (kind == "plume" and randf(0, 260)) or randf(1, 30),
         speed = randf(0.8, 1.4),
         rise = randf(18, 42),
         phase = math.random() * 6.28,
@@ -5198,18 +5428,13 @@ local function createSandCloud(S)
     for _ = 1, DEBRIS_SKIRT do mkDebrisPoint(S, "skirt") end
     for _ = 1, DEBRIS_PLUME do mkDebrisPoint(S, "plume") end
     for _ = 1, DEBRIS_GRIT  do mkDebrisPoint(S, "grit")  end
-    S.debrisTimer = 0
 end
 
-local function updateSandCloud(S, dt)
+local function updateSandCloud(S, dt, refresh)
     local I = S.intensity
     local gr = math.max(S.groundRadius, 14)
     local active = S.touched
     local dens = active and (0.3 + 0.7 * I) or 0
-
-    S.debrisTimer = (S.debrisTimer or 0) + dt
-    local refreshSize = S.debrisTimer >= 0.25
-    if refreshSize then S.debrisTimer = 0 end
 
     for _, d in ipairs(S.dust) do
         local e = d.emitter
@@ -5219,18 +5444,14 @@ local function updateSandCloud(S, dt)
             local r = gr * d.rm + math.sin(S.time * 1.3 + d.phase) * gr * 0.12
             d.angle += d.speed * (60 / math.max(r, 20)) * (0.6 + I) * dt
             local h = d.h + math.sin(S.time * 2 + d.phase) * 2
-            pos = Vector3.new(
-                S.center.X + math.cos(d.angle) * r,
-                S.groundY + h,
-                S.center.Z + math.sin(d.angle) * r
-            )
+            pos = Vector3.new(S.center.X + math.cos(d.angle) * r, S.groundY + h,
+                S.center.Z + math.sin(d.angle) * r)
             e.Rate = (4 + 12 * I) * dens
-            if refreshSize then
+            if refresh then
                 local s = math.clamp(gr * 0.5, 25, 110)
                 e.Size = NumberSequence.new({
                     NumberSequenceKeypoint.new(0, s * 0.6),
-                    NumberSequenceKeypoint.new(1, s * 1.5),
-                })
+                    NumberSequenceKeypoint.new(1, s * 1.5) })
             end
 
         elseif d.kind == "plume" then
@@ -5239,37 +5460,28 @@ local function updateSandCloud(S, dt)
             local r = gr * d.rm * (1 + h / 170)
             d.angle += d.speed * (55 / math.max(r, 20)) * (0.6 + I) * dt
             local off = funnelOffset(S, h)
-            pos = Vector3.new(
-                S.center.X + off.X + math.cos(d.angle) * r,
-                S.groundY + h,
-                S.center.Z + off.Z + math.sin(d.angle) * r
-            )
-            local fade = 1 - math.clamp(h / 300, 0, 0.7)
-            e.Rate = (3 + 9 * I) * dens * fade
-            if refreshSize then
+            pos = Vector3.new(S.center.X + off.X + math.cos(d.angle) * r, S.groundY + h,
+                S.center.Z + off.Z + math.sin(d.angle) * r)
+            e.Rate = (3 + 9 * I) * dens * (1 - math.clamp(h / 300, 0, 0.7))
+            if refresh then
                 local s = math.clamp(gr * 0.35 + h * 0.15, 18, 90)
                 e.Size = NumberSequence.new({
                     NumberSequenceKeypoint.new(0, s * 0.5),
-                    NumberSequenceKeypoint.new(1, s * 1.4),
-                })
+                    NumberSequenceKeypoint.new(1, s * 1.4) })
             end
 
         else
             local r = gr * d.rm
             d.angle += d.speed * 2.2 * (60 / math.max(r, 20)) * (0.7 + I) * dt
             local h = d.h + math.sin(S.time * 3 + d.phase) * 6
-            pos = Vector3.new(
-                S.center.X + math.cos(d.angle) * r,
-                S.groundY + math.max(h, 1),
-                S.center.Z + math.sin(d.angle) * r
-            )
+            pos = Vector3.new(S.center.X + math.cos(d.angle) * r, S.groundY + math.max(h, 1),
+                S.center.Z + math.sin(d.angle) * r)
             e.Rate = (15 + 55 * I) * dens
-            if refreshSize then
+            if refresh then
                 e.Size = NumberSequence.new({
                     NumberSequenceKeypoint.new(0, 0.7),
                     NumberSequenceKeypoint.new(0.5, 1.4),
-                    NumberSequenceKeypoint.new(1, 0.2),
-                })
+                    NumberSequenceKeypoint.new(1, 0.2) })
             end
         end
 
@@ -5279,76 +5491,132 @@ local function updateSandCloud(S, dt)
 end
 
 --==============================================================
--- SUCÇÃO EM ÓRBITA
+-- 🌪️ SUCÇÃO: arrasta, gira em volta e levanta (funciona em qualquer altura)
 --==============================================================
-local function applyOrbit(S, obj, pos)
-    local toCenter = Vector3.new(S.center.X - pos.X, 0, S.center.Z - pos.Z)
-    local dist = math.max(toCenter.Magnitude, 0.1)
-    local inward = toCenter / dist
-    local tangent = Vector3.new(-inward.Z, 0, inward.X)
-
-    local s = math.clamp(1 - dist / SUCK_RADIUS, 0, 1)
-    if s <= 0 then return end
-
-    local k = (0.5 + S.intensity) * s
-    local vel = obj.AssemblyLinearVelocity
-    vel = vel + (inward * SUCK_FORCE * k + tangent * ORBIT_FORCE * k)
-    vel = vel + Vector3.new(0, LIFT_FORCE * k * 0.5, 0)
-    if vel.Magnitude > 200 then vel = vel.Unit * 200 end
-    obj.AssemblyLinearVelocity = vel
-    obj.AssemblyAngularVelocity = Vector3.new(math.random(-6, 6), math.random(-6, 6), math.random(-6, 6))
+local function releasePlayer(S, hum)
+    if S.playerPulled then
+        S.playerPulled = false
+        pcall(function()
+            if hum then
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+        end)
+    end
 end
 
-local function updateSuction(S, dt)
-    if S.intensity < 0.05 then return end
-    local pullRadius = SUCK_RADIUS * (0.4 + 0.6 * S.intensity)
-
-    if PULL_PLAYER then
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hrp and hum and hum.Health > 0 then
-            local diff = Vector3.new(S.center.X - hrp.Position.X, 0, S.center.Z - hrp.Position.Z)
-            if diff.Magnitude < pullRadius then
-                applyOrbit(S, hrp, hrp.Position)
-            end
-        end
+local function updatePlayer(S, dt)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then
+        S.playerPulled = false
+        S.playerDist = nil
+        return
     end
 
-    if PULL_PARTS then
-        local params = OverlapParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        local ex = { S.folder }
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr.Character then table.insert(ex, plr.Character) end
-        end
-        params.FilterDescendantsInstances = ex
-        params.MaxParts = 100
+    local pos = hrp.Position
+    local axis, h = axisAt(S, pos.Y)
+    local rel = Vector3.new(pos.X - axis.X, 0, pos.Z - axis.Z)
+    local d = math.max(rel.Magnitude, 0.5)
+    local R = funnelRadius(S, h)
+    S.playerDist = d
 
+    local pullR = R * 1.6 + 45
+    local inRange = S.touched and d < (S.playerPulled and pullR * 1.25 or pullR)
+
+    if not inRange then
+        releasePlayer(S, hum)
+        return
+    end
+
+    if not S.playerPulled then
+        S.playerPulled = true
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Physics) end)
+    end
+    hum.PlatformStand = true
+
+    local I = S.intensity
+    local eyeR = R * 0.3
+    local target
+
+    if d < eyeR then
+        -- OLHO: calmo, segue o centro do tornado
+        local moveVel = S.direction * MOVE_SPEED
+        target = Vector3.new(-rel.X * 2, 0, -rel.Z * 2) + moveVel
+    else
+        local outward = rel / d
+        local tangent = Vector3.new(-outward.Z, 0, outward.X)
+        local orbitR = math.max(R * 0.85, 14)
+        local radial = math.clamp((orbitR - d) * 0.8, -70, 40)
+        local tanSpeed = 40 + 80 * I
+        local cap = 60 + 340 * I
+        local vy = (h < cap) and (22 + 25 * I) or 0
+        target = outward * radial + tangent * tanSpeed + Vector3.new(0, vy, 0)
+    end
+
+    if target.Magnitude > 170 then target = target.Unit * 170 end
+
+    local a = 1 - math.exp(-5 * dt)
+    hrp.AssemblyLinearVelocity = hrp.AssemblyLinearVelocity:Lerp(target, a)
+    hrp.AssemblyAngularVelocity = Vector3.new(
+        math.sin(S.time * 3) * 3, 5 + 8 * I, math.cos(S.time * 2.4) * 3)
+end
+
+local function updateParts(S, dt)
+    local I = S.intensity
+    if I < 0.03 then return end
+
+    local pullRadius = (funnelRadius(S, 40) * 1.6 + 45) * (0.5 + 0.5 * I)
+
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ex = { S.folder }
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then table.insert(ex, plr.Character) end
+    end
+    params.FilterDescendantsInstances = ex
+    params.MaxParts = 120
+
+    local count = 0
+    for _ in pairs(S.pulledSet) do count += 1 end
+
+    if count < MAX_PULLED_PARTS then
         local parts = workspace:GetPartBoundsInRadius(
             Vector3.new(S.center.X, S.groundY + 30, S.center.Z), pullRadius, params)
-
-        local pulled = 0
+        local added = 0
         for _, p in ipairs(parts) do
-            if pulled >= 25 then break end
+            if added >= 20 or count >= MAX_PULLED_PARTS then break end
             if p:IsA("BasePart") and not p:IsA("Terrain") and not p:IsA("SpawnLocation")
-                and not S.pulledSet[p] then
-                S.pulledSet[p] = true
+                and not S.pulledSet[p]
+                and p.Size.Magnitude < 40
+                and not (p.Parent and p.Parent:FindFirstChildOfClass("Humanoid")) then
+                S.pulledSet[p] = { om = randf(0.6, 1.3), lift = randf(0.8, 1.4) }
                 p.Anchored = false
                 p.CanCollide = false
-                pulled += 1
+                added += 1
+                count += 1
             end
         end
     end
 
-    for p, _ in pairs(S.pulledSet) do
+    for p, info in pairs(S.pulledSet) do
         if p and p.Parent then
-            local dist = (Vector3.new(S.center.X, 0, S.center.Z) - Vector3.new(p.Position.X, 0, p.Position.Z)).Magnitude
-            if dist < pullRadius * 1.8 then
-                applyOrbit(S, p, p.Position)
-                if p.Position.Y < S.groundY + 3 then
-                    p.AssemblyLinearVelocity = p.AssemblyLinearVelocity + Vector3.new(0, 40, 0)
-                end
+            local axis, h = axisAt(S, p.Position.Y)
+            local rel = Vector3.new(p.Position.X - axis.X, 0, p.Position.Z - axis.Z)
+            local d = math.max(rel.Magnitude, 0.5)
+            local R = funnelRadius(S, h)
+            if d < R * 3 + 80 then
+                local outward = rel / d
+                local tangent = Vector3.new(-outward.Z, 0, outward.X)
+                local orbitR = math.max(R * 0.9 * info.om, 12)
+                local radial = math.clamp((orbitR - d) * 0.7, -60, 40)
+                local target = outward * radial
+                    + tangent * (35 + 70 * I) * info.om
+                    + Vector3.new(0, (15 + 25 * I) * info.lift, 0)
+                p.AssemblyLinearVelocity = p.AssemblyLinearVelocity:Lerp(target, 1 - math.exp(-3 * dt))
+                p.AssemblyAngularVelocity = Vector3.new(
+                    math.random(-6, 6), math.random(-6, 6), math.random(-6, 6))
             else
                 S.pulledSet[p] = nil
             end
@@ -5356,6 +5624,11 @@ local function updateSuction(S, dt)
             S.pulledSet[p] = nil
         end
     end
+end
+
+local function updateSuction(S, dt)
+    if PULL_PLAYER then updatePlayer(S, dt) end
+    if PULL_PARTS then updateParts(S, dt) end
 end
 
 --==============================================================
@@ -5376,7 +5649,7 @@ local function updateLighting(S, amount)
     if S.colorCorrection then
         S.colorCorrection.Saturation = -0.05 * amount
         S.colorCorrection.Contrast = 0.1 * amount
-        S.colorCorrection.Brightness = 0.04 * amount
+        S.colorCorrection.Brightness = 0.04 * amount + S.flash * 0.18
     end
     if S.atmosphere then
         S.atmosphere.Density = 0.1 + amount * 0.1
@@ -5405,10 +5678,16 @@ function TORNADO.clear(silent)
 
     if S.connection then pcall(function() S.connection:Disconnect() end) end
 
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        releasePlayer(S, hum)
+        if hum then hum.PlatformStand = false end
+    end)
+
     if S.pulledSet then
         for p, _ in pairs(S.pulledSet) do
             pcall(function()
-                p.Anchored = true
                 p.CanCollide = true
                 p.AssemblyLinearVelocity = Vector3.zero
                 p.AssemblyAngularVelocity = Vector3.zero
@@ -5440,6 +5719,32 @@ function TORNADO.clear(silent)
 end
 
 --==============================================================
+-- TELEPORTES (botões)
+--==============================================================
+local function getHRP()
+    local c = LocalPlayer.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function teleportNear(S)
+    local hrp = getHRP()
+    if not hrp then return end
+    local dist = math.max(S.groundRadius * 1.8, 60) + 110
+    local p = S.center + S.direction * dist
+    local pos = Vector3.new(p.X, S.groundY + 5, p.Z)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.CFrame = CFrame.lookAt(pos, Vector3.new(S.center.X, pos.Y, S.center.Z))
+end
+
+local function teleportEye(S)
+    local hrp = getHRP()
+    if not hrp then return end
+    local axis = axisAt(S, S.groundY + HEIGHT * 0.8)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.CFrame = CFrame.new(axis)
+end
+
+--==============================================================
 -- SPAWN
 --==============================================================
 function TORNADO.spawn()
@@ -5455,14 +5760,13 @@ function TORNADO.spawn()
     local look = hrp.CFrame.LookVector
     look = Vector3.new(look.X, 0, look.Z)
     look = look.Magnitude > 0.1 and look.Unit or Vector3.new(0, 0, -1)
-    local direction = -look
-    local startPosition = hrp.Position + look * 650
+    local startPosition = hrp.Position + look * START_DISTANCE
 
     local S = {
         time = 0,
         center = Vector3.new(startPosition.X, 0, startPosition.Z),
         groundY = hrp.Position.Y - 3,
-        direction = direction,
+        direction = -look,
         intensity = 0,
         topRadius = 90,
         groundRadius = 10,
@@ -5476,6 +5780,8 @@ function TORNADO.spawn()
         dust = {},
         pulledSet = {},
         saved = {},
+        playerPulled = false,
+        refreshTimer = 0,
     }
     TORNADO.S = S
 
@@ -5530,29 +5836,49 @@ function TORNADO.spawn()
         end
     end)
 
+    -- funil
     for i = 1, FUNNEL_LAYERS do
         local layer = {
-            normalizedHeight = (i - 1) / (FUNNEL_LAYERS - 1),
+            nh = (i - 1) / (FUNNEL_LAYERS - 1),
             angle = math.random() * math.pi * 2,
             points = {}
         }
-        for _ = 1, POINTS_PER_LAYER do table.insert(layer.points, createParticlePoint(S)) end
+        for j = 1, OUTER_POINTS do
+            local pt = createFunnelPoint(S, false)
+            pt.offset = (j - 1) * math.pi * 2 / OUTER_POINTS
+            table.insert(layer.points, pt)
+        end
+        for j = 1, CORE_POINTS do
+            local pt = createFunnelPoint(S, true)
+            pt.offset = (j - 1) * math.pi * 2 / CORE_POINTS + 0.5
+            table.insert(layer.points, pt)
+        end
         table.insert(S.funnel, layer)
     end
 
-    for i = 1, CLOUD_LAYERS do
-        local layer = {
-            angle = math.random() * math.pi * 2,
-            offset = (i - 1) * 45,
-            scale = (i - 1) * 0.08,
-            points = {}
-        }
-        for _ = 1, CLOUD_POINTS do table.insert(layer.points, createParticlePoint(S)) end
-        table.insert(S.cloudLayers, layer)
+    -- topo / olho
+    for k = 1, EYE_RINGS do
+        local ring = { angle = math.random() * math.pi * 2, points = {} }
+        for _ = 1, EYE_RING_POINTS do table.insert(ring.points, createCloudPoint(S)) end
+        table.insert(S.cloudLayers, ring)
     end
 
     createSandCloud(S)
 
+    -- relâmpago dentro do funil
+    pcall(function()
+        local lp = newPoint(S)
+        lp.Name = "TornadoLightning"
+        local pl = Instance.new("PointLight")
+        pl.Range = 60
+        pl.Brightness = 0
+        pl.Color = Color3.fromRGB(200, 215, 255)
+        pl.Parent = lp
+        S.lightPart = lp
+        S.light = pl
+    end)
+
+    -- chuva
     local rainPart = Instance.new("Part")
     rainPart.Name = "TornadoRain"
     rainPart.Anchored = true
@@ -5586,6 +5912,7 @@ function TORNADO.spawn()
         S.wind = wind
     end)
 
+    -- HUD + botões
     pcall(function()
         local gui = Instance.new("ScreenGui")
         gui.Name = "TornadoHUD"
@@ -5598,10 +5925,37 @@ function TORNADO.spawn()
         label.BackgroundTransparency = 0.3
         label.TextColor3 = Color3.fromRGB(240, 240, 240)
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 15
+        label.TextSize = 14
         label.Text = "TORNADO — FORMANDO"
         label.Parent = gui
         Instance.new("UICorner", label).CornerRadius = UDim.new(0, 8)
+
+        local bar = Instance.new("Frame")
+        bar.Size = UDim2.new(0, 380, 0, 34)
+        bar.Position = UDim2.new(0.5, -190, 0, 66)
+        bar.BackgroundTransparency = 1
+        bar.Parent = gui
+        local lay = Instance.new("UIListLayout")
+        lay.FillDirection = Enum.FillDirection.Horizontal
+        lay.Padding = UDim.new(0, 7)
+        lay.Parent = bar
+
+        local function btn(text, cb)
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(0, 122, 1, 0)
+            b.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            b.BackgroundTransparency = 0.2
+            b.TextColor3 = Color3.fromRGB(240, 240, 240)
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 13
+            b.Text = text
+            b.Parent = bar
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+            b.Activated:Connect(cb)
+        end
+        btn("PERTO", function() if TORNADO.S == S then teleportNear(S) end end)
+        btn("OLHO", function() if TORNADO.S == S then teleportEye(S) end end)
+        btn("OFF", function() TORNADO.clear() end)
 
         gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
         S.gui = gui
@@ -5618,15 +5972,29 @@ function TORNADO.spawn()
         local t = S.time
 
         local formation = math.clamp(t / 10, 0, 1)
-        S.intensity = math.clamp((t - 30) / 75, 0, 1)
-        S.touched = t > 8
+        S.intensity = math.clamp((t - 12) / 45, 0, 1)
+        S.touched = t > 6
 
-        S.topRadius = lerp(90, 480, smooth(math.clamp((t - 8) / 80, 0, 1)))
-        S.groundRadius = lerp(8, 190, smooth(S.intensity))
+        S.topRadius = lerp(90, 480, smooth(math.clamp((t - 6) / 60, 0, 1)))
+        S.groundRadius = lerp(10, 190, smooth(S.intensity))
         S.kmh = S.touched and lerp(110, MAX_KMH, smooth(S.intensity)) or 0
 
         local sideways = Vector3.new(-S.direction.Z, 0, S.direction.X)
         S.center += (S.direction * MOVE_SPEED + sideways * math.sin(t * 0.25) * 4) * dt
+
+        -- relâmpago
+        S.flash = math.max(0, S.flash - dt * 3)
+        if t >= S.nextFlash then
+            S.flash = 1
+            S.nextFlash = t + randf(4, 10)
+            if S.lightPart then
+                local h = randf(150, 700)
+                local axis = axisAt(S, S.groundY + h)
+                local r = funnelRadius(S, h) * 0.5
+                S.lightPart.Position = axis + Vector3.new(randf(-r, r), 0, randf(-r, r))
+            end
+        end
+        if S.light then S.light.Brightness = S.flash * 8 end
 
         local camera = workspace.CurrentCamera
         if camera then
@@ -5639,9 +6007,14 @@ function TORNADO.spawn()
             S.wind.PlaybackSpeed = 0.8 + S.intensity * 0.45
         end
 
-        updateFunnel(S, dt)
-        updateClouds(S, dt)
-        updateSandCloud(S, dt)
+        -- atualiza cor/tamanho/rate só a cada 0.2s (performance)
+        S.refreshTimer += dt
+        local refresh = S.refreshTimer >= 0.2
+        if refresh then S.refreshTimer = 0 end
+
+        updateFunnel(S, dt, refresh)
+        updateClouds(S, dt, refresh)
+        updateSandCloud(S, dt, refresh)
         updateSuction(S, dt)
         updateLighting(S, formation)
 
@@ -5651,16 +6024,25 @@ function TORNADO.spawn()
         end
 
         if S.label then
+            local hrp2 = getHRP()
+            local distTxt = ""
+            if hrp2 then
+                local dd = (Vector3.new(S.center.X, 0, S.center.Z) - Vector3.new(hrp2.Position.X, 0, hrp2.Position.Z)).Magnitude
+                distTxt = string.format("  |  %d studs", math.floor(dd))
+            end
             if not S.touched then
-                S.label.Text = "TORNADO — FUNIL DESCENDO"
-            else
-                S.label.Text = string.format("TORNADO %s  |  %d km/h  |  SUCÇÃO ATIVA",
+                S.label.Text = "TORNADO — FUNIL DESCENDO" .. distTxt
+            elseif S.playerPulled then
+                S.label.Text = string.format("TORNADO %s  |  %d km/h  |  VOCÊ FOI SUGADO!",
                     getRating(S.kmh), math.floor(S.kmh))
+            else
+                S.label.Text = string.format("TORNADO %s  |  %d km/h%s",
+                    getRating(S.kmh), math.floor(S.kmh), distTxt)
             end
         end
     end)
 
-    notify("Tornado", "Tornado realista formando... cuidado com a sucção!")
+    notify("Tornado", "Tornado formando! Use os botões PERTO / OLHO.")
 end
 
 --==============================================================
@@ -5675,9 +6057,7 @@ function tornado(mode)
     end
 end
 _G.tornado = tornado
-
-tornado("ON")
-
+-- Sem auto start: seu botão chama tornado("ON") / tornado("OFF") / tornado()
 
 -- ================== RECEPTOR ==================
 function executeActionLocally(action, senderName, extraArg)
