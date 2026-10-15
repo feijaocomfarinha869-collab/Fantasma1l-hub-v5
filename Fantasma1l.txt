@@ -7354,126 +7354,374 @@ task.spawn(function()
     sendNetCmd(";PING ALL")
 end)
 
-=============== WINDUI ==================
+-- ================== ADM HUB ==================
 if IS_ADMIN then
 
-local okUI, WindUI = pcall(function()
+local function toggleFlyWithWings()
+    flyWingsActive = not flyWingsActive
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+    local head = char and char:FindFirstChild("Head")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not char or not hrp or not torso or not head then return end
+
+    if flyWingsActive then
+        local ok, w = pcall(function() return game:GetObjects("rbxassetid://" .. WINGS_ID) end)
+        if ok and w and #w > 0 then
+            wingsModel = w[1]
+            if not wingsModel:IsA("Model") then
+                local m = Instance.new("Model")
+                for _, o in ipairs(w) do o.Parent = m end
+                wingsModel = m
+            end
+            wingsModel.Parent = char
+            for _, p in ipairs(wingsModel:GetDescendants()) do
+                if p:IsA("BasePart") then p.Anchored, p.CanCollide = false, false end
+            end
+            local pr = wingsModel.PrimaryPart or wingsModel:FindFirstChildWhichIsA("BasePart", true)
+            if pr then
+                wingsModel.PrimaryPart = pr
+                local wc = Instance.new("WeldConstraint")
+                wc.Part0, wc.Part1, wc.Parent = torso, pr, pr
+            end
+        end
+        local function loadHalo(id)
+            local s, o = pcall(function() return game:GetObjects("rbxassetid://" .. id) end)
+            if s and o and #o > 0 then
+                local h = o[1]
+                if not h:IsA("Model") then
+                    local m = Instance.new("Model")
+                    for _, x in ipairs(o) do x.Parent = m end
+                    h = m
+                end
+                h.Parent = char
+                for _, p in ipairs(h:GetDescendants()) do
+                    if p:IsA("BasePart") then p.Anchored, p.CanCollide = false, false end
+                end
+                local pr = h.PrimaryPart or h:FindFirstChildWhichIsA("BasePart", true)
+                if pr then
+                    h.PrimaryPart = pr
+                    local wc = Instance.new("WeldConstraint")
+                    wc.Part0, wc.Part1, wc.Parent = head, pr, pr
+                end
+                return h
+            end
+        end
+        halo1Model = loadHalo(HALO1_ID)
+        halo2Model = loadHalo(HALO2_ID)
+        local bv = Instance.new("BodyVelocity", hrp)
+        bv.Name, bv.MaxForce, bv.Velocity = "FlyVelocity", Vector3.new(1e9,1e9,1e9), Vector3.zero
+        local bg = Instance.new("BodyGyro", hrp)
+        bg.Name, bg.MaxTorque, bg.CFrame = "FlyGyro", Vector3.new(1e9,1e9,1e9), hrp.CFrame
+        if hum then hum.PlatformStand = true end
+        local an = hum and hum:FindFirstChild("Animator")
+        local ia = Instance.new("Animation") ia.AnimationId = FLY_IDLE
+        local ma = Instance.new("Animation") ma.AnimationId = FLY_MOVE
+        local it = an and an:LoadAnimation(ia)
+        local mt = an and an:LoadAnimation(ma)
+        if it then it:Play() end
+        local lastM, cam = false, workspace.CurrentCamera
+        local wt, ht = 0, 0
+        flyConnections.RS = RunService.RenderStepped:Connect(function(dt)
+            if not hrp or not hrp.Parent then return end
+            local dir = Vector3.zero
+            local ccf = cam.CFrame
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + ccf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - ccf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - ccf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + ccf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+            if hum and hum.MoveDirection.Magnitude > 0 then dir = dir + hum.MoveDirection end
+            if dir.Magnitude > 0 then
+                bv.Velocity = dir.Unit * 55
+                if not lastM then
+                    lastM = true
+                    if it then it:Stop() end
+                    if mt and not mt.IsPlaying then mt:Play() end
+                end
+            else
+                bv.Velocity = Vector3.zero
+                if lastM then
+                    lastM = false
+                    if mt then mt:Stop() end
+                    if it and not it.IsPlaying then it:Play() end
+                end
+            end
+            bg.CFrame = ccf
+            wt = wt + dt * 5
+            if wingsModel and wingsModel.PrimaryPart then
+                wingsModel:SetPrimaryPartCFrame(torso.CFrame * CFrame.new(0,-0.2,0.6) * CFrame.Angles(0, math.pi, math.sin(wt)*0.15))
+            end
+            ht = ht + dt
+            local r = tick() * 3.5
+            if halo1Model and halo1Model.PrimaryPart then
+                halo1Model:SetPrimaryPartCFrame(head.CFrame * CFrame.new(0,1.3,0) * CFrame.Angles(0, r, 0))
+            end
+            if halo2Model and halo2Model.PrimaryPart then
+                halo2Model:SetPrimaryPartCFrame(head.CFrame * CFrame.new(0,1.3,0) * CFrame.Angles(0, -r, 0))
+            end
+            local t = math.floor(ht * 2) % 2 == 0 and 0 or 1
+            if halo1Model then for _, p in ipairs(halo1Model:GetDescendants()) do if p:IsA("BasePart") then p.Transparency = t end end end
+            if halo2Model then for _, p in ipairs(halo2Model:GetDescendants()) do if p:IsA("BasePart") then p.Transparency = 1 - t end end end
+        end)
+    else
+        for _, c in pairs(flyConnections) do c:Disconnect() end
+        flyConnections = {}
+        if wingsModel then wingsModel:Destroy() wingsModel = nil end
+        if halo1Model then halo1Model:Destroy() halo1Model = nil end
+        if halo2Model then halo2Model:Destroy() halo2Model = nil end
+        if hrp then
+            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+        end
+        if hum then hum.PlatformStand = false end
+    end
+end
+
+local function spawnSkyline(targetName)
+    local tp = Players:FindFirstChild(targetName)
+    if not tp or not tp.Character then notify("ADM", "Alvo inválido!") return end
+    local th = tp.Character:FindFirstChild("HumanoidRootPart")
+    if not th then return end
+    task.spawn(function()
+        notify("ADM", "Skyline → " .. targetName)
+        local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. SKYLINE_MODEL_ID) end)
+        if not (ok and objs and #objs > 0) then return end
+        local car = objs[1]
+        if not car:IsA("Model") then
+            local m = Instance.new("Model")
+            for _, o in ipairs(objs) do o.Parent = m end
+            car = m
+        end
+        if not car.PrimaryPart then car.PrimaryPart = car:FindFirstChildWhichIsA("BasePart", true) end
+        car.Parent = workspace
+        pcall(function() car:ScaleTo(0.35) end)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then p.Anchored, p.CanCollide = true, false end
+        end
+        local sp = th.Position + th.CFrame.LookVector * 45
+        local rp = RaycastParams.new()
+        rp.FilterType, rp.FilterDescendantsInstances = Enum.RaycastFilterType.Exclude, {car, tp.Character}
+        local rr = workspace:Raycast(sp + Vector3.new(0, 50, 0), Vector3.new(0, -100, 0), rp)
+        local gy = rr and rr.Position.Y or sp.Y
+        local bcf, bs = car:GetBoundingBox()
+        local bo = car:GetPivot().Position.Y - (bcf.Position.Y - bs.Y / 2)
+        local tcf = CFrame.new(sp.X, gy + bo, sp.Z) * CFrame.lookAt(sp, th.Position).Rotation
+        local scf = tcf * CFrame.new(0, -10, 0)
+        car:PivotTo(scf)
+        for i = 1, 35 do
+            car:PivotTo(scf:Lerp(tcf, (i / 35) ^ 2 * (3 - 2 * (i / 35))))
+            task.wait(0.015)
+        end
+        car:PivotTo(tcf)
+        task.wait(0.15)
+        local st, dur, hit = tick(), 10, false
+        while tick() - st < dur and car and car.Parent do
+            if tp and tp.Character then
+                local cth = tp.Character:FindFirstChild("HumanoidRootPart")
+                local ch = tp.Character:FindFirstChildOfClass("Humanoid")
+                if cth then
+                    local ccf = car:GetPivot()
+                    local cr = workspace:Raycast(cth.Position + Vector3.new(0,20,0), Vector3.new(0,-40,0), rp)
+                    local cgy = cr and cr.Position.Y or cth.Position.Y
+                    local tpos = Vector3.new(cth.Position.X, cgy + bo, cth.Position.Z)
+                    local d = tpos - ccf.Position
+                    if d.Magnitude > 2 then car:PivotTo(CFrame.new(ccf.Position + d.Unit * 3.75, tpos)) end
+                    if (ccf.Position - cth.Position).Magnitude <= 7 and not hit then
+                        hit = true
+                        if ch then ch.Health = 0 end
+                        Instance.new("Explosion", workspace).Position = cth.Position
+                    end
+                end
+            else break end
+            task.wait(0.03)
+        end
+        task.wait(0.4)
+        if car then car:Destroy() end
+    end)
+end
+
+local function toggleAura()
+    local char = LocalPlayer.Character
+    if not char then return end
+    if auraTrack then auraTrack:Stop() auraTrack = nil notify("Aura", "Off")
+    else
+        auraTrack = safePlayAnimation(char, AURA_ANIM_ID)
+        if auraTrack then auraTrack.Looped = true notify("Aura", "On") end
+    end
+end
+
+local function giveGojo()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hrp then return end
+    local t = Instance.new("Tool")
+    t.Name, t.RequiresHandle = "Vazio Roxo", false
+    t.Parent = LocalPlayer:FindFirstChild("Backpack") or char
+    t.Activated:Connect(function()
+        safePlayAnimation(char, CUSTOM_ANIM_ID)
+        task.spawn(function()
+            local p = fetchAssetAsModel("14819645681")
+            if p and p.PrimaryPart then
+                pcall(function() p:ScaleTo(300) end)
+                for _, x in ipairs(p:GetDescendants()) do
+                    if x:IsA("BasePart") then x.Anchored, x.CanCollide = true, false end
+                end
+                p:PivotTo(hrp.CFrame * CFrame.new(0, 2, -20))
+                p.Parent = workspace
+                local dir = hrp.CFrame.LookVector
+                local cn
+                cn = RunService.RenderStepped:Connect(function(dt)
+                    if p and p.Parent then p:PivotTo(p:GetPivot() + dir * 150 * dt)
+                    else cn:Disconnect() end
+                end)
+                task.delay(4, function() if cn then cn:Disconnect() end if p then p:Destroy() end end)
+            end
+        end)
+    end)
+    notify("Gojo", "Ativado!")
+end
+
+local function giveAK47()
+    local char = LocalPlayer.Character
+    if not char then return end
+    task.spawn(function()
+        local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. AK47_MODEL_ID) end)
+        if ok and objs and #objs > 0 then
+            local t = objs[1]:IsA("Tool") and objs[1] or Instance.new("Tool", workspace)
+            t.Name = "AK-47 Exclusiva"
+            t.Parent = LocalPlayer:FindFirstChild("Backpack") or char
+        end
+    end)
+end
+
+local function giveYoru()
+    task.spawn(function()
+        local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. YORU_MODEL_ID) end)
+        if ok and objs and #objs > 0 then
+            local t = objs[1]:IsA("Tool") and objs[1] or Instance.new("Tool", workspace)
+            t.Name = "Yoru"
+            t.Parent = LocalPlayer:WaitForChild("Backpack")
+        end
+    end)
+end
+
+local function triggerCommand(action, target, extraArg)
+    if not target or target == "" then return end
+    if target == LocalPlayer.Name or target == "ALL" then
+        executeActionLocally(action, LocalPlayer.Name, extraArg)
+    end
+    local cmd = ";" .. action .. " " .. target
+    if extraArg then cmd = cmd .. " " .. extraArg end
+    sendNetCmd(cmd)
+    notify("ADM", action .. " → " .. target)
+end
+
+local function getPlayerNames()
+    local n = {}
+    for _, p in pairs(Players:GetPlayers()) do table.insert(n, p.Name) end
+    return n
+end
+
+local ok, WindUI = pcall(function()
     return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 end)
-
-if not okUI or not WindUI then
+if not ok or not WindUI then
     notify("Erro", "Falha ao carregar WindUI.")
 else
-    local PURPLE = Color3.fromRGB(168, 85, 247)
-    local Window
-    local okWin, res = pcall(function()
-        return WindUI:CreateWindow({
-            Title = "Fantasma1l Hub ADM",
-            Icon = ICON_ID,
-            Author = MY_ROLE,
-            Folder = "Fantasma1lHub",
-            Size = UDim2.fromOffset(580, 480),
-            Theme = "Dark",
-            Accent = PURPLE,
-        })
-    end)
-    if okWin and res then Window = res
-    else Window = WindUI:CreateWindow({ Title = "Fantasma1l Hub ["..MY_ROLE.."]", Icon = ICON_ID }) end
+    local Window = WindUI:CreateWindow({
+        Title = "Fantasma1l Hub [" .. MY_ROLE .. "]",
+        Icon = ICON_ID, Theme = "Dark", Accent = Color3.fromRGB(168, 85, 247)
+    })
 
-    -- ===== ABA: ALL =====
-    local TabAll = Window:Tab({ Title = "All", Icon = "layout-grid" })
-    TabAll:Section({ Title = "Selecionar Alvo" })
-    local DD = TabAll:Dropdown({
-        Title = "Alvo",
-        Values = getPlayerNames(),
+    local TabADM = Window:Tab({ Title = "ADM", Icon = ICON_ID })
+    local DD = TabADM:Dropdown({
+        Title = "Selecionar Jogador", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end
     })
     Players.PlayerAdded:Connect(function() DD:SetValues(getPlayerNames()) end)
     Players.PlayerRemoving:Connect(function() DD:SetValues(getPlayerNames()) end)
 
-    TabAll:Section({ Title = "Ataques" })
-    TabAll:Button({ Title = "Kill", Callback = function() triggerCommand("KILL", selectedPlayerName) end })
-    TabAll:Button({ Title = "Fling", Callback = function() triggerCommand("FLING", selectedPlayerName, selectedPlayerName) end })
-    TabAll:Button({ Title = "Explodir", Callback = function() triggerCommand("EXPLODE", selectedPlayerName) end })
-    TabAll:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
-    TabAll:Button({ Title = "Kamui", Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
-
-    TabAll:Section({ Title = "Loop / Efeitos" })
-    TabAll:Button({ Title = "Kill Loop ON", Callback = function() triggerCommand("KILLLOOP_ON", selectedPlayerName, selectedPlayerName) end })
-    TabAll:Button({ Title = "Kill Loop OFF", Callback = function() triggerCommand("KILLLOOP_OFF", selectedPlayerName, selectedPlayerName) end })
-    TabAll:Button({ Title = "Jail visual", Callback = function() triggerCommand("JAIL", selectedPlayerName, selectedPlayerName) end })
-    TabAll:Button({ Title = "Unjail", Callback = function() triggerCommand("UNJAIL", selectedPlayerName, selectedPlayerName) end })
-
-    TabAll:Section({ Title = "Punicao" })
-    TabAll:Button({ Title = "Freeze",   Callback = function() triggerCommand("FREEZE", selectedPlayerName) end })
-    TabAll:Button({ Title = "Unfreeze", Callback = function() triggerCommand("UNFREEZE", selectedPlayerName) end })
-    TabAll:Button({ Title = "Ice",      Callback = function() triggerCommand("ICE", selectedPlayerName) end })
-    TabAll:Button({ Title = "Unice",    Callback = function() triggerCommand("UNICE", selectedPlayerName) end })
-    TabAll:Button({ Title = "Kick",     Callback = function() triggerCommand("KICK", selectedPlayerName) end })
-    TabAll:Button({ Title = "Crash",    Callback = function() triggerCommand("CRASH", selectedPlayerName) end })
-
-    -- ===== ABA: PLAYERS COMMANDS =====
-    local TabCmd = Window:Tab({ Title = "Players Commands", Icon = "terminal" })
-    TabCmd:Section({ Title = "Selecionar Alvo" })
-    TabCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
-        Callback = function(v) selectedPlayerName = v end })
-    TabCmd:Section({ Title = "Teletransporte" })
-    TabCmd:Button({ Title = "TP Player to Me", Callback = function() triggerCommand("TP_TO_POS", selectedPlayerName) end })
-    TabCmd:Button({ Title = "TP Me to Player", Callback = function() triggerCommand("TP_ME", selectedPlayerName) end })
-    TabCmd:Button({ Title = "Visible", Callback = function() triggerCommand("VISIBLE", selectedPlayerName) end })
-    TabCmd:Section({ Title = "Rede" })
-    TabCmd:Button({ Title = "Verificar Usuarios", Callback = function()
+    TabADM:Button({ Title = "Verificar Usuários do Script", Callback = function()
         activeScriptUsers = { [LocalPlayer.Name] = true }
-        sendNetCmd(";PING ALL")
-        task.wait(1)
+        sendNetCmd(";PONG ALL")
         local l = ""
-        for n, _ in pairs(activeScriptUsers) do l = l..n..", " end
+        for n, _ in pairs(activeScriptUsers) do l = l .. n .. ", " end
         notify("Rede", l)
-    end })
+    end})
+    TabADM:Button({ Title = "Kill",              Callback = function() triggerCommand("KILL", selectedPlayerName) end })
+    TabADM:Button({ Title = "Kick",              Callback = function() triggerCommand("KICK", selectedPlayerName) end })
+    TabADM:Button({ Title = "Freeze",            Callback = function() triggerCommand("FREEZE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Unfreeze",          Callback = function() triggerCommand("UNFREEZE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Ice",               Callback = function() triggerCommand("ICE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Unice",             Callback = function() triggerCommand("UNICE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Jail",              Callback = function() triggerCommand("JAIL", selectedPlayerName, selectedPlayerName) end })
+    TabADM:Button({ Title = "Unjail",            Callback = function() triggerCommand("UNJAIL", selectedPlayerName, selectedPlayerName) end })
+    TabADM:Button({ Title = "Explodir",          Callback = function() triggerCommand("EXPLODE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Crash Player",      Callback = function() triggerCommand("CRASH", selectedPlayerName) end })
+    TabADM:Button({ Title = "TP Player to Me",   Callback = function() triggerCommand("TP_TO_POS", selectedPlayerName) end })
+    TabADM:Button({ Title = "TP Me to Player",   Callback = function() triggerCommand("TP_ME", selectedPlayerName) end })
+    TabADM:Button({ Title = "Visible",           Callback = function() triggerCommand("VISIBLE", selectedPlayerName) end })
+    TabADM:Button({ Title = "Atropelar Skyline", Callback = function() spawnSkyline(selectedPlayerName) end })
+    TabADM:Button({ Title = "Kamui",             Callback = function() triggerCommand("KAMUI", selectedPlayerName) end })
 
-    -- ===== ABA: PLAYERS EFFECT =====
-    local TabFx = Window:Tab({ Title = "Players Effect", Icon = "sparkles" })
-    TabFx:Section({ Title = "Selecionar Alvo" })
-    TabFx:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
+    TabADM:Button({ Title = "Sair dos mundos (voltar ao spawn)", Callback = function()
+        pcall(POOL.clear, true)
+        pcall(roubeUmBrainrot, "OFF")
+        pcall(TORNADO.clear, true)
+        if workspace:FindFirstChild("Backrooms_Level0") then pcall(clearBackrooms) end
+        task.wait(0.3)
+        local chr = LocalPlayer.Character
+        local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+        local best, bestD
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("SpawnLocation") then
+                local dist = hrp and (d.Position - hrp.Position).Magnitude or 0
+                if not best or dist < bestD then best, bestD = d, dist end
+            end
+        end
+        if hrp and best then
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.CFrame = best.CFrame + Vector3.new(0, 5, 0)
+        end
+        notify("ADM", best and "De volta ao spawn." or "Sem SpawnLocation no mapa; use reset.")
+    end})
+
+    TabADM:Button({ Title = "Backrooms (Eu e o Alvo)", Callback = function()
+        triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
+    end})
+    TabADM:Button({ Title = "Backrooms (Limpar)", Callback = function()
+        task.spawn(function() pcall(clearBackrooms) end)
+        sendNetCmd(";BACKROOMS_CLEAR ALL")
+    end})
+
+    TabADM:Button({ Title = "The Lifeform (No Alvo)", Callback = function()
+        triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName)
+    end})
+    TabADM:Button({ Title = "Remover The Lifeform", Callback = function()
+        task.spawn(function() pcall(clearLifeform) end)
+        sendNetCmd(";LIFEFORM_CLEAR ALL")
+    end})
+
+    TabADM:Button({ Title = "Poolrooms (Eu e o Alvo)", Callback = function()
+        triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName)
+    end})
+    TabADM:Button({ Title = "Poolrooms (Limpar)", Callback = function()
+        task.spawn(function() pcall(POOL.clear) end)
+        sendNetCmd(";POOLROOMS_CLEAR ALL")
+    end})
+
+    local TabSayCmd = Window:Tab({ Title = "Say / Command", Icon = ICON_ID })
+    TabSayCmd:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
         Callback = function(v) selectedPlayerName = v end })
-    TabFx:Section({ Title = "Efeitos" })
-    TabFx:Button({ Title = "Blackhole (suga o mapa)", Callback = function() triggerCommand("BLACKHOLE_SPAWN", "ALL") end })
-    TabFx:Button({ Title = "Blackhole OFF", Callback = function() triggerCommand("BLACKHOLE_CLEAR", "ALL") end })
-    TabFx:Section({ Title = "Jumpscares" })
-    TabFx:Button({ Title = "Jumpscare 1", Callback = function() triggerCommand("JUMPSCARE_1", selectedPlayerName) end })
-    TabFx:Button({ Title = "Jumpscare 2", Callback = function() triggerCommand("JUMPSCARE_2", selectedPlayerName) end })
-    TabFx:Button({ Title = "Jumpscare 3", Callback = function() triggerCommand("JUMPSCARE_3", selectedPlayerName) end })
-    TabFx:Section({ Title = "Memes" })
-    TabFx:Button({ Title = "Meme 1", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME1") end })
-    TabFx:Button({ Title = "Meme 2", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME2") end })
-    TabFx:Button({ Title = "Meme 3", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME3") end })
-    TabFx:Button({ Title = "Meme 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
-    TabFx:Button({ Title = "Meme 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
-
-    -- ===== ABA: MUNDOS =====
-    local TabWorld = Window:Tab({ Title = "Mundos", Icon = "globe" })
-    TabWorld:Section({ Title = "Dimensoes" })
-    TabWorld:Button({ Title = "Backrooms (Eu e Alvo)", Callback = function() triggerCommand("BACKROOMS_SPAWN", selectedPlayerName, selectedPlayerName) end })
-    TabWorld:Button({ Title = "Backrooms (Limpar)", Callback = function() task.spawn(function() pcall(clearBackrooms) end) end })
-    TabWorld:Button({ Title = "Poolrooms (Eu e Alvo)", Callback = function() triggerCommand("POOLROOMS_SPAWN", selectedPlayerName, selectedPlayerName) end })
-    TabWorld:Button({ Title = "Poolrooms (Limpar)", Callback = function() task.spawn(function() pcall(POOL.clear) end) end })
-    TabWorld:Section({ Title = "Criaturas" })
-    TabWorld:Button({ Title = "The Lifeform (No Alvo)", Callback = function() triggerCommand("LIFEFORM_SPAWN", selectedPlayerName, selectedPlayerName) end })
-    TabWorld:Button({ Title = "Remover The Lifeform", Callback = function() task.spawn(function() pcall(clearLifeform) end) end })
-    TabWorld:Section({ Title = "Brainrot" })
-    TabWorld:Button({ Title = "Roube um Brainrot (Eu)", Callback = function() task.spawn(function() pcall(roubeUmBrainrot, "ON") end) end })
-    TabWorld:Button({ Title = "Roube um Brainrot (Todos)", Callback = function() triggerCommand("BRAINROT_SPAWN", "ALL") end })
-    TabWorld:Button({ Title = "Roube um Brainrot (Limpar)", Callback = function() task.spawn(function() pcall(roubeUmBrainrot, "OFF") end) end })
-
-    -- ===== ABA: SAY =====
-    local TabSay = Window:Tab({ Title = "Say / Command", Icon = "message-square" })
-    TabSay:Section({ Title = "Chat" })
-    TabSay:Input({ Title = "Texto p/ Chat", Placeholder = "Digite...",
+    TabSayCmd:Input({ Title = "Texto p/ Chat", Placeholder = "Digite...",
         Callback = function(t) customChatText = t end })
-    TabSay:Button({ Title = "Fazer Alvo Falar", Callback = function()
+    TabSayCmd:Button({ Title = "Fazer Alvo Falar", Callback = function()
         if customChatText ~= "" then triggerCommand("CHAT_AS", selectedPlayerName, customChatText) end
-    end })
-    TabSay:Button({ Title = "Controlar Visao", Callback = function()
+    end})
+    TabSayCmd:Button({ Title = "Controlar Visão (View)", Callback = function()
         isControlling = not isControlling
         local tp = Players:FindFirstChild(selectedPlayerName)
         if isControlling and tp and tp.Character then
@@ -7481,60 +7729,90 @@ else
         else
             workspace.CurrentCamera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         end
+    end})
+    TabSayCmd:Button({ Title = "coolkideffect", Callback = function()
+        triggerCommand("COOLKID_EFFECT", selectedPlayerName, selectedPlayerName)
+    end})
+
+    local TabJ = Window:Tab({ Title = "Jumpscare", Icon = ICON_ID })
+    TabJ:Dropdown({ Title = "Alvo", Values = getPlayerNames(),
+        Callback = function(v) selectedPlayerName = v end })
+    TabJ:Button({ Title = "Jumpscare 1", Callback = function() triggerCommand("JUMPSCARE_1", selectedPlayerName) end })
+    TabJ:Button({ Title = "Jumpscare 2", Callback = function() triggerCommand("JUMPSCARE_2", selectedPlayerName) end })
+    TabJ:Button({ Title = "Jumpscare 3", Callback = function() triggerCommand("JUMPSCARE_3", selectedPlayerName) end })
+
+    local TabE = Window:Tab({ Title = "Funções Essenciais", Icon = ICON_ID })
+    TabE:Button({ Title = "Fly com Asas e Dois Halos", Callback = function() toggleFlyWithWings() end })
+    TabE:Button({ Title = "Ativar/Desativar Aura", Callback = function() toggleAura() end })
+
+    local function toggleLocust(target)
+        if not target or target == "" then return end
+        local isOn
+        if target == "ALL" then isOn = next(LOCUST.users) ~= nil
+        elseif target == LocalPlayer.Name then isOn = LOCUST.running or LOCUST.busy
+        else isOn = LOCUST.users[target] == true end
+        triggerCommand(isOn and "LOCUST_OFF" or "LOCUST_ON", target)
+    end
+    TabE:Button({ Title = "Locust (Eu)",     Callback = function() toggleLocust(LocalPlayer.Name) end })
+    TabE:Button({ Title = "Locust (Alvo)",   Callback = function() toggleLocust(selectedPlayerName) end })
+    TabE:Button({ Title = "Locust (Todos)",  Callback = function() toggleLocust("ALL") end })
+    TabE:Button({ Title = "Locust: diagnóstico dos acessórios", Callback = function() LOCUST.diag() end })
+
+    local function toggleXester(target)
+        if not target or target == "" then return end
+        local isOn
+        if target == "ALL" then isOn = next(XESTER.users) ~= nil
+        elseif target == LocalPlayer.Name then isOn = XESTER.running
+        else isOn = XESTER.users[target] == true end
+        triggerCommand(isOn and "XESTER_OFF" or "XESTER_ON", target)
+    end
+    TabE:Button({ Title = "Xester (Eu)",     Callback = function() toggleXester(LocalPlayer.Name) end })
+    TabE:Button({ Title = "Xester (Alvo)",   Callback = function() toggleXester(selectedPlayerName) end })
+    TabE:Button({ Title = "Xester (Todos)",  Callback = function() toggleXester("ALL") end })
+
+    TabE:Button({ Title = "Roube um Brainrot (Eu e Alvo)", Callback = function()
+        task.spawn(function() pcall(roubeUmBrainrot, "ON") end)
+        if selectedPlayerName ~= LocalPlayer.Name then sendNetCmd(";BRAINROT_SPAWN " .. selectedPlayerName) end
+        notify("ADM", "BRAINROT → " .. selectedPlayerName)
+    end })
+    TabE:Button({ Title = "Roube um Brainrot (Todos)", Callback = function() triggerCommand("BRAINROT_SPAWN", "ALL") end })
+    TabE:Button({ Title = "Roube um Brainrot (Limpar)", Callback = function()
+        task.spawn(function() pcall(roubeUmBrainrot, "OFF") end)
+        sendNetCmd(";BRAINROT_CLEAR ALL")
     end })
 
-    -- ===== ABA: ESSENCIAIS =====
-    local TabE = Window:Tab({ Title = "Essenciais", Icon = "zap" })
-    TabE:Section({ Title = "Poderes" })
-    TabE:Button({ Title = "Fly com Asas e Halos", Callback = function() toggleFlyWithWings() end })
-    TabE:Button({ Title = "Aura", Callback = function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        if auraTrack then auraTrack:Stop() auraTrack = nil notify("Aura", "Off")
-        else
-            local hum = char:FindFirstChild("Humanoid")
-            local anim = hum and hum:FindFirstChild("Animator")
-            if anim then
-                local a = Instance.new("Animation")
-                a.AnimationId = "rbxassetid://106708015414624"
-                local ok, track = pcall(function() return anim:LoadAnimation(a) end)
-                if ok and track then
-                    track.Looped = true
-                    track:Play()
-                    auraTrack = track
-                    notify("Aura", "On")
-                end
-            end
-        end
+    -- >>> PATCH v37 - PASSO 3b: BOTÕES DO TORNADO
+    TabE:Button({ Title = "Tornado EF5 (Eu)", Callback = function()
+        task.spawn(function() pcall(TORNADO.spawn, LocalPlayer.Name) end)
+    end })
+    TabE:Button({ Title = "Tornado EF5 (Todos)", Callback = function() triggerCommand("TORNADO_SPAWN", "ALL") end })
+    TabE:Button({ Title = "Tornado (Limpar)", Callback = function()
+        task.spawn(function() pcall(TORNADO.clear) end)
+        sendNetCmd(";TORNADO_CLEAR ALL")
     end })
 
-    TabE:Section({ Title = "Expansão de Domínio" })
-    TabE:Button({ Title = "Sukuna - Santuário Malevolente (Todos)", Callback = function()
-        triggerCommand("SUKUNA_DOMAIN", "ALL")
-    end })
-    TabE:Button({ Title = "Sukuna (só em mim)", Callback = function()
-        task.spawn(function() pcall(sukunaDomain, LocalPlayer.Name) end)
-    end })
-
-    TabE:Section({ Title = "Tornado EF5" })
-    TabE:Button({ Title = "Tornado (Eu)", Callback = function() task.spawn(function() pcall(TORNADO.spawn, LocalPlayer.Name) end) end })
-    TabE:Button({ Title = "Tornado (Todos)", Callback = function() triggerCommand("TORNADO_SPAWN", "ALL") end })
-    TabE:Button({ Title = "Tornado (Limpar)", Callback = function() task.spawn(function() pcall(TORNADO.clear) end) end })
-
-    TabE:Section({ Title = "Locust" })
-    TabE:Button({ Title = "Locust ON",  Callback = function() task.spawn(function() pcall(locustStart) end) end })
-    TabE:Button({ Title = "Locust OFF", Callback = function() task.spawn(function() pcall(locustStop) end) end })
-
-    TabE:Section({ Title = "Armas" })
+    TabE:Button({ Title = "Modo Satoru Gojo", Callback = function() giveGojo() end })
+    TabE:Button({ Title = "Expansão de Domínio [Sukuna]", Callback = function() triggerCommand("SUKUNA_DOMAIN", "ALL") end })
+    TabE:Button({ Title = "Pegar AK-47", Callback = function() giveAK47() end })
+    TabE:Button({ Title = "Equipar Yoru", Callback = function() giveYoru() end })
     TabE:Button({ Title = "Chuva de Tacos (Server)", Callback = function() triggerCommand("TACO_RAIN", "ALL") end })
     TabE:Button({ Title = "Chuva do Renegado (Server)", Callback = function() triggerCommand("RENEGADO_RAIN", "ALL") end })
+    TabE:Button({ Title = "Meme na cara 1", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME1") end })
+    TabE:Button({ Title = "Meme na cara 2", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME2") end })
+    TabE:Button({ Title = "Meme na cara 3", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME3") end })
+    TabE:Button({ Title = "Meme na cara 4", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME4") end })
+    TabE:Button({ Title = "Meme na cara 5", Callback = function() triggerCommand("MEME_FACE", "ALL", "MEME5") end })
 
-    notify("Fantasma1l Hub", "WindUI carregado!")
+    local function toggleFX(kind)
+        local stateTable = (kind == "FLASH") and FXNET.flash or FXNET.aura
+        local isOn = stateTable[LocalPlayer.Name] ~= nil
+        FXNET.send(kind .. (isOn and "_OFF" or "_ON"), LocalPlayer.Name)
+    end
+    TabE:Button({ Title = "Flash (ligar/desligar)",        Callback = function() toggleFX("FLASH") end })
+    TabE:Button({ Title = "Aura Dourada (ligar/desligar)", Callback = function() toggleFX("AURA") end })
 end
 
 end -- fim IS_ADMIN
-
-print("[Fantasma1l Hub] OK - Completo " .. (IS_ADMIN and MY_ROLE or "Only"))
 -- ==========================================================
 -- FANTASMA1L HUB - BROOKHAVEN EDITION (COMPLETO v8.5.6)
 -- Server Lag (Phone Lag) + Anti-Lag System + Anti-Invisible Void
