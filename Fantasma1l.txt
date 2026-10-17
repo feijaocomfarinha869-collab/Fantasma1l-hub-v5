@@ -21,11 +21,11 @@ local WHITELIST = {
     ["renegado6661l"]             = { Role = "DONO" },
     
     -- SUB DONO (2 VAGAS)
-    ["PREENCHA_AQUI_SUB_DONO_1"]  = { Role = "SUB DONO" },
-    ["PREENCHA_AQUI_SUB_DONO_2"]  = { Role = "SUB DONO" },
+    ["darkADM_ofc"]  = { Role = "SUB DONO" },
+    ["BaconSigmaaura67420"]  = { Role = "SUB DONO" },
     
     -- ADMS (9 VAGAS)
-    ["BaconSigmaaura67420"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_1"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
@@ -56,6 +56,42 @@ if entry then
     MY_ROLE = entry.Role
 end
 
+print("[Fantasma1l Hub] Modo: " .. (IS_ADMIN and ("ADMIN - " .. MY_ROLE) or "Brookhaven Only"))
+
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Fantasma1l Hub",
+        Text = IS_ADMIN and (MY_ROLE) or "Brookhaven RP Edition",
+        Duration = 5
+    })
+end)
+
+local NETWORK_ROLES = {}
+local REQUIRE_WHITELIST = true
+local IS_ADMIN, MY_ROLE = false, "USER"
+do
+    local entry = WHITELIST[LocalPlayer.Name]
+    if entry then
+        if entry.Permanent then
+            IS_ADMIN, MY_ROLE = true, entry.Role
+        elseif entry.Days then
+            local ok, log = pcall(function()
+                return game:GetService("DataStoreService"):GetDataStore("F1L_Log"):GetAsync("log")
+            end)
+            log = log or {}
+            local now = os.time()
+            if not log[LocalPlayer.Name] then
+                log[LocalPlayer.Name] = now
+                pcall(function()
+                    game:GetService("DataStoreService"):GetDataStore("F1L_Log"):SetAsync("log", log)
+                end)
+                IS_ADMIN, MY_ROLE = true, entry.Role
+            elseif (now - log[LocalPlayer.Name]) / 86400 <= entry.Days then
+                IS_ADMIN, MY_ROLE = true, entry.Role
+            end
+        end
+    end
+end
 print("[Fantasma1l Hub] Modo: " .. (IS_ADMIN and ("ADMIN - " .. MY_ROLE) or "Brookhaven Only"))
 
 pcall(function()
@@ -6978,88 +7014,49 @@ function executeActionLocally(action, senderName, extraArg)
     elseif action == "FREEZE" and hrp and hum then hrp.Anchored, hum.WalkSpeed, hum.JumpPower = true, 0, 0
     elseif action == "UNFREEZE" and hrp and hum then hrp.Anchored, hum.WalkSpeed, hum.JumpPower = false, 16, 50
     elseif action == "CRASH" then while true do end
-    elseif action == "EXPLODE" then
-    local targetPlr = extraArg and Players:FindFirstChild(extraArg) or LocalPlayer
-    if targetPlr and targetPlr.Character then
-        local thrp = targetPlr.Character:FindFirstChild("HumanoidRootPart")
-        local thum = targetPlr.Character:FindFirstChildOfClass("Humanoid")
-        if thrp then
-            -- Cria a explosão no seu jogo na posição do alvo
-            local exp = Instance.new("Explosion", workspace)
-            exp.Position = thrp.Position
-            exp.BlastRadius = 15
-            exp.BlastPressure = 50000
-            exp.DestroyJointRadiusPercent = 1
-            exp.Visible = true
-            
-            -- Se o alvo for você mesmo, você morre
-            if targetPlr == LocalPlayer and thum then
-                thum.Health = 0
+    elseif action == "EXPLODE" and hrp then
+        Instance.new("Explosion", workspace).Position = hrp.Position
+        if hum then hum.Health = 0 end
+    elseif action == "ICE" and hrp then
+        if workspace:FindFirstChild("Ice_" .. LocalPlayer.Name) then workspace["Ice_" .. LocalPlayer.Name]:Destroy() end
+        local ip = Instance.new("Part", workspace)
+        ip.Name, ip.Size, ip.CFrame = "Ice_" .. LocalPlayer.Name, Vector3.new(6, 8, 6), hrp.CFrame
+        ip.Anchored, ip.CanCollide = true, false
+        ip.Color, ip.Material, ip.Transparency = Color3.fromRGB(0, 170, 255), Enum.Material.Glass, 0.4
+        if hum then hum.WalkSpeed = 0 end
+        hrp.Anchored = true
+    elseif action == "UNICE" and hrp then
+        if workspace:FindFirstChild("Ice_" .. LocalPlayer.Name) then workspace["Ice_" .. LocalPlayer.Name]:Destroy() end
+        if hum then hum.WalkSpeed = 16 end
+        hrp.Anchored = false
+    elseif action == "JAIL" and extraArg then
+        local targetPlr = Players:FindFirstChild(extraArg)
+        if targetPlr and targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
+            local thrp = targetPlr.Character.HumanoidRootPart
+            if workspace:FindFirstChild("Jail_" .. targetPlr.Name) then
+                workspace["Jail_" .. targetPlr.Name]:Destroy()
+            end
+            local cage = Instance.new("Model", workspace)
+            cage.Name = "Jail_" .. targetPlr.Name
+            local cf = thrp.CFrame
+            for _, d in ipairs({
+                {Vector3.new(6,1,6), cf * CFrame.new(0,-3.5,0)},
+                {Vector3.new(6,1,6), cf * CFrame.new(0, 3.5,0)},
+                {Vector3.new(1,6,6), cf * CFrame.new( 3,0,0)},
+                {Vector3.new(1,6,6), cf * CFrame.new(-3,0,0)},
+                {Vector3.new(6,6,1), cf * CFrame.new(0,0, 3)},
+                {Vector3.new(6,6,1), cf * CFrame.new(0,0,-3)},
+            }) do
+                local p = Instance.new("Part", cage)
+                p.Size, p.CFrame = d[1], d[2]
+                p.Color, p.Material = Color3.fromRGB(168, 85, 247), Enum.Material.Neon
+                p.Anchored, p.Transparency = true, 0.3
             end
         end
-    end
-    elseif action == "ICE" and extraArg then
-    local targetPlr = Players:FindFirstChild(extraArg)
-    if targetPlr and targetPlr.Character then
-        local thrp = targetPlr.Character:FindFirstChild("HumanoidRootPart")
-        local thum = targetPlr.Character:FindFirstChildOfClass("Humanoid")
-        if thrp then
-            if workspace:FindFirstChild("Ice_" .. targetPlr.Name) then workspace["Ice_" .. targetPlr.Name]:Destroy() end
-            local ip = Instance.new("Part", workspace)
-            ip.Name, ip.Size, ip.CFrame = "Ice_" .. targetPlr.Name, Vector3.new(6, 9, 6), thrp.CFrame
-            ip.Anchored, ip.CanCollide = true, false
-            ip.Color, ip.Material, ip.Transparency = Color3.fromRGB(0, 170, 255), Enum.Material.Glass, 0.3
-            
-            -- Efeito de brilho no gelo para ficar bem visível
-            local light = Instance.new("PointLight", ip)
-            light.Color = Color3.fromRGB(0, 170, 255)
-            light.Range = 10
-            light.Brightness = 2
-            
-            if thum then thum.WalkSpeed = 0 end
-            thrp.Anchored = true
+    elseif action == "UNJAIL" and extraArg then
+        if workspace:FindFirstChild("Jail_" .. extraArg) then
+            workspace["Jail_" .. extraArg]:Destroy()
         end
-    end
-elseif action == "UNICE" and extraArg then
-    if workspace:FindFirstChild("Ice_" .. extraArg) then
-        workspace["Ice_" .. extraArg]:Destroy()
-    end
-    local targetPlr = Players:FindFirstChild(extraArg)
-    if targetPlr and targetPlr.Character then
-        local thrp = targetPlr.Character:FindFirstChild("HumanoidRootPart")
-        local thum = targetPlr.Character:FindFirstChildOfClass("Humanoid")
-        if thum then thum.WalkSpeed = 16 end
-        if thrp then thrp.Anchored = false end
-    end
-    elseif action == "JAIL" and extraArg then
-    local targetPlr = Players:FindFirstChild(extraArg)
-    if targetPlr and targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
-        local thrp = targetPlr.Character.HumanoidRootPart
-        if workspace:FindFirstChild("Jail_" .. targetPlr.Name) then
-            workspace["Jail_" .. targetPlr.Name]:Destroy()
-        end
-        local cage = Instance.new("Model", workspace)
-        cage.Name = "Jail_" .. targetPlr.Name
-        local cf = thrp.CFrame
-        for _, d in ipairs({
-            {Vector3.new(6,1,6), cf * CFrame.new(0,-3.5,0)},
-            {Vector3.new(6,1,6), cf * CFrame.new(0, 3.5,0)},
-            {Vector3.new(1,6,6), cf * CFrame.new( 3,0,0)},
-            {Vector3.new(1,6,6), cf * CFrame.new(-3,0,0)},
-            {Vector3.new(6,6,1), cf * CFrame.new(0,0, 3)},
-            {Vector3.new(6,6,1), cf * CFrame.new(0,0,-3)},
-        }) do
-            local p = Instance.new("Part", cage)
-            p.Size, p.CFrame = d[1], d[2]
-            p.Color, p.Material = Color3.fromRGB(168, 85, 247), Enum.Material.Neon
-            p.Anchored, p.CanCollide = true, true
-            p.Transparency = 0.2 -- Deixa visível
-        end
-    end
-elseif action == "UNJAIL" and extraArg then
-    if workspace:FindFirstChild("Jail_" .. extraArg) then
-        workspace["Jail_" .. extraArg]:Destroy()
-    end
     elseif action == "TP_TO_POS" and hrp and senderName then
         local sp = Players:FindFirstChild(senderName)
         if sp and sp.Character and sp.Character:FindFirstChild("HumanoidRootPart") then
