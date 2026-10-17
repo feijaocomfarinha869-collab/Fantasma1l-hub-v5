@@ -1,4 +1,4 @@
-ī--[[
+--[[
     ==========================================================
     FANT-- ==================  EF5 ASMA1L HUB - COMPLETO UNIFICADO v37
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5)
@@ -26,7 +26,7 @@ local WHITELIST = {
     
     -- ADMS (9 VAGAS)
     ["BaconSigmaaura67420"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" }),
+    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_5"]       = { Role = "ADM" },
@@ -8165,7 +8165,7 @@ end
 
 -- ================== SPAWN DO BUS ==================
 local function GetBus()
-    local v = workspace:FindFirstChild("Vehicles"
+    local v = workspace:FindFirstChild("Vehicles")
     return v and (v:FindFirstChild(LocalPlayer.Name .. "Car") or v:FindFirstChild(LocalPlayer.Name .. "Bus"))
 end
 
