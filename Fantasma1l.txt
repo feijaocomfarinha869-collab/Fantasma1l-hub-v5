@@ -8695,5 +8695,3 @@ end)ustomAudioId)
 
     notify("Fantasma1l Hub", "Brookhaven Edition v8.5.6 carregado!")
 end)
-asma1l Hub", "Brookhaven Edition v8.5.6 carregado!")
-end)
