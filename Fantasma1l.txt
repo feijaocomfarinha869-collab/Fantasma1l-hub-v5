@@ -26,7 +26,7 @@ local WHITELIST = {
     
     -- ADMS (9 VAGAS)
     ["BaconSigmaaura67420"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" }),
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_5"]       = { Role = "ADM" },
@@ -7854,7 +7854,8 @@ else
 end
 
 end -- fim IS_ADMIN
--- ==========================================================
+
+==========================================================
 -- FANTASMA1L HUB - BROOKHAVEN EDITION (COMPLETO v8.5.6)
 -- Server Lag (Phone Lag) + Anti-Lag System + Anti-Invisible Void
 -- ==========================================================
@@ -8165,7 +8166,7 @@ end
 
 -- ================== SPAWN DO BUS ==================
 local function GetBus()
-    local v = workspace:FindFirstChild("Vehicles")
+    local v = workspace:FindFirstChild("Vehicles"
     return v and (v:FindFirstChild(LocalPlayer.Name .. "Car") or v:FindFirstChild(LocalPlayer.Name .. "Bus"))
 end
 
@@ -8677,15 +8678,6 @@ task.spawn(function()
         Callback = function(v) customAudioId = v end })
     TabAudio:AddButton({ "Tocar no Boombox", function()
         local id = tonumber(customAudioId)
-        if not id then notify("Erro", "Coloque um ID valido.") return end
-        pcall(function()
-            local br = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1BoomBox")
-            if br then br:InvokeServer(id) else notify("Erro", "Boombox nao encontrado.") end
-        end)
-    end })
-
-    notify("Fantasma1l Hub", "Brookhaven Edition v8.5.6 carregado!")
-end)ustomAudioId)
         if not id then notify("Erro", "Coloque um ID valido.") return end
         pcall(function()
             local br = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1BoomBox")
