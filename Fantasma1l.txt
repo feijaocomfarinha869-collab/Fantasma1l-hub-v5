@@ -1,4 +1,4 @@
---[[
+ī--[[
     ==========================================================
     FANT-- ==================  EF5 ASMA1L HUB - COMPLETO UNIFICADO v37
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5)
@@ -7854,7 +7854,6 @@ else
 end
 
 end -- fim IS_ADMIN
-
 ==========================================================
 -- FANTASMA1L HUB - BROOKHAVEN EDITION (COMPLETO v8.5.6)
 -- Server Lag (Phone Lag) + Anti-Lag System + Anti-Invisible Void
