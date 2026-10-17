@@ -17,43 +17,45 @@ local LocalPlayer        = Players.LocalPlayer
 
 -- ================== WHITELIST ==================
 local WHITELIST = {
-    ["renegado6661l"]         = { Role = "DONO",     Permanent = true },
-    ["PREENCHA_AQUI_SUBDONO"] = { Role = "SUB DONO", Days = 30 },
-    ["PREENCHA_AQUI_ADM_1"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_2"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_3"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_4"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_5"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_6"]   = { Role = "ADM",      Days = 30 },
-    ["PREENCHA_AQUI_ADM_7"]   = { Role = "ADM",      Days = 30 },
+    -- DONO
+    ["renegado6661l"]             = { Role = "DONO" },
+    
+    -- SUB DONO (2 VAGAS)
+    ["darkADM_ofc"]  = { Role = "SUB DONO" },
+    ["BaconSigmaaura67420"]  = { Role = "SUB DONO" },
+    
+    -- ADMS (9 VAGAS)
+    ["PREENCHA_AQUI_ADM_1"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_5"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_6"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_7"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_8"]       = { Role = "ADM" },
+    ["PREENCHA_AQUI_ADM_9"]       = { Role = "ADM" },
 }
 
 local NETWORK_ROLES = {}
 local REQUIRE_WHITELIST = true
 local IS_ADMIN, MY_ROLE = false, "USER"
-do
-    local entry = WHITELIST[LocalPlayer.Name]
-    if entry then
-        if entry.Permanent then
-            IS_ADMIN, MY_ROLE = true, entry.Role
-        elseif entry.Days then
-            local ok, log = pcall(function()
-                return game:GetService("DataStoreService"):GetDataStore("F1L_Log"):GetAsync("log")
-            end)
-            log = log or {}
-            local now = os.time()
-            if not log[LocalPlayer.Name] then
-                log[LocalPlayer.Name] = now
-                pcall(function()
-                    game:GetService("DataStoreService"):GetDataStore("F1L_Log"):SetAsync("log", log)
-                end)
-                IS_ADMIN, MY_ROLE = true, entry.Role
-            elseif (now - log[LocalPlayer.Name]) / 86400 <= entry.Days then
-                IS_ADMIN, MY_ROLE = true, entry.Role
-            end
-        end
+
+-- Verifica o nome ignorando maiúsculas e minúsculas
+local myNameLower = string.lower(LocalPlayer.Name)
+local entry = nil
+
+for name, data in pairs(WHITELIST) do
+    if string.lower(name) == myNameLower then
+        entry = data
+        break
     end
 end
+
+if entry then
+    IS_ADMIN = true
+    MY_ROLE = entry.Role
+end
+
 print("[Fantasma1l Hub] Modo: " .. (IS_ADMIN and ("ADMIN - " .. MY_ROLE) or "Brookhaven Only"))
 
 pcall(function()
