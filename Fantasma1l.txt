@@ -17,54 +17,16 @@ local LocalPlayer        = Players.LocalPlayer
 
 -- ================== WHITELIST ==================
 local WHITELIST = {
-    -- DONO
-    ["renegado6661l"]             = { Role = "DONO" },
-    
-    -- SUB DONO (2 VAGAS)
-    ["darkADM_ofc"]  = { Role = "SUB DONO" },
-    ["BaconSigmaaura67420"]  = { Role = "SUB DONO" },
-    
-    -- ADMS (9 VAGAS)
-    ["PREENCHA_AQUI_ADM_1"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_5"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_6"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_7"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_8"]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_9"]       = { Role = "ADM" },
+    ["renegado6661l"]        = { Role = "DONO",     Permanent = true },
+    ["darkADM_ofc"]          = { Role = "SUB DONO", Days = 30 },
+    ["PREENCHA_AQUI_ADM_1"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_2"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_3"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_4"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_5"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_6"]   = { Role = "ADM",      Days = 30 },
+    ["PREENCHA_AQUI_ADM_7"]   = { Role = "ADM",      Days = 30 },
 }
-
-local NETWORK_ROLES = {}
-local REQUIRE_WHITELIST = true
-local IS_ADMIN, MY_ROLE = false, "USER"
-
--- Verifica o nome ignorando maiúsculas e minúsculas
-local myNameLower = string.lower(LocalPlayer.Name)
-local entry = nil
-
-for name, data in pairs(WHITELIST) do
-    if string.lower(name) == myNameLower then
-        entry = data
-        break
-    end
-end
-
-if entry then
-    IS_ADMIN = true
-    MY_ROLE = entry.Role
-end
-
-print("[Fantasma1l Hub] Modo: " .. (IS_ADMIN and ("ADMIN - " .. MY_ROLE) or "Brookhaven Only"))
-
-pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "Fantasma1l Hub",
-        Text = IS_ADMIN and (MY_ROLE) or "Brookhaven RP Edition",
-        Duration = 5
-    })
-end)
 
 local NETWORK_ROLES = {}
 local REQUIRE_WHITELIST = true
@@ -7851,7 +7813,7 @@ else
 end
 
 end -- fim IS_ADMIN
-==========================================================
+-- ==========================================================
 -- FANTASMA1L HUB - BROOKHAVEN EDITION (COMPLETO v8.5.6)
 -- Server Lag (Phone Lag) + Anti-Lag System + Anti-Invisible Void
 -- ==========================================================
