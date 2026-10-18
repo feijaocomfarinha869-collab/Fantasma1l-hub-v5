@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v40
+    FANTASMA1L HUB - COMPLETO UNIFICADO v41
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5
      | IMAGENS CORRIGIDAS | EXPANSAO DE DOMINIO DO GOJO)
     ==========================================================
@@ -4773,26 +4773,43 @@ local function runSukunaDomain(senderName)
     for _, a in ipairs(hidden) do pcall(function() a.Parent = Lighting end) end
 end
 
--- ================== EXPANSÃO DE DOMÍNIO (GOJO) - VAZIO ILIMITADO v2 ==================
+-- ================== EXPANSÃO DE DOMÍNIO (GOJO) - VAZIO ILIMITADO v3 (estilo Jujutsu Shenanigans) ==================
+-- Sequência (baseada no vídeo de referência):
+--  1) pose do Gojo + esfera preta + brilho (bloom) branco
+--  2) tela branca -> você e o alvo MAIS PRÓXIMO são teleportados pro domínio
+--  3) riscos magenta/roxo/vermelho irradiando num cosmos roxo
+--  4) transição pro cosmos azul-turquesa com fumaça, respingos brancos e o BURACO NEGRO distante
+--  5) alvo paralisado (chão invisível) e morrendo devagar em 5s -> domínio colapsa e todos voltam
 GOJO = { busy = false, cancelFlag = false, cdEnd = 0, token = 0 }
 
 do
     local TweenService = game:GetService("TweenService")
+    local Debris       = game:GetService("Debris")
 
-    local COOLDOWN   = 35    -- recarga (segundos) depois que a expansão termina
-    local CAST_TIME  = 2.6   -- duração da abertura cinematográfica
-    local HOLD_TIME  = 5     -- tempo que o alvo leva pra morrer
-    local RANGE      = 140   -- alcance (quando o alvo é ALL)
-    local SIZE, TH   = 520, 6
-    local GOJO_SOUND = ""    -- opcional: "rbxassetid://SEU_AUDIO"
-    local GOJO_IMAGE = ""    -- opcional: imagem que pisca na tela do alvo (ID)
-    local LOW        = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    -- ======== CONFIGURAÇÃO ========
+    local COOLDOWN    = 20     -- recarga (s) depois que a expansão termina
+    local HOLD_TIME   = 5      -- tempo que o alvo leva pra morrer (paralisado)
+    local MAX_DIST    = 600    -- distância máxima pra achar o alvo mais próximo
+    local HOLE_STUDS  = 150    -- diâmetro do buraco negro (como na imagem de referência)
+    local GOJO_SOUND  = ""     -- opcional: "rbxassetid://ID_DA_MUSICA_DO_DOMINIO"
+    local COSMOS_SKY  = ""     -- opcional: ID de uma skybox de galáxia (decal/imagem)
+    local LOW         = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-    local C_BLUE   = Color3.fromRGB(90, 160, 255)
-    local C_CYAN   = Color3.fromRGB(150, 220, 255)
     local C_WHITE  = Color3.new(1, 1, 1)
-    local C_VIOLET = Color3.fromRGB(170, 130, 255)
+    local C_CYAN   = Color3.fromRGB(150, 220, 255)
+    local WHITE, BLACK, OLIVE = C_WHITE, Color3.new(0, 0, 0), Color3.fromRGB(128, 128, 0)
     local LIGHT_KEYS = { "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogColor", "FogStart", "FogEnd", "ExposureCompensation" }
+    local SMOKE_TEX = "rbxasset://textures/particles/smoke_main.dds"
+
+    local RAINBOW = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.15, Color3.fromRGB(255, 220, 150)),
+        ColorSequenceKeypoint.new(0.30, Color3.fromRGB(190, 255, 170)),
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(140, 220, 255)),
+        ColorSequenceKeypoint.new(0.60, Color3.fromRGB(170, 140, 255)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255, 160, 220)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255)),
+    })
 
     local function tw(obj, t, props, style, dir)
         local tween = TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
@@ -4811,16 +4828,150 @@ do
         return p
     end
 
-    local function randBinary()
-        local lines = {}
-        for i = 1, math.random(3, 5) do
-            local s = ""
-            for _ = 1, math.random(6, 11) do s = s .. tostring(math.random(0, 1)) end
-            lines[i] = s
-        end
-        return table.concat(lines, "\n")
+    -- ======== BURACO NEGRO (BillboardGui - o seu código, sempre encara a câmera) ========
+    local function circle(parent, scale, color, z, transp)
+        local f = Instance.new("Frame")
+        f.AnchorPoint = Vector2.new(.5, .5)
+        f.Position = UDim2.fromScale(.5, .5)
+        f.Size = UDim2.fromScale(scale, scale)
+        f.BackgroundColor3 = color
+        f.BackgroundTransparency = transp or 0
+        f.BorderSizePixel = 0
+        f.ZIndex = z
+        Instance.new("UICorner", f).CornerRadius = UDim.new(1, 0)
+        f.Parent = parent
+        return f
+    end
+    local function ring(parent, scale, thickness, color, z, transp)
+        local f = circle(parent, scale, color, z, 1)
+        local s = Instance.new("UIStroke", f)
+        s.Color = color; s.Thickness = thickness; s.Transparency = transp or 0
+        s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        return f, s
     end
 
+    local function buildBlackHoleBillboard(adornee, studs)
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "VoidEye"
+        bb.Adornee = adornee
+        bb.Size = UDim2.fromScale(studs, studs)   -- tamanho em studs
+        bb.LightInfluence = 0
+        bb.AlwaysOnTop = false
+        bb.MaxDistance = 100000
+        bb.ResetOnSpawn = false
+        bb.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+        local rootF = Instance.new("Frame", bb)
+        rootF.Size = UDim2.fromScale(1, 1)
+        rootF.BackgroundTransparency = 1
+        rootF.Name = "Root"
+
+        local L = {}
+        L.glow = circle(rootF, 1.0, Color3.fromRGB(120, 160, 255), 1, .85)
+        local gg = Instance.new("UIGradient", L.glow)
+        gg.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, .2), NumberSequenceKeypoint.new(.5, .7), NumberSequenceKeypoint.new(1, .2)
+        })
+
+        -- anel dourado fino (como no vídeo) + anéis bege/oliva (como na imagem)
+        L.gold, L.goldStroke = ring(rootF, .95, 7, Color3.fromRGB(255, 225, 90), 2, .1)
+        L.olive, L.oliveStroke = ring(rootF, .9, 18, OLIVE, 2, .15)
+        local og = Instance.new("UIGradient", L.oliveStroke)
+        og.Color = ColorSequence.new(Color3.fromRGB(230, 225, 190), Color3.fromRGB(150, 145, 100))
+        L.oliveGrad = og
+        L.olive2, L.olive2Stroke = ring(rootF, .82, 6, Color3.fromRGB(240, 236, 210), 2, .3)
+
+        L.rainbow, L.rainbowStroke = ring(rootF, .74, 10, WHITE, 3, 0)
+        L.rainbowGrad = Instance.new("UIGradient", L.rainbowStroke)
+        L.rainbowGrad.Color = RAINBOW
+        L.rainbowGrad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(.35, .1),
+            NumberSequenceKeypoint.new(.6, .75), NumberSequenceKeypoint.new(.85, .2), NumberSequenceKeypoint.new(1, 0)
+        })
+        L.rainbowThin, L.rainbowThinStroke = ring(rootF, .7, 3, WHITE, 3, 0)
+        L.rainbowThinGrad = Instance.new("UIGradient", L.rainbowThinStroke)
+        L.rainbowThinGrad.Color = RAINBOW
+
+        L.swirl = circle(rootF, .68, Color3.fromRGB(150, 160, 210), 4, 0)
+        L.swirlGrad = Instance.new("UIGradient", L.swirl)
+        L.swirlGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 235, 255)),
+            ColorSequenceKeypoint.new(.25, Color3.fromRGB(90, 100, 150)),
+            ColorSequenceKeypoint.new(.5, Color3.fromRGB(200, 210, 245)),
+            ColorSequenceKeypoint.new(.75, Color3.fromRGB(70, 80, 130)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 235, 255)),
+        })
+
+        L.wisps = {}
+        for i = 1, 6 do
+            local w, ws = ring(rootF, .66 - i * .025, 4 + (i % 3) * 2, WHITE, 5, .35)
+            local wg = Instance.new("UIGradient", ws)
+            wg.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(.2, .2),
+                NumberSequenceKeypoint.new(.45, 1), NumberSequenceKeypoint.new(1, 1)
+            })
+            wg.Rotation = i * 60
+            L.wisps[i] = { g = wg, speed = (40 + i * 18) * (i % 2 == 0 and -1 or 1) }
+        end
+
+        L.coreEdge = circle(rootF, .43, Color3.fromRGB(20, 22, 40), 6, .3)
+        L.core = circle(rootF, .4, BLACK, 7, 0)
+
+        L.splats = {}
+        for i = 1, 26 do
+            local ang = math.random() * math.pi * 2
+            local d = .1 + math.random() * .32
+            local s = .015 + math.random() * .05
+            local sp = Instance.new("Frame", rootF)
+            sp.AnchorPoint = Vector2.new(.5, .5)
+            sp.Position = UDim2.fromScale(.5 + math.cos(ang) * d, .5 + math.sin(ang) * d)
+            sp.Size = UDim2.fromScale(s * (1 + math.random() * 1.5), s)
+            sp.Rotation = math.random(0, 360)
+            sp.BackgroundColor3 = WHITE
+            sp.BackgroundTransparency = 0
+            sp.BorderSizePixel = 0
+            sp.ZIndex = 8
+            Instance.new("UICorner", sp).CornerRadius = UDim.new(1, 0)
+            L.splats[i] = sp
+        end
+
+        -- mancha branca GRANDE no centro (aparece no impacto, como na imagem de referência)
+        L.splash = {}
+        local function blob(x, y, w, h, rot)
+            local f = Instance.new("Frame")
+            f.AnchorPoint = Vector2.new(.5, .5)
+            f.Position = UDim2.fromScale(x, y)
+            f.Size = UDim2.fromScale(0, 0)
+            f.Rotation = rot or 0
+            f.BackgroundColor3 = WHITE
+            f.BorderSizePixel = 0
+            f.ZIndex = 9
+            Instance.new("UICorner", f).CornerRadius = UDim.new(1, 0)
+            f.Parent = rootF
+            L.splash[#L.splash + 1] = { f = f, w = w, h = h }
+        end
+        for _ = 1, 26 do
+            local a, d = math.random() * math.pi * 2, math.random() * .13
+            local s = .05 + math.random() * .11
+            blob(.5 + math.cos(a) * d, .5 + math.sin(a) * d, s * (1 + math.random()), s, math.random(0, 360))
+        end
+        for _ = 1, 34 do
+            local a, d = math.random() * math.pi * 2, .12 + math.random() * .3
+            local s = .01 + math.random() * .035
+            blob(.5 + math.cos(a) * d, .5 + math.sin(a) * d, s * (1 + math.random() * 2), s, math.random(0, 360))
+        end
+        for _ = 1, 8 do
+            local a, d = math.random() * math.pi * 2, .15 + math.random() * .25
+            blob(.5 + math.cos(a) * d, .5 + math.sin(a) * d, .12 + math.random() * .1, .008, math.deg(a))
+        end
+
+        rootF.Size = UDim2.fromScale(0, 0)
+        rootF.AnchorPoint = Vector2.new(.5, .5)
+        rootF.Position = UDim2.fromScale(.5, .5)
+        return bb, rootF, L
+    end
+
+    -- ======== CONTROLE ========
     function GOJO.cancel()
         if GOJO.busy then GOJO.cancelFlag = true end
     end
@@ -4834,17 +4985,52 @@ do
         return math.max(GOJO.cdEnd - os.clock(), 0)
     end
 
-    -- usado pelo botão do painel, pelo HUD e pelo comando de chat
+    -- alvo mais próximo entre quem usa o hub (só eles podem ser teleportados)
+    function GOJO.findNearest()
+        local myChar = LocalPlayer.Character
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myHrp then return nil end
+        local best, bestD = nil, MAX_DIST
+        for name in pairs(activeScriptUsers) do
+            if name ~= LocalPlayer.Name then
+                local plr = Players:FindFirstChild(name)
+                local c = plr and plr.Character
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                local hm = c and c:FindFirstChildOfClass("Humanoid")
+                if h and hm and hm.Health > 0 then
+                    local d = (h.Position - myHrp.Position).Magnitude
+                    if d < bestD then best, bestD = name, d end
+                end
+            end
+        end
+        return best
+    end
+
+    -- target = "NEAREST" (alvo mais próximo) ou o nome de um jogador
     function GOJO.cast(target)
         if not target or target == "" then return false end
         if GOJO.busy then notify("Gojo", "A expansão já está ativa.") return false end
         local left = GOJO.cooldownLeft()
         if left > 0 then notify("Gojo", "Em recarga: " .. math.ceil(left) .. "s") return false end
-        task.spawn(function() pcall(GOJO.run, LocalPlayer.Name, target) end)
-        sendNetCmd(";GOJO_DOMAIN " .. target)
+
+        local name = target
+        if string.upper(target) == "NEAREST" then
+            name = GOJO.findNearest()
+            if not name then
+                notify("Gojo", "Nenhum jogador com o hub por perto.")
+                return false
+            end
+        end
+        if name == LocalPlayer.Name then
+            notify("Gojo", "Selecione outro jogador como alvo.")
+            return false
+        end
+        task.spawn(function() pcall(GOJO.run, LocalPlayer.Name, name) end)
+        sendNetCmd(";GOJO_DOMAIN " .. name)
         return true
     end
 
+    -- ======== A EXPANSÃO ========
     function GOJO.run(senderName, targetName)
         local sp = Players:FindFirstChild(senderName)
         local sc = sp and sp.Character
@@ -4857,28 +5043,30 @@ do
         local token = GOJO.token
 
         local tname = string.lower(tostring(targetName or ""))
-        local isAll = (tname == "all")
         local iAmCaster = (senderName == LocalPlayer.Name)
-        local function matches(plr)
-            return string.lower(plr.Name) == tname or string.lower(plr.DisplayName) == tname
+        local iAmTarget = (not iAmCaster) and (string.lower(LocalPlayer.Name) == tname or string.lower(LocalPlayer.DisplayName) == tname)
+        local participant = iAmCaster or iAmTarget
+
+        local myChar = LocalPlayer.Character
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if participant and (not myHrp or not myHum or myHum.Health <= 0) then
+            GOJO.busy = false
+            return
         end
+        local casterPos = sh.Position
+        local near = participant or (myHrp ~= nil and (myHrp.Position - casterPos).Magnitude <= 300)
+
         local function alive()
             return GOJO.token == token and not GOJO.cancelFlag
                 and sc.Parent ~= nil and sh.Parent ~= nil and sHum.Health > 0
         end
 
-        local myChar = LocalPlayer.Character
-        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-        local casterPos = sh.Position
-        local iAmTarget = false
-        if not iAmCaster and myHrp and myHum and myHum.Health > 0 then
-            if isAll then iAmTarget = (myHrp.Position - casterPos).Magnitude <= RANGE
-            else iAmTarget = matches(LocalPlayer) end
-        end
-        -- só quem está perto (ou é o alvo/autor) recebe luz, câmera e interface
-        local near = iAmCaster or iAmTarget
-            or (myHrp ~= nil and (myHrp.Position - casterPos).Magnitude <= 600)
+        -- layout do domínio (longe do mapa, no céu)
+        local C = Vector3.new(((tonumber(sp.UserId) or 0) % 40) * 800, 6000, 0)
+        local casterSpot = CFrame.lookAt(C + Vector3.new(0, 4, -14), C + Vector3.new(0, 4, 60))
+        local targetSpot = CFrame.lookAt(C + Vector3.new(0, 4, 10), C + Vector3.new(0, 4, -60))
+        local holeC = C + Vector3.new(0, 18, 118)
 
         local oldWS = myHum and myHum.WalkSpeed or 16
         local oldJP = myHum and myHum.JumpPower or 50
@@ -4891,390 +5079,304 @@ do
         local cam = workspace.CurrentCamera
         local oldFov = cam and cam.FieldOfView or 70
         local renderName = "GojoRender" .. tostring(math.random(1, 1000000))
-        local saved, hidden = {}, {}
-        local cc, bloom, gui, flash, barTop, barBot, title, subtitle
-        local running, paralyzed = true, false
+        local saved, hiddenAtm, hiddenSky = {}, {}, {}
+        local cc, bloom, gui, flash, domainSky, bb
+        local running, paralyzed, teleported = true, false, false
         local frozen = {}
         local casterTrack
+        local returnCF
+        local T0 = os.clock()
+
+        local function waitUntil(t)
+            while alive() and os.clock() - T0 < t do task.wait() end
+            return alive()
+        end
 
         local ok, err = pcall(function()
-            local cx, cz = casterPos.X, casterPos.Z
-            local rp = RaycastParams.new()
-            rp.FilterDescendantsInstances, rp.FilterType = { sc }, Enum.RaycastFilterType.Exclude
-            local rr = workspace:Raycast(casterPos + Vector3.new(0, 50, 0), Vector3.new(0, -200, 0), rp)
-            local gy = rr and rr.Position.Y or (casterPos.Y - 3)
-            local half = SIZE / 2
-            local cy = gy + half - 20
-            local look = Vector3.new(sh.CFrame.LookVector.X, 0, sh.CFrame.LookVector.Z)
-            look = look.Magnitude > 0.1 and look.Unit or Vector3.new(0, 0, -1)
-            local focus = Vector3.new(cx, casterPos.Y, cz)
-            if not isAll then focus = focus - look * 14 end
-
-            -- ===== LUZ DO ESPAÇO (transição suave) =====
+            -- ===== 1) ESFERA PRETA no local original (todos que estão perto veem) =====
             if near then
-                for _, k in ipairs(LIGHT_KEYS) do pcall(function() saved[k] = Lighting[k] end) end
-                pcall(function()
-                    for _, c in ipairs(Lighting:GetChildren()) do
-                        if c:IsA("Atmosphere") then table.insert(hidden, c) c.Parent = nil end
-                    end
-                end)
-                pcall(function()
-                    tw(Lighting, 1.2, {
-                        Ambient = Color3.fromRGB(40, 30, 95),
-                        OutdoorAmbient = Color3.fromRGB(28, 22, 70),
-                        Brightness = 0.4,
-                        ClockTime = 0,
-                        FogColor = Color3.fromRGB(6, 4, 20),
-                        FogStart = 40,
-                        FogEnd = 700,
-                        ExposureCompensation = -0.2,
-                    })
-                end)
-                cc = Instance.new("ColorCorrectionEffect")
-                cc.Parent = Lighting
-                tw(cc, 1.4, { TintColor = Color3.fromRGB(190, 175, 255), Saturation = 0.2, Contrast = 0.3 })
-                bloom = Instance.new("BloomEffect")
-                bloom.Intensity, bloom.Size, bloom.Threshold = 0, 30, 0.9
-                bloom.Parent = Lighting
-                tw(bloom, 1.4, { Intensity = 0.9 })
-            end
-
-            -- ===== INTERFACE CINEMATOGRÁFICA (flash, tarjas, título) =====
-            if near then
-                local pg = LocalPlayer:WaitForChild("PlayerGui", 3)
-                gui = Instance.new("ScreenGui")
-                gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = "GojoDomainGui", true, false, 60
-                gui.Parent = pg
-
-                barTop = Instance.new("Frame")
-                barTop.BackgroundColor3, barTop.BorderSizePixel = Color3.new(0, 0, 0), 0
-                barTop.Size = UDim2.new(1, 0, 0, 0)
-                barTop.Parent = gui
-                barBot = Instance.new("Frame")
-                barBot.BackgroundColor3, barBot.BorderSizePixel = Color3.new(0, 0, 0), 0
-                barBot.AnchorPoint, barBot.Position = Vector2.new(0, 1), UDim2.new(0, 0, 1, 0)
-                barBot.Size = UDim2.new(1, 0, 0, 0)
-                barBot.Parent = gui
-                tw(barTop, 0.6, { Size = UDim2.new(1, 0, 0.11, 0) })
-                tw(barBot, 0.6, { Size = UDim2.new(1, 0, 0.11, 0) })
-
-                title = Instance.new("TextLabel")
-                title.AnchorPoint, title.Position = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.3, 0)
-                title.Size = UDim2.new(0.9, 0, 0.12, 0)
-                title.BackgroundTransparency = 1
-                title.Text = "EXPANSÃO DE DOMÍNIO"
-                title.Font, title.TextScaled = Enum.Font.GothamBlack, true
-                title.TextColor3 = C_WHITE
-                title.TextTransparency, title.TextStrokeTransparency = 1, 1
-                title.TextStrokeColor3 = C_BLUE
-                title.Parent = gui
-                local tsc = Instance.new("UIScale")
-                tsc.Scale = 1.5
-                tsc.Parent = title
-
-                subtitle = Instance.new("TextLabel")
-                subtitle.AnchorPoint, subtitle.Position = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.39, 0)
-                subtitle.Size = UDim2.new(0.7, 0, 0.07, 0)
-                subtitle.BackgroundTransparency = 1
-                subtitle.Text = "Vazio Ilimitado"
-                subtitle.Font, subtitle.TextScaled = Enum.Font.GothamBold, true
-                subtitle.TextColor3 = C_CYAN
-                subtitle.TextTransparency, subtitle.TextStrokeTransparency = 1, 1
-                subtitle.TextStrokeColor3 = C_BLUE
-                subtitle.Parent = gui
-
-                task.delay(0.5, function()
-                    if running and title.Parent then
-                        tw(tsc, 0.9, { Scale = 1 }, Enum.EasingStyle.Quint)
-                        tw(title, 0.7, { TextTransparency = 0, TextStrokeTransparency = 0.4 })
-                    end
-                end)
-                task.delay(1.2, function()
-                    if running and subtitle.Parent then
-                        tw(subtitle, 0.7, { TextTransparency = 0, TextStrokeTransparency = 0.5 })
-                    end
-                end)
-                task.delay(3.6, function()
-                    if running and title.Parent then
-                        tw(title, 0.8, { TextTransparency = 1, TextStrokeTransparency = 1 })
-                        tw(subtitle, 0.8, { TextTransparency = 1, TextStrokeTransparency = 1 })
-                    end
-                end)
-
-                flash = Instance.new("Frame")
-                flash.Size = UDim2.new(1, 0, 1, 0)
-                flash.BackgroundColor3, flash.BorderSizePixel = C_WHITE, 0
-                flash.Parent = gui
-                tw(flash, 1.3, { BackgroundTransparency = 1 })
-
-                -- soco de câmera (zoom) sem trocar o tipo da câmera
-                if cam then
-                    tw(cam, 0.25, { FieldOfView = oldFov - 22 })
-                    task.delay(0.3, function()
-                        if running and cam then tw(cam, 1.4, { FieldOfView = oldFov + 8 }, Enum.EasingStyle.Quint) end
+                local sphere = mkp(folder, Vector3.new(1, 1, 1), CFrame.new(casterPos), BLACK, nil, 0, Enum.PartType.Ball)
+                local shell = mkp(folder, Vector3.new(1, 1, 1), CFrame.new(casterPos), C_CYAN, Enum.Material.Neon, 0.85, Enum.PartType.Ball)
+                tw(sphere, 0.8, { Size = Vector3.new(24, 24, 24) }, Enum.EasingStyle.Back)
+                tw(shell, 0.8, { Size = Vector3.new(28, 28, 28) }, Enum.EasingStyle.Back)
+                task.delay(1.15, function()
+                    pcall(function()
+                        tw(sphere, 0.35, { Size = Vector3.new(1, 1, 1) })
+                        tw(shell, 0.35, { Size = Vector3.new(1, 1, 1), Transparency = 1 })
                     end)
-                    task.delay(1.9, function()
-                        if running and cam then tw(cam, 0.8, { FieldOfView = oldFov }) end
-                    end)
-                end
+                end)
+                if casterTrack == nil then casterTrack = safePlayAnimation(sc, CUSTOM_ANIM_ID) end
             end
+            if iAmCaster then sHum.WalkSpeed = 0 end
 
-            if GOJO_SOUND ~= "" then
+            if GOJO_SOUND ~= "" and near then
                 local snd = Instance.new("Sound")
                 snd.SoundId, snd.Volume = GOJO_SOUND, 5
                 snd.Parent = sh
                 snd:Play()
-                game:GetService("Debris"):AddItem(snd, 20)
+                Debris:AddItem(snd, 40)
             end
 
-            -- ===== ANIMAÇÃO DO PERSONAGEM (pose do Gojo) =====
-            casterTrack = safePlayAnimation(sc, CUSTOM_ANIM_ID)
-            if iAmCaster then sHum.WalkSpeed = 0 end
+            -- ===== preparação de quem vai pro domínio (você e o alvo) =====
+            local lineData, smokes, splashE, stars = {}, {}, {}, nil
+            local holeOpened, linesOn, ringT0 = false, false, 0
+            local L
 
-            -- ===== ONDAS DE ENERGIA AZUL/BRANCA =====
-            for i = 1, 3 do
-                task.delay((i - 1) * 0.14, function()
-                    if not running then return end
-                    local w = mkp(folder, Vector3.new(0.3, 4, 4), CFrame.new(cx, gy + 0.3, cz) * CFrame.Angles(0, 0, math.rad(90)),
-                        (i == 2) and C_WHITE or C_CYAN, Enum.Material.Neon, 0.15, Enum.PartType.Cylinder)
-                    tw(w, 1.1, { Size = Vector3.new(0.3, 240, 240), Transparency = 1 }, Enum.EasingStyle.Quad)
-                end)
-            end
-
-            -- ===== CAIXA DO ESPAÇO =====
-            local SPACE = Color3.fromRGB(3, 2, 10)
-            local walls = {}
-            local function wall(size, pos)
-                table.insert(walls, mkp(folder, size, CFrame.new(pos), SPACE, nil, 1))
-            end
-            wall(Vector3.new(TH, SIZE, SIZE), Vector3.new(cx - half, cy, cz))
-            wall(Vector3.new(TH, SIZE, SIZE), Vector3.new(cx + half, cy, cz))
-            wall(Vector3.new(SIZE, SIZE, TH), Vector3.new(cx, cy, cz - half))
-            wall(Vector3.new(SIZE, SIZE, TH), Vector3.new(cx, cy, cz + half))
-            wall(Vector3.new(SIZE, TH, SIZE), Vector3.new(cx, cy + half, cz))
-            local floorP = mkp(folder, Vector3.new(SIZE, 0.2, SIZE), CFrame.new(cx, gy + 0.08, cz), Color3.fromRGB(8, 6, 24), nil, 1)
-            floorP.Reflectance = 0.3
-            table.insert(walls, floorP)
-            for _, w in ipairs(walls) do tw(w, 1.4, { Transparency = 0 }) end
-
-            -- estrelas (um emissor de volume em vez de centenas de peças)
-            local starPart = mkp(folder, Vector3.new(SIZE - 40, SIZE - 40, SIZE - 40), CFrame.new(cx, cy, cz), C_WHITE, nil, 1)
-            local starEm = Instance.new("ParticleEmitter")
-            pcall(function()
-                starEm.Shape = Enum.ParticleEmitterShape.Box
-                starEm.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-                starEm.ShapeInOut = Enum.ParticleEmitterShapeInOut.InAndOut
-            end)
-            starEm.Rate = LOW and 25 or 60
-            starEm.Lifetime = NumberRange.new(5, 9)
-            starEm.Speed = NumberRange.new(0, 2)
-            starEm.RotSpeed = NumberRange.new(-30, 30)
-            starEm.Size = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0),
-                NumberSequenceKeypoint.new(0.2, 6),
-                NumberSequenceKeypoint.new(0.8, 6),
-                NumberSequenceKeypoint.new(1, 0) })
-            starEm.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, C_WHITE),
-                ColorSequenceKeypoint.new(0.5, C_CYAN),
-                ColorSequenceKeypoint.new(1, C_VIOLET) })
-            starEm.LightEmission, starEm.LightInfluence = 1, 0
-            starEm.Parent = starPart
-            starEm:Emit(LOW and 90 or 220)
-
-            -- nebulosas
-            local neb = { Color3.fromRGB(80, 60, 200), Color3.fromRGB(150, 60, 200), Color3.fromRGB(40, 110, 220) }
-            for i = 1, (LOW and 3 or 7) do
-                local d = math.random(70, 150)
-                mkp(folder, Vector3.new(d, d, d),
-                    CFrame.new(cx + (math.random() - 0.5) * (SIZE - 140), gy + 60 + math.random() * (SIZE - 180), cz + (math.random() - 0.5) * (SIZE - 140)),
-                    neb[(i % 3) + 1], Enum.Material.Neon, 0.9, Enum.PartType.Ball)
-            end
-
-            -- ===== BURACO NEGRO + ANEL ARCO-ÍRIS =====
-            local holeC = Vector3.new(cx, gy + 70, cz) + look * 150
-            local hole = mkp(folder, Vector3.new(1, 1, 1), CFrame.new(holeC), Color3.new(0, 0, 0), nil, 0, Enum.PartType.Ball)
-            tw(hole, CAST_TIME, { Size = Vector3.new(110, 110, 110) }, Enum.EasingStyle.Quad)
-            local halo = mkp(folder, Vector3.new(126, 126, 126), CFrame.new(holeC), Color3.fromRGB(190, 210, 255), Enum.Material.Neon, 0.9, Enum.PartType.Ball)
-            local hl = Instance.new("PointLight")
-            hl.Color, hl.Range, hl.Brightness = C_CYAN, 120, 3
-            hl.Parent = halo
-
-            local ring = {}
-            local rightV = look:Cross(Vector3.yAxis).Unit
-            local N, R = (LOW and 54 or 84), 74
-            for i = 1, N do
-                local a = (i / N) * math.pi * 2
-                local pos = holeC + rightV * math.cos(a) * R + Vector3.yAxis * math.sin(a) * R
-                ring[i] = mkp(folder, Vector3.new(5, 5, 5), CFrame.new(pos), C_WHITE, Enum.Material.Neon, 1, Enum.PartType.Ball)
-            end
-
-            -- ===== SOBRECARGA DE INFORMAÇÃO: painéis binários em órbita + riscos de luz =====
-            local cards = {}
-            for i = 1, (LOW and 8 or 18) do
-                local card = mkp(folder, Vector3.new(9, 5.5, 0.15), CFrame.new(focus), Color3.fromRGB(10, 20, 55), Enum.Material.Neon, 1)
-                local sg = Instance.new("SurfaceGui")
-                sg.Face, sg.LightInfluence, sg.PixelsPerStud = Enum.NormalId.Front, 0, 40
-                sg.Parent = card
-                local lb = Instance.new("TextLabel")
-                lb.Size, lb.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
-                lb.Text = randBinary()
-                lb.Font, lb.TextScaled, lb.TextColor3 = Enum.Font.Code, true, C_CYAN
-                lb.Parent = sg
-                cards[i] = {
-                    part = card, label = lb,
-                    a = math.random() * math.pi * 2,
-                    r = 24 + math.random() * 40,
-                    h = 4 + math.random() * 38,
-                    sp = (math.random() < 0.5 and -1 or 1) * (0.25 + math.random() * 0.4),
-                }
-            end
-
-            local streaks = {}
-            for i = 1, (LOW and 12 or 28) do
-                local len = 30 + math.random() * 60
-                local p = mkp(folder, Vector3.new(0.3, 0.3, len), CFrame.new(cx, cy, cz),
-                    (i % 3 == 0) and C_WHITE or C_CYAN, Enum.Material.Neon, 1)
-                local ang = math.random() * math.pi * 2
-                streaks[i] = {
-                    part = p,
-                    pos = Vector3.new(cx + (math.random() - 0.5) * (SIZE - 80), gy + 15 + math.random() * (SIZE - 80), cz + (math.random() - 0.5) * (SIZE - 80)),
-                    dir = Vector3.new(math.cos(ang), (math.random() - 0.5) * 0.3, math.sin(ang)).Unit,
-                    speed = 140 + math.random() * 220,
-                }
-            end
-
-            -- ===== BRILHO (Gojo = azul | alvos = roxo) =====
-            local function glow(char, color)
-                local h = Instance.new("Highlight")
-                h.Adornee = char
-                h.FillColor, h.OutlineColor = color, C_WHITE
-                h.FillTransparency, h.OutlineTransparency = 0.75, 0.2
-                h.Parent = folder
-            end
-            glow(sc, C_BLUE)
-            for _, plr in ipairs(Players:GetPlayers()) do
-                local c = plr.Character
-                local hrp2 = c and c:FindFirstChild("HumanoidRootPart")
-                if plr ~= sp and hrp2 then
-                    local hit
-                    if isAll then hit = (hrp2.Position - casterPos).Magnitude <= RANGE else hit = matches(plr) end
-                    if hit then glow(c, C_VIOLET) end
+            local function setLook(kind, t)
+                local p
+                if kind == "A" then
+                    p = { Ambient = Color3.fromRGB(70, 25, 100), OutdoorAmbient = Color3.fromRGB(50, 20, 85), Brightness = 0.3,
+                          ClockTime = 0, FogColor = Color3.fromRGB(22, 6, 40), FogStart = 120, FogEnd = 1000, ExposureCompensation = 0 }
+                else
+                    p = { Ambient = Color3.fromRGB(25, 55, 85), OutdoorAmbient = Color3.fromRGB(18, 40, 70), Brightness = 0.3,
+                          ClockTime = 0, FogColor = Color3.fromRGB(3, 12, 22), FogStart = 250, FogEnd = 1800, ExposureCompensation = 0 }
                 end
-            end
-
-            -- ===== LOOP VISUAL (um só RenderStep pra tudo) =====
-            local t0 = os.clock()
-            local flickerT = 0
-            local cardsOn, streaksOn = false, false
-            RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
-                local t = os.clock() - t0
-                local alpha = math.clamp(t / CAST_TIME, 0, 1)
-                for i, s in ipairs(ring) do
-                    s.Color = Color3.fromHSV((i / N + t * 0.12) % 1, 0.4, 1)
-                    if alpha < 1 then s.Transparency = 1 - 0.9 * alpha end
-                end
-                if not cardsOn and t > 0.8 then
-                    cardsOn = true
-                    for _, c in ipairs(cards) do tw(c.part, 0.8, { Transparency = 0.5 }) end
-                end
-                if not streaksOn and t > 1.0 then
-                    streaksOn = true
-                    for _, s in ipairs(streaks) do tw(s.part, 0.8, { Transparency = 0.2 }) end
-                end
-                for i, c in ipairs(cards) do
-                    c.a += c.sp * dt
-                    local pos = focus + Vector3.new(math.cos(c.a) * c.r, c.h + math.sin(t * 0.8 + i) * 2, math.sin(c.a) * c.r)
-                    c.part.CFrame = CFrame.lookAt(pos, focus + Vector3.new(0, c.h * 0.3, 0))
-                end
-                flickerT += dt
-                if flickerT > 0.15 then
-                    flickerT = 0
-                    for _ = 1, 4 do cards[math.random(#cards)].label.Text = randBinary() end
-                end
-                for _, s in ipairs(streaks) do
-                    s.pos += s.dir * s.speed * dt
-                    local d = s.pos - Vector3.new(cx, cy, cz)
-                    if math.abs(d.X) > half - 30 or math.abs(d.Z) > half - 30 then
-                        s.pos = Vector3.new(cx - s.dir.X * (half - 40), s.pos.Y, cz - s.dir.Z * (half - 40))
-                    end
-                    s.part.CFrame = CFrame.lookAt(s.pos, s.pos + s.dir)
-                end
-                if iAmTarget and paralyzed and cam then
-                    cam.FieldOfView = oldFov + math.sin(t * 7) * 6 + math.sin(t * 19) * 3
-                    cam.CFrame = cam.CFrame * CFrame.Angles(
-                        (math.random() - 0.5) * 0.012, (math.random() - 0.5) * 0.012, (math.random() - 0.5) * 0.02)
-                end
-            end)
-
-            -- ===== SOBRECARGA NA TELA DO ALVO =====
-            if iAmTarget and gui then
-                local tint = Instance.new("Frame")
-                tint.Size = UDim2.new(1, 0, 1, 0)
-                tint.BackgroundTransparency, tint.BorderSizePixel = 0.88, 0
-                tint.Parent = gui
-                local noise = {}
-                for i = 1, (LOW and 8 or 14) do
-                    local f = Instance.new("Frame")
-                    f.BorderSizePixel = 0
-                    f.Parent = gui
-                    noise[i] = f
-                end
-                if GOJO_IMAGE ~= "" then
-                    local im = Instance.new("ImageLabel")
-                    im.Size, im.Position = UDim2.new(0.5, 0, 0.5, 0), UDim2.new(0.25, 0, 0.25, 0)
-                    im.BackgroundTransparency, im.ImageTransparency = 1, 0.5
-                    im.Image = resolveImage(GOJO_IMAGE)
-                    im.ScaleType = Enum.ScaleType.Fit
-                    im.Parent = gui
-                end
-                local lbl = Instance.new("TextLabel")
-                lbl.Size, lbl.Position = UDim2.new(0.9, 0, 0.06, 0), UDim2.new(0.05, 0, 0.82, 0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = "Informação infinita... você não consegue se mexer."
-                lbl.Font, lbl.TextScaled = Enum.Font.GothamBold, true
-                lbl.TextColor3 = Color3.fromRGB(230, 235, 255)
-                lbl.TextStrokeTransparency = 0
-                lbl.Parent = gui
-                task.spawn(function()
-                    while running and gui and gui.Parent do
-                        tint.BackgroundColor3 = Color3.fromHSV(0.5 + math.random() * 0.25, 0.6, 1)
-                        for _, f in ipairs(noise) do
-                            f.Size = UDim2.new(math.random(2, 40) / 100, 0, math.random(1, 10) / 100, 0)
-                            f.Position = UDim2.new(math.random() * 0.9, 0, math.random() * 0.95, 0)
-                            f.BackgroundColor3 = Color3.fromHSV(0.5 + math.random() * 0.25, 0.5, 1)
-                            f.BackgroundTransparency = 0.65 + math.random() * 0.3
-                        end
-                        task.wait(0.12)
-                    end
-                end)
-            end
-
-            -- ===== PUXA O ALVO (escondido pelo clarão) E PARALISA =====
-            task.wait(0.35)
-            if alive() and iAmTarget then
-                if not isAll then myHrp.CFrame = CFrame.lookAt(focus, focus + look) end
-                myHrp.AssemblyLinearVelocity = Vector3.zero
-                myHrp.Anchored = true
-                myHum.WalkSpeed, myHum.JumpPower = 0, 0
-                pcall(function() myHum.JumpHeight = 0 end)
                 pcall(function()
-                    local an = myHum:FindFirstChildOfClass("Animator") or myHum
-                    for _, tr in ipairs(an:GetPlayingAnimationTracks()) do
-                        tr:AdjustSpeed(0)
-                        table.insert(frozen, tr)
+                    if t <= 0 then
+                        for k, v in pairs(p) do Lighting[k] = v end
+                    else
+                        tw(Lighting, t, p)
                     end
                 end)
-                paralyzed = true
             end
 
-            -- espera o fim da abertura (cancelável)
-            local tc = os.clock()
-            while alive() and os.clock() - tc < CAST_TIME - 0.35 do task.wait() end
-            if casterTrack then pcall(function() casterTrack:Stop(0.4) end) end
+            if participant then
+                for _, k in ipairs(LIGHT_KEYS) do pcall(function() saved[k] = Lighting[k] end) end
+                pcall(function()
+                    for _, c in ipairs(Lighting:GetChildren()) do
+                        if c:IsA("Atmosphere") then table.insert(hiddenAtm, c) c.Parent = nil
+                        elseif c:IsA("Sky") then table.insert(hiddenSky, c) c.Parent = nil end
+                    end
+                end)
+
+                local pg = LocalPlayer:WaitForChild("PlayerGui", 3)
+                gui = Instance.new("ScreenGui")
+                gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = "GojoDomainGui", true, false, 60
+                gui.Parent = pg
+                flash = Instance.new("Frame")
+                flash.Size = UDim2.new(1, 0, 1, 0)
+                flash.BackgroundColor3, flash.BorderSizePixel = C_WHITE, 0
+                flash.BackgroundTransparency = 1
+                flash.ZIndex = 100
+                flash.Parent = gui
+
+                cc = Instance.new("ColorCorrectionEffect")
+                cc.Parent = Lighting
+                bloom = Instance.new("BloomEffect")
+                bloom.Intensity, bloom.Size, bloom.Threshold = 0, 40, 0.8
+                bloom.Parent = Lighting
+                tw(bloom, 1.0, { Intensity = 2.2, Size = 60 })   -- brilho branco da abertura
+                if cam then tw(cam, 1.0, { FieldOfView = oldFov - 12 }) end
+
+                -- --- céu/cosmos ---
+                domainSky = Instance.new("Sky")
+                domainSky.Name = "GojoCosmos"
+                local face = ""
+                if COSMOS_SKY ~= "" then face = resolveImage(COSMOS_SKY) end
+                domainSky.SkyboxBk, domainSky.SkyboxDn, domainSky.SkyboxFt = face, face, face
+                domainSky.SkyboxLf, domainSky.SkyboxRt, domainSky.SkyboxUp = face, face, face
+                domainSky.StarCount = 4000
+                domainSky.CelestialBodiesShown = false
+                domainSky.Parent = Lighting
+
+                -- --- chão INVISÍVEL (mas sólido) e barreiras invisíveis ---
+                local function solid(size, off)
+                    local b = mkp(folder, size, CFrame.new(C + off), C_WHITE, nil, 1)
+                    b.CanCollide = true
+                end
+                solid(Vector3.new(170, 4, 170), Vector3.new(0, -2, 0))
+                solid(Vector3.new(4, 260, 170), Vector3.new(-85, 110, 0))
+                solid(Vector3.new(4, 260, 170), Vector3.new(85, 110, 0))
+                solid(Vector3.new(170, 260, 4), Vector3.new(0, 110, -85))
+                solid(Vector3.new(170, 260, 4), Vector3.new(0, 110, 85))
+                solid(Vector3.new(170, 4, 170), Vector3.new(0, 240, 0))
+
+                -- --- estrelas ---
+                local starPart = mkp(folder, Vector3.new(460, 460, 460), CFrame.new(C + Vector3.new(0, 100, 0)), C_WHITE, nil, 1)
+                stars = Instance.new("ParticleEmitter")
+                pcall(function()
+                    stars.Shape = Enum.ParticleEmitterShape.Box
+                    stars.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+                    stars.ShapeInOut = Enum.ParticleEmitterShapeInOut.InAndOut
+                end)
+                stars.Rate = LOW and 20 or 45
+                stars.Lifetime = NumberRange.new(6, 10)
+                stars.Speed = NumberRange.new(0, 2)
+                stars.Size = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.2, 5),
+                    NumberSequenceKeypoint.new(0.8, 5), NumberSequenceKeypoint.new(1, 0) })
+                stars.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, C_WHITE), ColorSequenceKeypoint.new(0.6, C_CYAN),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(190, 150, 255)) })
+                stars.LightEmission, stars.LightInfluence = 1, 0
+                stars.Parent = starPart
+                stars:Emit(LOW and 80 or 200)
+
+                -- --- riscos magenta/roxo/vermelho (fase da ativação) ---
+                local cols = { Color3.fromRGB(255, 40, 220), Color3.fromRGB(180, 50, 255), Color3.fromRGB(255, 45, 90), Color3.fromRGB(255, 170, 255) }
+                for i = 1, (LOW and 36 or 70) do
+                    local side = (i % 2 == 0) and 1 or -1
+                    local V = C + Vector3.new(0, 20, 320 * side)
+                    local d = Vector3.new((math.random() - 0.5) * 1.8, (math.random() - 0.5) * 1.2, -side * (0.5 + math.random() * 0.8)).Unit
+                    local len = 60 + math.random() * 160
+                    local p = mkp(folder, Vector3.new(0.5, 0.5, len), CFrame.new(V), cols[math.random(#cols)], Enum.Material.Neon, 1)
+                    lineData[i] = { part = p, V = V, d = d, r = 60 + math.random() * 500, sp = 260 + math.random() * 420 }
+                end
+
+                -- --- fumaça azul-turquesa do cosmos (fase final) ---
+                local teal = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 140, 170)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 80, 115)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 30, 55)) })
+                local nSmoke = LOW and 7 or 12
+                for i = 1, nSmoke do
+                    local a = (i / nSmoke) * math.pi * 2
+                    local rad = 200 + math.random() * 120
+                    local pos = C + Vector3.new(math.cos(a) * rad, 20 + math.random() * 120, math.sin(a) * rad)
+                    local sPart = mkp(folder, Vector3.new(4, 4, 4), CFrame.new(pos), C_WHITE, nil, 1)
+                    local e = Instance.new("ParticleEmitter")
+                    e.Texture = SMOKE_TEX
+                    e.Rate = LOW and 1.2 or 2.5
+                    e.Lifetime = NumberRange.new(14, 20)
+                    e.Speed = NumberRange.new(2, 6)
+                    e.SpreadAngle = Vector2.new(180, 180)
+                    e.Rotation = NumberRange.new(0, 360)
+                    e.RotSpeed = NumberRange.new(-6, 6)
+                    e.Drag = 0.5
+                    e.LightEmission, e.LightInfluence = 0.35, 0
+                    e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 160), NumberSequenceKeypoint.new(1, 320) })
+                    e.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, 0.55),
+                        NumberSequenceKeypoint.new(0.75, 0.7), NumberSequenceKeypoint.new(1, 1) })
+                    e.Color = teal
+                    e.Enabled = false
+                    e.Parent = sPart
+                    smokes[#smokes + 1] = e
+                end
+
+                -- --- respingos brancos (lado direito, como no vídeo) ---
+                for _, off in ipairs({ Vector3.new(130, 30, 110), Vector3.new(105, -10, 135), Vector3.new(150, 60, 140) }) do
+                    local sPart = mkp(folder, Vector3.new(4, 4, 4), CFrame.new(C + off), C_WHITE, nil, 1)
+                    local e = Instance.new("ParticleEmitter")
+                    e.Texture = SMOKE_TEX
+                    e.Rate = LOW and 3 or 6
+                    e.Lifetime = NumberRange.new(4, 7)
+                    e.Speed = NumberRange.new(4, 14)
+                    e.SpreadAngle = Vector2.new(180, 180)
+                    e.Rotation = NumberRange.new(0, 360)
+                    e.RotSpeed = NumberRange.new(-40, 40)
+                    e.Drag = 1.2
+                    e.LightEmission, e.LightInfluence = 0.8, 0
+                    e.Size = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 14), NumberSequenceKeypoint.new(0.5, 32), NumberSequenceKeypoint.new(1, 44) })
+                    e.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.15, 0.1),
+                        NumberSequenceKeypoint.new(0.7, 0.45), NumberSequenceKeypoint.new(1, 1) })
+                    e.Color = ColorSequence.new(C_WHITE, Color3.fromRGB(200, 225, 245))
+                    e.Enabled = false
+                    e.Parent = sPart
+                    splashE[#splashE + 1] = e
+                end
+
+                -- --- loop visual único ---
+                local rt0 = os.clock()
+                RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
+                    local t = os.clock() - rt0
+                    if linesOn then
+                        for _, ln in ipairs(lineData) do
+                            ln.r += ln.sp * dt
+                            if ln.r > 650 then ln.r = 40 end
+                            local pos = ln.V + ln.d * ln.r
+                            ln.part.CFrame = CFrame.lookAt(pos, pos + ln.d)
+                        end
+                    end
+                    if L then
+                        L.rainbowGrad.Rotation = (L.rainbowGrad.Rotation + 22 * dt) % 360
+                        L.swirlGrad.Rotation = (L.swirlGrad.Rotation - 12 * dt) % 360
+                        for _, w in ipairs(L.wisps) do
+                            w.g.Rotation = (w.g.Rotation + w.speed * dt) % 360
+                        end
+                    end
+                    if iAmTarget and paralyzed and cam then
+                        cam.FieldOfView = oldFov + math.sin(t * 7) * 3
+                        cam.CFrame = cam.CFrame * CFrame.Angles(
+                            (math.random() - 0.5) * 0.008, (math.random() - 0.5) * 0.008, (math.random() - 0.5) * 0.012)
+                    end
+                end)
+            end
+
+            -- ===== 2) BRILHO BRANCO -> TELA BRANCA -> TELEPORTE =====
+            if not waitUntil(0.9) then return end
+            if flash then tw(flash, 0.25, { BackgroundTransparency = 0 }) end
+
+            if not waitUntil(1.15) then return end
+            if participant then
+                returnCF = myHrp.CFrame
+                myHrp.AssemblyLinearVelocity = Vector3.zero
+                myHrp.CFrame = iAmCaster and casterSpot or targetSpot
+                teleported = true
+                if iAmTarget then
+                    myHrp.Anchored = true
+                    myHum.WalkSpeed, myHum.JumpPower = 0, 0
+                    pcall(function() myHum.JumpHeight = 0 end)
+                    pcall(function()
+                        local an = myHum:FindFirstChildOfClass("Animator") or myHum
+                        for _, tr in ipairs(an:GetPlayingAnimationTracks()) do
+                            tr:AdjustSpeed(0)
+                            table.insert(frozen, tr)
+                        end
+                    end)
+                    paralyzed = true
+                end
+                setLook("A", 0)
+                tw(cc, 0.6, { TintColor = Color3.fromRGB(255, 190, 255), Saturation = 0.25, Contrast = 0.2 })
+                tw(bloom, 0.6, { Intensity = 0.9, Size = 30 })
+                linesOn = true
+                for _, ln in ipairs(lineData) do tw(ln.part, 0.5, { Transparency = 0.1 }) end
+                tw(flash, 1.1, { BackgroundTransparency = 1 })   -- a tela branca se dissolve nos riscos
+                if cam then tw(cam, 1.1, { FieldOfView = oldFov }) end
+            end
+
+            -- ===== 3) RISCOS MAGENTA (pose do Gojo) até 4.0s =====
+            if not waitUntil(4.0) then return end
+            if casterTrack then pcall(function() casterTrack:Stop(0.5) end) end
             if iAmCaster then pcall(function() sHum.WalkSpeed = oldCasterWS end) end
 
-            -- ===== MORTE LENTA (HOLD_TIME segundos) =====
+            -- ===== 4) TRANSIÇÃO: névoa turquesa + buraco negro abrindo =====
+            if participant then
+                for _, ln in ipairs(lineData) do tw(ln.part, 0.9, { Transparency = 1 }) end
+                task.delay(1.0, function() linesOn = false end)
+                setLook("B", 1.2)
+                tw(cc, 1.2, { TintColor = Color3.fromRGB(190, 225, 255), Saturation = 0.1, Contrast = 0.25 })
+                for _, e in ipairs(smokes) do e.Enabled = true e:Emit(6) end
+                for _, e in ipairs(splashE) do e.Enabled = true e:Emit(4) end
+
+                local holeAnchor = mkp(folder, Vector3.new(1, 1, 1), CFrame.new(holeC), C_WHITE, nil, 1)
+                local rootF
+                bb, rootF, L = buildBlackHoleBillboard(holeAnchor, HOLE_STUDS)
+                tw(rootF, 0.9, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Back)   -- abertura com impacto
+                if cam then
+                    tw(cam, 0.3, { FieldOfView = oldFov - 8 })
+                    task.delay(0.35, function()
+                        if running and cam then tw(cam, 1.2, { FieldOfView = oldFov }, Enum.EasingStyle.Quint) end
+                    end)
+                end
+            end
+
+            -- ===== 5) ALVO PARALISADO, MORRENDO EM HOLD_TIME SEGUNDOS =====
+            if not waitUntil(5.2) then return end
+            if participant and L then
+                task.delay(0.4, function()
+                    if not running then return end
+                    for _, s in ipairs(L.splash) do
+                        task.delay(math.random() * 0.25, function()
+                            if running and s.f.Parent then
+                                tw(s.f, 0.35, { Size = UDim2.fromScale(s.w, s.h) }, Enum.EasingStyle.Back)
+                            end
+                        end)
+                    end
+                end)
+            end
             local h0 = (iAmTarget and myHum) and myHum.Health or 0
             local st = os.clock()
             while alive() and os.clock() - st < HOLD_TIME do
@@ -5292,9 +5394,19 @@ do
         end)
         if not ok then warn("[Gojo] " .. tostring(err)) end
 
-        -- ===== FINALIZAÇÃO: solta todo mundo, colapsa o domínio e volta ao normal =====
+        -- ===== 6) FINAL: clarão, todo mundo volta pro lugar, tudo é limpo =====
         running = false
         pcall(function() RunService:UnbindFromRenderStep(renderName) end)
+        pcall(function()
+            if flash then
+                flash.BackgroundColor3, flash.BackgroundTransparency = C_WHITE, 0.15
+            end
+            task.wait(0.2)
+            if participant and teleported and returnCF and myHrp and myHrp.Parent and myHum and myHum.Health > 0 then
+                myHrp.AssemblyLinearVelocity = Vector3.zero
+                myHrp.CFrame = returnCF
+            end
+        end)
         pcall(function()
             if iAmTarget then
                 if myHrp and myHrp.Parent and paralyzed then myHrp.Anchored = false end
@@ -5305,185 +5417,20 @@ do
             if iAmCaster then sHum.WalkSpeed = oldCasterWS end
             if casterTrack then casterTrack:Stop(0.3) end
         end)
-        pcall(function()
-            for _, d in ipairs(folder:GetDescendants()) do
-                if d:IsA("BasePart") then pcall(tw, d, 0.9, { Transparency = 1 })
-                elseif d:IsA("ParticleEmitter") then d.Enabled = false end
-            end
-            if near then
-                if flash then
-                    flash.BackgroundColor3, flash.BackgroundTransparency = C_CYAN, 0.35
-                    tw(flash, 1.1, { BackgroundTransparency = 1 })
-                end
-                if barTop then tw(barTop, 0.9, { Size = UDim2.new(1, 0, 0, 0) }) end
-                if barBot then tw(barBot, 0.9, { Size = UDim2.new(1, 0, 0, 0) }) end
-                if title then tw(title, 0.5, { TextTransparency = 1, TextStrokeTransparency = 1 }) end
-                if subtitle then tw(subtitle, 0.5, { TextTransparency = 1, TextStrokeTransparency = 1 }) end
-                if next(saved) ~= nil then
-                    local back = {}
-                    for k, v in pairs(saved) do back[k] = v end
-                    tw(Lighting, 1.0, back)
-                end
-                if cc then tw(cc, 0.9, { Saturation = 0, Contrast = 0, TintColor = C_WHITE }) end
-                if bloom then tw(bloom, 0.9, { Intensity = 0 }) end
-                if cam then tw(cam, 0.9, { FieldOfView = oldFov }) end
-            end
-            task.wait(1.05)
-        end)
-
         pcall(function() if cam then cam.FieldOfView = oldFov end end)
         pcall(function() folder:Destroy() end)
-        pcall(function() if gui then gui:Destroy() end end)
+        pcall(function() if bb then bb:Destroy() end end)
+        pcall(function() if domainSky then domainSky:Destroy() end end)
         pcall(function() if cc then cc:Destroy() end end)
         pcall(function() if bloom then bloom:Destroy() end end)
         for k, v in pairs(saved) do pcall(function() Lighting[k] = v end) end
-        for _, a in ipairs(hidden) do pcall(function() a.Parent = Lighting end) end
+        for _, a in ipairs(hiddenAtm) do pcall(function() a.Parent = Lighting end) end
+        for _, a in ipairs(hiddenSky) do pcall(function() a.Parent = Lighting end) end
+        if flash then pcall(function() tw(flash, 0.9, { BackgroundTransparency = 1 }) end) end
+        task.delay(1.0, function() pcall(function() if gui then gui:Destroy() end end) end)
         if iAmCaster then GOJO.cdEnd = os.clock() + COOLDOWN end
         GOJO.busy = false
     end
-
-    -- ===== HUD DA HABILIDADE (botão de toque, recarga, estado) =====
-    function GOJO.buildHud()
-        local pg = LocalPlayer:WaitForChild("PlayerGui")
-        local old = pg:FindFirstChild("GojoDomainHUD")
-        if old then old:Destroy() end
-
-        local sg = Instance.new("ScreenGui")
-        sg.Name, sg.ResetOnSpawn, sg.DisplayOrder = "GojoDomainHUD", false, 40
-        sg.Parent = pg
-
-        local function round(obj, r)
-            local c = Instance.new("UICorner")
-            c.CornerRadius = UDim.new(0, r)
-            c.Parent = obj
-        end
-
-        local root = Instance.new("Frame")
-        root.Name = "Root"
-        root.AnchorPoint, root.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10)
-        root.Size = UDim2.new(0, 270, 0, 76)
-        root.BackgroundColor3, root.BorderSizePixel = C_WHITE, 0
-        root.BackgroundTransparency = 0.1
-        root.Parent = sg
-        round(root, 20)
-        local rg = Instance.new("UIGradient")
-        rg.Color = ColorSequence.new(Color3.fromRGB(16, 28, 66), Color3.fromRGB(4, 6, 16))
-        rg.Rotation = 90
-        rg.Parent = root
-        local rs = Instance.new("UIStroke")
-        rs.Thickness, rs.Color = 2, C_CYAN
-        rs.Parent = root
-        local ui = Instance.new("UIScale")
-        ui.Parent = root
-
-        local function fit()
-            local c = workspace.CurrentCamera
-            local vp = c and c.ViewportSize or Vector2.new(1280, 720)
-            ui.Scale = math.clamp(math.min(vp.X / 900, vp.Y / 520), 0.65, 1.25)
-        end
-        fit()
-        if workspace.CurrentCamera then
-            workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
-        end
-
-        local btn = Instance.new("TextButton")
-        btn.Name = "Cast"
-        btn.AnchorPoint, btn.Position = Vector2.new(0, 0.5), UDim2.new(0, 10, 0.5, 0)
-        btn.Size = UDim2.new(0, 56, 0, 56)
-        btn.BackgroundColor3, btn.AutoButtonColor = C_WHITE, false
-        btn.Text, btn.Font, btn.TextSize, btn.TextColor3 = "∞", Enum.Font.GothamBlack, 34, C_WHITE
-        btn.Parent = root
-        round(btn, 28)
-        local bg = Instance.new("UIGradient")
-        bg.Color = ColorSequence.new(Color3.fromRGB(70, 130, 255), Color3.fromRGB(20, 40, 120))
-        bg.Rotation = 45
-        bg.Parent = btn
-        local bstroke = Instance.new("UIStroke")
-        bstroke.Thickness, bstroke.Color = 2, C_CYAN
-        bstroke.Parent = btn
-        local bsc = Instance.new("UIScale")
-        bsc.Parent = btn
-        btn.MouseEnter:Connect(function() tw(bsc, 0.15, { Scale = 1.08 }) end)
-        btn.MouseLeave:Connect(function() tw(bsc, 0.15, { Scale = 1 }) end)
-        btn.MouseButton1Down:Connect(function() tw(bsc, 0.1, { Scale = 0.92 }) end)
-        btn.MouseButton1Up:Connect(function() tw(bsc, 0.15, { Scale = 1.05 }) end)
-        btn.Activated:Connect(function() GOJO.cast("ALL") end)
-
-        local function label(text, y, h, size, font, color)
-            local l = Instance.new("TextLabel")
-            l.BackgroundTransparency = 1
-            l.Position, l.Size = UDim2.new(0, 76, 0, y), UDim2.new(1, -110, 0, h)
-            l.Text, l.Font, l.TextSize, l.TextColor3 = text, font, size, color
-            l.TextXAlignment = Enum.TextXAlignment.Left
-            l.Parent = root
-            return l
-        end
-        label("EXPANSÃO DE DOMÍNIO", 6, 18, 13, Enum.Font.GothamBlack, C_WHITE)
-        local status = label("DISPONÍVEL", 25, 16, 12, Enum.Font.GothamMedium, C_CYAN)
-
-        local barBg = Instance.new("Frame")
-        barBg.Position, barBg.Size = UDim2.new(0, 76, 0, 50), UDim2.new(1, -90, 0, 10)
-        barBg.BackgroundColor3, barBg.BorderSizePixel = Color3.fromRGB(20, 26, 50), 0
-        barBg.Parent = root
-        round(barBg, 5)
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new(1, 0, 1, 0)
-        fill.BackgroundColor3, fill.BorderSizePixel = C_CYAN, 0
-        fill.Parent = barBg
-        round(fill, 5)
-        local fg = Instance.new("UIGradient")
-        fg.Color = ColorSequence.new(C_BLUE, C_WHITE)
-        fg.Parent = fill
-
-        local cancelBtn = Instance.new("TextButton")
-        cancelBtn.AnchorPoint, cancelBtn.Position = Vector2.new(1, 0), UDim2.new(1, -8, 0, 8)
-        cancelBtn.Size = UDim2.new(0, 24, 0, 24)
-        cancelBtn.BackgroundColor3, cancelBtn.Text = Color3.fromRGB(90, 40, 70), "✕"
-        cancelBtn.Font, cancelBtn.TextSize, cancelBtn.TextColor3 = Enum.Font.GothamBold, 14, C_WHITE
-        cancelBtn.Visible = false
-        cancelBtn.Parent = root
-        round(cancelBtn, 12)
-        cancelBtn.Activated:Connect(function() GOJO.cancelAll() end)
-
-        local lastState
-        local conn
-        conn = RunService.Heartbeat:Connect(function()
-            if not sg.Parent then conn:Disconnect() return end
-            local state, left = "READY", 0
-            if GOJO.busy then
-                state = "RUN"
-            else
-                left = GOJO.cooldownLeft()
-                if left > 0 then state = "CD" end
-            end
-            if state ~= lastState then
-                lastState = state
-                local col = (state == "READY" and C_CYAN) or (state == "RUN" and C_VIOLET) or Color3.fromRGB(130, 140, 175)
-                tw(rs, 0.25, { Color = col })
-                tw(bstroke, 0.25, { Color = col })
-                tw(fill, 0.25, { BackgroundColor3 = col })
-                status.TextColor3 = col
-                cancelBtn.Visible = (state == "RUN")
-            end
-            if state == "READY" then
-                status.Text = "DISPONÍVEL"
-                fill.Size = UDim2.new(1, 0, 1, 0)
-                rs.Thickness = 2 + math.sin(os.clock() * 4) * 0.6
-            elseif state == "RUN" then
-                status.Text = "EM EXECUÇÃO"
-                fill.Size = UDim2.new(1, 0, 1, 0)
-                rs.Thickness = 2.5 + math.sin(os.clock() * 9)
-            else
-                status.Text = string.format("RECARGA  %.1fs", left)
-                fill.Size = UDim2.new(math.clamp(1 - left / COOLDOWN, 0, 1), 0, 1, 0)
-                rs.Thickness = 2
-            end
-        end)
-    end
-end
-
-if IS_ADMIN then
-    task.spawn(function() pcall(GOJO.buildHud) end)
 end
 
 -- ================== COMANDOS ADM EXTRAS (FLOAT / LOOPKILL / REJOIN) ==================
@@ -6139,7 +6086,7 @@ if not ok or not WindUI then
     notify("Erro", "Falha ao carregar WindUI.")
 else
     local HUB_NAME   = "Fantasma1l hub"
-    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.18"
+    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.19"
     local HUB_AUTHOR = "By Fantasma1l / renegado6661l"
 
     -- chama método do WindUI tentando as duas assinaturas (obj:método e obj.método)
@@ -6379,15 +6326,11 @@ else
                 end),
                 cmd(";gojo",      "Modo Satoru Gojo", function() giveGojo() end),
                 cmd(";sukuna",    "Expansão de Domínio [Sukuna]", function() triggerCommand("SUKUNA_DOMAIN", "ALL") end),
-                cmd(";gojodominio", "Expansão de Domínio [Gojo] no Alvo", function()
-                    if selectedPlayerName == LocalPlayer.Name then
-                        notify("ADM", "Selecione outro jogador como alvo.")
-                        return
-                    end
-                    triggerCommand("GOJO_DOMAIN", selectedPlayerName)
+                cmd(";gojodominio", "Expansão de Domínio [Gojo] no jogador MAIS PRÓXIMO", function()
+                    GOJO.cast("NEAREST")
                 end),
-                cmd(";gojodominioall", "Expansão de Domínio [Gojo] (todos perto)", function()
-                    triggerCommand("GOJO_DOMAIN", "ALL")
+                cmd(";gojodominiosel", "Expansão de Domínio [Gojo] no alvo selecionado", function()
+                    GOJO.cast(selectedPlayerName)
                 end),
                 cmd(";gojocancel", "Cancelar a Expansão de Domínio", function()
                     GOJO.cancelAll()
