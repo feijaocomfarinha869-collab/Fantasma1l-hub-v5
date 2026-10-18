@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v41
+    FANTASMA1L HUB - COMPLETO UNIFICADO v42
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5
      | IMAGENS CORRIGIDAS | EXPANSAO DE DOMINIO DO GOJO)
     ==========================================================
@@ -5021,10 +5021,6 @@ do
                 return false
             end
         end
-        if name == LocalPlayer.Name then
-            notify("Gojo", "Selecione outro jogador como alvo.")
-            return false
-        end
         task.spawn(function() pcall(GOJO.run, LocalPlayer.Name, name) end)
         sendNetCmd(";GOJO_DOMAIN " .. name)
         return true
@@ -5044,7 +5040,9 @@ do
 
         local tname = string.lower(tostring(targetName or ""))
         local iAmCaster = (senderName == LocalPlayer.Name)
-        local iAmTarget = (not iAmCaster) and (string.lower(LocalPlayer.Name) == tname or string.lower(LocalPlayer.DisplayName) == tname)
+        local nameIsMe = (string.lower(LocalPlayer.Name) == tname or string.lower(LocalPlayer.DisplayName) == tname)
+        local selfCast = iAmCaster and nameIsMe          -- você escolheu o seu próprio nome: só pra ver o domínio (não paralisa nem mata você)
+        local iAmTarget = nameIsMe and not iAmCaster     -- você é a vítima de outro jogador
         local participant = iAmCaster or iAmTarget
 
         local myChar = LocalPlayer.Character
@@ -5064,8 +5062,8 @@ do
 
         -- layout do domínio (longe do mapa, no céu)
         local C = Vector3.new(((tonumber(sp.UserId) or 0) % 40) * 800, 6000, 0)
-        local casterSpot = CFrame.lookAt(C + Vector3.new(0, 4, -14), C + Vector3.new(0, 4, 60))
-        local targetSpot = CFrame.lookAt(C + Vector3.new(0, 4, 10), C + Vector3.new(0, 4, -60))
+        local casterSpot = CFrame.lookAt(C + Vector3.new(-6, 4, -12), C + Vector3.new(-6, 4, 80))
+        local targetSpot = CFrame.lookAt(C + Vector3.new(7, 4, 8), C + Vector3.new(7, 4, 90))
         local holeC = C + Vector3.new(0, 18, 118)
 
         local oldWS = myHum and myHum.WalkSpeed or 16
@@ -5085,6 +5083,8 @@ do
         local frozen = {}
         local casterTrack
         local returnCF
+        local aimFrames = 0
+        local oldLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
         local T0 = os.clock()
 
         local function waitUntil(t)
@@ -5282,6 +5282,12 @@ do
                 local rt0 = os.clock()
                 RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
                     local t = os.clock() - rt0
+                    if aimFrames > 0 and cam and myHrp and myHrp.Parent then
+                        -- vira a câmera pro buraco negro (sem isso o alvo olhava pro lado errado e via só preto)
+                        aimFrames -= 1
+                        local p = myHrp.Position
+                        cam.CFrame = CFrame.lookAt(p + Vector3.new(0, 4, -13), p + Vector3.new(0, 6, 40))
+                    end
                     if linesOn then
                         for _, ln in ipairs(lineData) do
                             ln.r += ln.sp * dt
@@ -5315,6 +5321,7 @@ do
                 myHrp.AssemblyLinearVelocity = Vector3.zero
                 myHrp.CFrame = iAmCaster and casterSpot or targetSpot
                 teleported = true
+                aimFrames = 12
                 if iAmTarget then
                     myHrp.Anchored = true
                     myHum.WalkSpeed, myHum.JumpPower = 0, 0
@@ -5405,6 +5412,13 @@ do
             if participant and teleported and returnCF and myHrp and myHrp.Parent and myHum and myHum.Health > 0 then
                 myHrp.AssemblyLinearVelocity = Vector3.zero
                 myHrp.CFrame = returnCF
+                if cam then
+                    for _ = 1, 6 do
+                        local p = myHrp.Position
+                        cam.CFrame = CFrame.lookAt(p - oldLook * 12 + Vector3.new(0, 3, 0), p + oldLook * 40)
+                        RunService.RenderStepped:Wait()
+                    end
+                end
             end
         end)
         pcall(function()
@@ -6086,7 +6100,7 @@ if not ok or not WindUI then
     notify("Erro", "Falha ao carregar WindUI.")
 else
     local HUB_NAME   = "Fantasma1l hub"
-    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.19"
+    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.20"
     local HUB_AUTHOR = "By Fantasma1l / renegado6661l"
 
     -- chama método do WindUI tentando as duas assinaturas (obj:método e obj.método)
@@ -6329,7 +6343,7 @@ else
                 cmd(";gojodominio", "Expansão de Domínio [Gojo] no jogador MAIS PRÓXIMO", function()
                     GOJO.cast("NEAREST")
                 end),
-                cmd(";gojodominiosel", "Expansão de Domínio [Gojo] no alvo selecionado", function()
+                cmd(";gojodominiosel", "Expansão de Domínio [Gojo] no alvo selecionado (pode ser você)", function()
                     GOJO.cast(selectedPlayerName)
                 end),
                 cmd(";gojocancel", "Cancelar a Expansão de Domínio", function()
