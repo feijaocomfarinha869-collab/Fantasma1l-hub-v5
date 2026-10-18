@@ -6586,8 +6586,8 @@ end
 
 end -- fim IS_ADMIN
 -- ==========================================================
--- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.6.0)
--- Detecção de WindUI + Webhook Discord com Foto de Perfil & Link do Servidor
+-- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.6.1 - FIX AVATAR & LINK)
+-- Detecção WindUI + Webhook Discord com Foto de Perfil via API Oficial Roblox
 -- ==========================================================
 
 local Players            = game:GetService("Players")
@@ -6614,8 +6614,7 @@ local function detectarHub()
     if wind then
         return true, "ScreenGui WindUI encontrada", "DONO 👑 (renegado6661l)"
     end
-    
-    -- Verificação por nome de usuário (Fallback)
+
     if string.lower(LocalPlayer.Name) == "renegado6661l" then
         return true, "Conta Oficial renegado6661l", "DONO 👑 (renegado6661l)"
     end
@@ -6623,8 +6622,31 @@ local function detectarHub()
     return false, "Sem WindUI", "Utilizador Comum"
 end
 
--- Executa a checagem
 IS_ADMIN, DETECT_REASON, MY_ROLE = detectarHub()
+
+-- ================== PEGAR FOTO DE PERFIL REAL (API ROBLOX) ==================
+local function getAvatarImageUrl()
+    local defaultImg = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=420&height=420&format=png"
+    local req = syn and syn.request or http and http.request or http_request or fluxus and fluxus.request or request
+    if not req then return defaultImg end
+
+    local apiUrl = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" .. tostring(LocalPlayer.UserId) .. "&size=420x420&format=Png&isCircular=false"
+    local success, response = pcall(function()
+        return req({
+            Url = apiUrl,
+            Method = "GET"
+        })
+    end)
+
+    if success and response and response.Body then
+        local okParse, data = pcall(function() return HttpService:JSONDecode(response.Body) end)
+        if okParse and data and data.data and data.data[1] and data.data[1].imageUrl then
+            return data.data[1].imageUrl
+        end
+    end
+
+    return defaultImg
+end
 
 -- ================== SISTEMA DE WEBHOOK DISCORD ==================
 local function sendDiscordWebhook()
@@ -6643,14 +6665,12 @@ local function sendDiscordWebhook()
                 end
             end)
 
-            -- Obter foto de perfil real do Roblox (Headshot 420x420)
-            local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=420&height=420&format=png"
+            -- Foto de perfil HD convertida pela API da Roblox
+            local avatarUrl = getAvatarImageUrl()
             
-            -- Gerar link de entrada direta no servidor do jogo
+            -- Links de entrada no servidor
             local joinServerLink = "https://www.roblox.com/games/start?placeId=" .. tostring(game.PlaceId) .. "&launchData=" .. tostring(game.JobId)
-            local serverScriptLink = "Roblox.GameLauncher.joinGameInstance(" .. tostring(game.PlaceId) .. ', "' .. tostring(game.JobId) .. '")'
 
-            -- Cor: Vermelho para Dono/ADM, Verde para Usuário Normal
             local embedColor = IS_ADMIN and 16711680 or 65280
 
             local data = {
@@ -6658,7 +6678,7 @@ local function sendDiscordWebhook()
                 ["embeds"] = {
                     {
                         ["title"] = "👻 Fantasma1l Hub - Nova Execução",
-                        ["description"] = "Um usuário acabou de executar o hub no Brookhaven!",
+                        ["description"] = "Um utilizador executou o hub no Brookhaven!",
                         ["color"] = embedColor,
                         ["thumbnail"] = {
                             ["url"] = avatarUrl
@@ -6674,7 +6694,7 @@ local function sendDiscordWebhook()
                             { ["name"] = "🔗 Link do Servidor", ["value"] = "[Clique para entrar no Servidor](" .. joinServerLink .. ")", ["inline"] = false }
                         },
                         ["footer"] = {
-                            ["text"] = "Fantasma1l Hub - Brookhaven v8.6.0"
+                            ["text"] = "Fantasma1l Hub - Brookhaven v8.6.1"
                         },
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }
@@ -6695,7 +6715,6 @@ local function sendDiscordWebhook()
     end)
 end
 
--- Envia para o webhook
 sendDiscordWebhook()
 
 local function notify(t, txt, dur)
@@ -7236,7 +7255,7 @@ task.spawn(function()
 
     local Window = redz:MakeWindow({
         Title = "Fantasma1l Hub",
-        SubTitle = "Brookhaven Edition v8.6.0 | " .. MY_ROLE,
+        SubTitle = "Brookhaven Edition v8.6.1 | " .. MY_ROLE,
         SaveFolder = "Fantasma1l_Brookhaven"
     })
     Window:AddMinimizeButton({
@@ -7253,7 +7272,7 @@ task.spawn(function()
     Window:SelectTab(TabHome)
 
     TabHome:AddSection({ "Informacoes" })
-    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.6.0" })
+    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.6.1" })
     TabHome:AddParagraph({ "Cargo Atribuído", MY_ROLE })
     TabHome:AddButton({ "Rejoin Server", function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
@@ -7477,7 +7496,7 @@ task.spawn(function()
         if v then
             local conn = RunService.Heartbeat:Connect(function()
                 local hrp = getHRP()
-                if not hrp then return end
+                if not hrp me then return end
                 local v3 = hrp.AssemblyLinearVelocity
                 if v3.Magnitude > 500 or v3.Y < -300 or v3.Y > 500 then
                     hrp.AssemblyLinearVelocity = Vector3.zero
@@ -7508,5 +7527,5 @@ task.spawn(function()
         end)
     end })
 
-    notify("Fantasma1l Hub", "Brookhaven Edition v8.6.0 carregado com sucesso!")
+    notify("Fantasma1l Hub", "Brookhaven Edition v8.6.1 carregado com sucesso!")
 end)
