@@ -6586,8 +6586,8 @@ end
 
 end -- fim IS_ADMIN
 -- ==========================================================
--- FANTASMA1L HUB - BROOKHAVEN EDITION (COMPLETO v8.5.8)
--- Server Lag (Phone Lag) + Anti-Lag + Deteção de Painel + Webhook
+-- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.5.9)
+-- Detecção Específica de WindUI + Cargo Dono (renegado6661l) + Webhook Discord
 -- ==========================================================
 
 local Players            = game:GetService("Players")
@@ -6599,98 +6599,37 @@ local HttpService        = game:GetService("HttpService")
 local LocalPlayer        = Players.LocalPlayer
 
 local ICON_ID = "rbxassetid://72455921762458"
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1561501648298188801/1seLFNFBSSjoOt9qZc2vs_gfirlf6pkvUjDkzsFYW7ozCVUGloPd9Jq1mXcUqDkajWbY"
 
--- ================== SISTEMA DE DETECÇÃO DE PAINEL / HUB ==================
-local IS_ADMIN, MY_ROLE = false, "Utilizador Comum"
-local DETECTED_HUB_NAME = "Nenhum"
+-- ================== SISTEMA DE DETECÇÃO DE GUI ==================
+local IS_ADMIN = false
+local MY_ROLE = "Utilizador Comum"
+local DETECT_REASON = "Sem WindUI"
 
-local function detectHubAndSetRole()
-    local foundHub = false
-    local hubTitle = ""
+local function detectarHub()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return false, "PlayerGui não encontrado", "Utilizador Comum" end
 
-    -- 1. Verifica se existe alguma janela da UI ou ScreenGui com o nome do hub no PlayerGui
-    pcall(function()
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            for _, gui in ipairs(playerGui:GetDescendants()) do
-                if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-                    local text = string.lower(gui.Text)
-                    if text:find("fantasma1l") then
-                        foundHub = true
-                        hubTitle = "Fantasma1l Hub"
-                        break
-                    elseif text:find("admin") or text:find("hub") then
-                        foundHub = true
-                        hubTitle = gui.Text
-                        break
-                    end
-                elseif gui:IsA("ScreenGui") then
-                    local gName = string.lower(gui.Name)
-                    if gName:find("fantasma") then
-                        foundHub = true
-                        hubTitle = "Fantasma1l Hub"
-                        break
-                    elseif gName:find("admin") or gName:find("windui") then
-                        foundHub = true
-                        hubTitle = gui.Name
-                        break
-                    end
-                end
-            end
-        end
-    end)
-
-    -- 2. Verifica variáveis globais (getgenv) usadas por loaders ou hubs
-    if not foundHub then
-        pcall(function()
-            for key, _ in pairs(getgenv()) do
-                local kLower = string.lower(tostring(key))
-                if kLower:find("fantasma") or kLower:find("admin") or kLower:find("hub") then
-                    foundHub = true
-                    hubTitle = tostring(key)
-                    break
-                end
-            end
-        end)
+    local wind = pg:FindFirstChild("WindUI")
+    if wind then
+        return true, "ScreenGui WindUI encontrada", "DONO 👑 (renegado6661l)"
+    end
+    
+    -- Verificação por nome de usuário (Fallback se for o renegado6661l diretamente)
+    if string.lower(LocalPlayer.Name) == "renegado6661l" then
+        return true, "Conta Oficial renegado6661l", "DONO 👑 (renegado6661l)"
     end
 
-    -- Atribuição de Cargos baseada no painel detetado
-    if foundHub then
-        DETECTED_HUB_NAME = hubTitle
-        local lowerTitle = string.lower(hubTitle)
-        
-        if lowerTitle:find("fantasma") then
-            IS_ADMIN = true
-            MY_ROLE = "DONO 👑 (Fantasma1l Hub Detetado)"
-        else
-            IS_ADMIN = true
-            MY_ROLE = "ADM 🛡️ (Painel Externo Detetado: " .. hubTitle .. ")"
-        end
-    else
-        -- Fallback por ID de Roblox (caso queiras adicionar IDs fixos de donos/adms)
-        local ownerIds = { 
-            -- Coloca o teu UserID do Roblox aqui se necessário
-        }
-        for _, id in ipairs(ownerIds) do
-            if LocalPlayer.UserId == id then
-                IS_ADMIN = true
-                MY_ROLE = "DONO 👑 (Por UserID)"
-                DETECTED_HUB_NAME = "UserID Whitelist"
-                break
-            end
-        end
-    end
+    return false, "Sem WindUI", "Utilizador Comum"
 end
 
--- Executa a deteção imediatamente
-detectHubAndSetRole()
+-- Executa a checagem
+IS_ADMIN, DETECT_REASON, MY_ROLE = detectarHub()
 
 -- ================== SISTEMA DE WEBHOOK DISCORD ==================
 local function sendDiscordWebhook()
     task.spawn(function()
         pcall(function()
-            local webhookUrl = "https://discord.com/api/webhooks/1561501648298188801/1seLFNFBSSjoOt9qZc2vs_gfirlf6pkvUjDkzsFYW7ozCVUGloPd9Jq1mXcUqDkajWbY"
-            
             local executorName = "Desconhecido"
             pcall(function()
                 if identifyexecutor then
@@ -6704,6 +6643,7 @@ local function sendDiscordWebhook()
                 end
             end)
 
+            -- Cor: Vermelho para Dono/ADM, Verde para Usuário Normal
             local embedColor = IS_ADMIN and 16711680 or 65280
 
             local data = {
@@ -6711,18 +6651,18 @@ local function sendDiscordWebhook()
                 ["embeds"] = {
                     {
                         ["title"] = "👻 Fantasma1l Hub - Nova Execução",
-                        ["description"] = "Um utilizador executou o hub no Brookhaven!",
+                        ["description"] = "Um usuário acabou de executar o hub no Brookhaven!",
                         ["color"] = embedColor,
                         ["fields"] = {
                             { ["name"] = "👤 Utilizador", ["value"] = LocalPlayer.Name .. " (" .. LocalPlayer.DisplayName .. ")", ["inline"] = true },
                             { ["name"] = "🆔 User ID", ["value"] = tostring(LocalPlayer.UserId), ["inline"] = true },
                             { ["name"] = "🛠️ Executor", ["value"] = tostring(executorName), ["inline"] = true },
                             { ["name"] = "👑 Cargo Atribuído", ["value"] = MY_ROLE, ["inline"] = false },
-                            { ["name"] = "🔍 Painel/Hub Detetado", ["value"] = DETECTED_HUB_NAME, ["inline"] = true },
+                            { ["name"] = "🔍 Status do Detetor", ["value"] = DETECT_REASON, ["inline"] = true },
                             { ["name"] = "🌐 Place ID", ["value"] = tostring(game.PlaceId), ["inline"] = true }
                         },
                         ["footer"] = {
-                            ["text"] = "Fantasma1l Hub - Brookhaven Edition v8.5.8"
+                            ["text"] = "Fantasma1l Hub - Brookhaven v8.5.9"
                         },
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }
@@ -6733,7 +6673,7 @@ local function sendDiscordWebhook()
             local req = syn and syn.request or http and http.request or http_request or fluxus and fluxus.request or request
             if req then
                 req({
-                    Url = webhookUrl,
+                    Url = WEBHOOK_URL,
                     Method = "POST",
                     Headers = { ["Content-Type"] = "application/json" },
                     Body = encodedData
@@ -6743,7 +6683,7 @@ local function sendDiscordWebhook()
     end)
 end
 
--- Envia o webhook com o resultado da deteção
+-- Envia para o webhook
 sendDiscordWebhook()
 
 local function notify(t, txt, dur)
@@ -6752,7 +6692,7 @@ local function notify(t, txt, dur)
     end)
 end
 
-notify("Fantasma1l Hub", "A carregar v8.5.8 | Cargo: " .. MY_ROLE, 3)
+notify("Fantasma1l Hub", "Carregado! | Cargo: " .. MY_ROLE, 4)
 
 local function getHRP()
     local c = LocalPlayer.Character
@@ -7284,7 +7224,7 @@ task.spawn(function()
 
     local Window = redz:MakeWindow({
         Title = "Fantasma1l Hub",
-        SubTitle = "Brookhaven Edition v8.5.8 | " .. MY_ROLE,
+        SubTitle = "Brookhaven Edition v8.5.9 | " .. MY_ROLE,
         SaveFolder = "Fantasma1l_Brookhaven"
     })
     Window:AddMinimizeButton({
@@ -7301,8 +7241,8 @@ task.spawn(function()
     Window:SelectTab(TabHome)
 
     TabHome:AddSection({ "Informacoes" })
-    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.5.8" })
-    TabHome:AddParagraph({ "Cargo Atual", MY_ROLE })
+    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.5.9" })
+    TabHome:AddParagraph({ "Cargo Atribuído", MY_ROLE })
     TabHome:AddButton({ "Rejoin Server", function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end })
@@ -7556,6 +7496,5 @@ task.spawn(function()
         end)
     end })
 
-    notify("Fantasma1l Hub", "Brookhaven Edition carregado com sucesso!")
+    notify("Fantasma1l Hub", "Brookhaven Edition v8.5.9 carregado com sucesso!")
 end)
-
