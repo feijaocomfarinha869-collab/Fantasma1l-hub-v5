@@ -6586,8 +6586,8 @@ end
 
 end -- fim IS_ADMIN
 -- ==========================================================
--- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.5.9)
--- Detecção Específica de WindUI + Cargo Dono (renegado6661l) + Webhook Discord
+-- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.6.0)
+-- Detecção de WindUI + Webhook Discord com Foto de Perfil & Link do Servidor
 -- ==========================================================
 
 local Players            = game:GetService("Players")
@@ -6615,7 +6615,7 @@ local function detectarHub()
         return true, "ScreenGui WindUI encontrada", "DONO 👑 (renegado6661l)"
     end
     
-    -- Verificação por nome de usuário (Fallback se for o renegado6661l diretamente)
+    -- Verificação por nome de usuário (Fallback)
     if string.lower(LocalPlayer.Name) == "renegado6661l" then
         return true, "Conta Oficial renegado6661l", "DONO 👑 (renegado6661l)"
     end
@@ -6643,6 +6643,13 @@ local function sendDiscordWebhook()
                 end
             end)
 
+            -- Obter foto de perfil real do Roblox (Headshot 420x420)
+            local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=420&height=420&format=png"
+            
+            -- Gerar link de entrada direta no servidor do jogo
+            local joinServerLink = "https://www.roblox.com/games/start?placeId=" .. tostring(game.PlaceId) .. "&launchData=" .. tostring(game.JobId)
+            local serverScriptLink = "Roblox.GameLauncher.joinGameInstance(" .. tostring(game.PlaceId) .. ', "' .. tostring(game.JobId) .. '")'
+
             -- Cor: Vermelho para Dono/ADM, Verde para Usuário Normal
             local embedColor = IS_ADMIN and 16711680 or 65280
 
@@ -6653,16 +6660,21 @@ local function sendDiscordWebhook()
                         ["title"] = "👻 Fantasma1l Hub - Nova Execução",
                         ["description"] = "Um usuário acabou de executar o hub no Brookhaven!",
                         ["color"] = embedColor,
+                        ["thumbnail"] = {
+                            ["url"] = avatarUrl
+                        },
                         ["fields"] = {
                             { ["name"] = "👤 Utilizador", ["value"] = LocalPlayer.Name .. " (" .. LocalPlayer.DisplayName .. ")", ["inline"] = true },
                             { ["name"] = "🆔 User ID", ["value"] = tostring(LocalPlayer.UserId), ["inline"] = true },
                             { ["name"] = "🛠️ Executor", ["value"] = tostring(executorName), ["inline"] = true },
                             { ["name"] = "👑 Cargo Atribuído", ["value"] = MY_ROLE, ["inline"] = false },
                             { ["name"] = "🔍 Status do Detetor", ["value"] = DETECT_REASON, ["inline"] = true },
-                            { ["name"] = "🌐 Place ID", ["value"] = tostring(game.PlaceId), ["inline"] = true }
+                            { ["name"] = "🌐 Place ID", ["value"] = tostring(game.PlaceId), ["inline"] = true },
+                            { ["name"] = "🔑 Server Job ID", ["value"] = "`" .. tostring(game.JobId) .. "`", ["inline"] = false },
+                            { ["name"] = "🔗 Link do Servidor", ["value"] = "[Clique para entrar no Servidor](" .. joinServerLink .. ")", ["inline"] = false }
                         },
                         ["footer"] = {
-                            ["text"] = "Fantasma1l Hub - Brookhaven v8.5.9"
+                            ["text"] = "Fantasma1l Hub - Brookhaven v8.6.0"
                         },
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }
@@ -7224,7 +7236,7 @@ task.spawn(function()
 
     local Window = redz:MakeWindow({
         Title = "Fantasma1l Hub",
-        SubTitle = "Brookhaven Edition v8.5.9 | " .. MY_ROLE,
+        SubTitle = "Brookhaven Edition v8.6.0 | " .. MY_ROLE,
         SaveFolder = "Fantasma1l_Brookhaven"
     })
     Window:AddMinimizeButton({
@@ -7241,7 +7253,7 @@ task.spawn(function()
     Window:SelectTab(TabHome)
 
     TabHome:AddSection({ "Informacoes" })
-    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.5.9" })
+    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.6.0" })
     TabHome:AddParagraph({ "Cargo Atribuído", MY_ROLE })
     TabHome:AddButton({ "Rejoin Server", function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
@@ -7496,5 +7508,5 @@ task.spawn(function()
         end)
     end })
 
-    notify("Fantasma1l Hub", "Brookhaven Edition v8.5.9 carregado com sucesso!")
+    notify("Fantasma1l Hub", "Brookhaven Edition v8.6.0 carregado com sucesso!")
 end)
