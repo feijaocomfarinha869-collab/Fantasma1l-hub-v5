@@ -4791,7 +4791,7 @@ do
     local HOLD_TIME   = 5      -- tempo que o alvo leva pra morrer (paralisado)
     local MAX_DIST    = 600    -- distância máxima pra achar o alvo mais próximo
     local HOLE_STUDS  = 150    -- diâmetro do buraco negro (como na imagem de referência)
-    local GOJO_SOUND  = ""     -- opcional: "rbxassetid://ID_DA_MUSICA_DO_DOMINIO"
+    local GOJO_SOUND  = ""     -- opcional: "rbxassetid://6667923288"
     local COSMOS_SKY  = ""     -- opcional: ID de uma skybox de galáxia (decal/imagem)
     local LOW         = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
