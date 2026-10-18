@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v38
+    FANTASMA1L HUB - COMPLETO UNIFICADO v40
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5
      | IMAGENS CORRIGIDAS | EXPANSAO DE DOMINIO DO GOJO)
     ==========================================================
@@ -4773,18 +4773,32 @@ local function runSukunaDomain(senderName)
     for _, a in ipairs(hidden) do pcall(function() a.Parent = Lighting end) end
 end
 
--- ================== EXPANSÃO DE DOMÍNIO (GOJO) - VAZIO IMENSURÁVEL ==================
-GOJO = { busy = false }
+-- ================== EXPANSÃO DE DOMÍNIO (GOJO) - VAZIO ILIMITADO v2 ==================
+GOJO = { busy = false, cancelFlag = false, cdEnd = 0, token = 0 }
 
 do
     local TweenService = game:GetService("TweenService")
 
-    local CAST_TIME  = 1.8   -- tempo da abertura do domínio
+    local COOLDOWN   = 35    -- recarga (segundos) depois que a expansão termina
+    local CAST_TIME  = 2.6   -- duração da abertura cinematográfica
     local HOLD_TIME  = 5     -- tempo que o alvo leva pra morrer
-    local RANGE      = 140   -- alcance (só quando o alvo é ALL)
+    local RANGE      = 140   -- alcance (quando o alvo é ALL)
     local SIZE, TH   = 520, 6
     local GOJO_SOUND = ""    -- opcional: "rbxassetid://SEU_AUDIO"
     local GOJO_IMAGE = ""    -- opcional: imagem que pisca na tela do alvo (ID)
+    local LOW        = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+    local C_BLUE   = Color3.fromRGB(90, 160, 255)
+    local C_CYAN   = Color3.fromRGB(150, 220, 255)
+    local C_WHITE  = Color3.new(1, 1, 1)
+    local C_VIOLET = Color3.fromRGB(170, 130, 255)
+    local LIGHT_KEYS = { "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogColor", "FogStart", "FogEnd", "ExposureCompensation" }
+
+    local function tw(obj, t, props, style, dir)
+        local tween = TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
+        tween:Play()
+        return tween
+    end
 
     local function mkp(parent, size, cf, color, mat, transp, shape)
         local p = Instance.new("Part")
@@ -4797,12 +4811,50 @@ do
         return p
     end
 
+    local function randBinary()
+        local lines = {}
+        for i = 1, math.random(3, 5) do
+            local s = ""
+            for _ = 1, math.random(6, 11) do s = s .. tostring(math.random(0, 1)) end
+            lines[i] = s
+        end
+        return table.concat(lines, "\n")
+    end
+
+    function GOJO.cancel()
+        if GOJO.busy then GOJO.cancelFlag = true end
+    end
+
+    function GOJO.cancelAll()
+        GOJO.cancel()
+        sendNetCmd(";GOJO_CANCEL ALL")
+    end
+
+    function GOJO.cooldownLeft()
+        return math.max(GOJO.cdEnd - os.clock(), 0)
+    end
+
+    -- usado pelo botão do painel, pelo HUD e pelo comando de chat
+    function GOJO.cast(target)
+        if not target or target == "" then return false end
+        if GOJO.busy then notify("Gojo", "A expansão já está ativa.") return false end
+        local left = GOJO.cooldownLeft()
+        if left > 0 then notify("Gojo", "Em recarga: " .. math.ceil(left) .. "s") return false end
+        task.spawn(function() pcall(GOJO.run, LocalPlayer.Name, target) end)
+        sendNetCmd(";GOJO_DOMAIN " .. target)
+        return true
+    end
+
     function GOJO.run(senderName, targetName)
         local sp = Players:FindFirstChild(senderName)
         local sc = sp and sp.Character
         local sh = sc and sc:FindFirstChild("HumanoidRootPart")
-        if GOJO.busy or not sh then return end
+        local sHum = sc and sc:FindFirstChildOfClass("Humanoid")
+        if GOJO.busy or not sh or not sHum or sHum.Health <= 0 then return end
         GOJO.busy = true
+        GOJO.cancelFlag = false
+        GOJO.token += 1
+        local token = GOJO.token
 
         local tname = string.lower(tostring(targetName or ""))
         local isAll = (tname == "all")
@@ -4810,17 +4862,27 @@ do
         local function matches(plr)
             return string.lower(plr.Name) == tname or string.lower(plr.DisplayName) == tname
         end
+        local function alive()
+            return GOJO.token == token and not GOJO.cancelFlag
+                and sc.Parent ~= nil and sh.Parent ~= nil and sHum.Health > 0
+        end
 
         local myChar = LocalPlayer.Character
         local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
         local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        local casterPos = sh.Position
         local iAmTarget = false
-        if not iAmCaster and myHrp and myHum then
-            if isAll then iAmTarget = (myHrp.Position - sh.Position).Magnitude <= RANGE
+        if not iAmCaster and myHrp and myHum and myHum.Health > 0 then
+            if isAll then iAmTarget = (myHrp.Position - casterPos).Magnitude <= RANGE
             else iAmTarget = matches(LocalPlayer) end
         end
+        -- só quem está perto (ou é o alvo/autor) recebe luz, câmera e interface
+        local near = iAmCaster or iAmTarget
+            or (myHrp ~= nil and (myHrp.Position - casterPos).Magnitude <= 600)
+
         local oldWS = myHum and myHum.WalkSpeed or 16
         local oldJP = myHum and myHum.JumpPower or 50
+        local oldCasterWS = sHum.WalkSpeed
 
         local folder = Instance.new("Folder")
         folder.Name = "GojoDomain"
@@ -4830,85 +4892,157 @@ do
         local oldFov = cam and cam.FieldOfView or 70
         local renderName = "GojoRender" .. tostring(math.random(1, 1000000))
         local saved, hidden = {}, {}
-        local cc, bloom, gui
+        local cc, bloom, gui, flash, barTop, barBot, title, subtitle
         local running, paralyzed = true, false
         local frozen = {}
+        local casterTrack
 
         local ok, err = pcall(function()
-            local cx, cz = sh.Position.X, sh.Position.Z
+            local cx, cz = casterPos.X, casterPos.Z
             local rp = RaycastParams.new()
             rp.FilterDescendantsInstances, rp.FilterType = { sc }, Enum.RaycastFilterType.Exclude
-            local rr = workspace:Raycast(sh.Position + Vector3.new(0, 50, 0), Vector3.new(0, -200, 0), rp)
-            local gy = rr and rr.Position.Y or (sh.Position.Y - 3)
+            local rr = workspace:Raycast(casterPos + Vector3.new(0, 50, 0), Vector3.new(0, -200, 0), rp)
+            local gy = rr and rr.Position.Y or (casterPos.Y - 3)
             local half = SIZE / 2
             local cy = gy + half - 20
             local look = Vector3.new(sh.CFrame.LookVector.X, 0, sh.CFrame.LookVector.Z)
             look = look.Magnitude > 0.1 and look.Unit or Vector3.new(0, 0, -1)
-            local casterPos = sh.Position
+            local focus = Vector3.new(cx, casterPos.Y, cz)
+            if not isAll then focus = focus - look * 14 end
 
-            -- ===== LUZ DO ESPAÇO =====
-            for _, k in ipairs({ "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogColor", "FogStart", "FogEnd", "ExposureCompensation" }) do
-                pcall(function() saved[k] = Lighting[k] end)
+            -- ===== LUZ DO ESPAÇO (transição suave) =====
+            if near then
+                for _, k in ipairs(LIGHT_KEYS) do pcall(function() saved[k] = Lighting[k] end) end
+                pcall(function()
+                    for _, c in ipairs(Lighting:GetChildren()) do
+                        if c:IsA("Atmosphere") then table.insert(hidden, c) c.Parent = nil end
+                    end
+                end)
+                pcall(function()
+                    tw(Lighting, 1.2, {
+                        Ambient = Color3.fromRGB(40, 30, 95),
+                        OutdoorAmbient = Color3.fromRGB(28, 22, 70),
+                        Brightness = 0.4,
+                        ClockTime = 0,
+                        FogColor = Color3.fromRGB(6, 4, 20),
+                        FogStart = 40,
+                        FogEnd = 700,
+                        ExposureCompensation = -0.2,
+                    })
+                end)
+                cc = Instance.new("ColorCorrectionEffect")
+                cc.Parent = Lighting
+                tw(cc, 1.4, { TintColor = Color3.fromRGB(190, 175, 255), Saturation = 0.2, Contrast = 0.3 })
+                bloom = Instance.new("BloomEffect")
+                bloom.Intensity, bloom.Size, bloom.Threshold = 0, 30, 0.9
+                bloom.Parent = Lighting
+                tw(bloom, 1.4, { Intensity = 0.9 })
             end
-            pcall(function()
-                for _, c in ipairs(Lighting:GetChildren()) do
-                    if c:IsA("Atmosphere") then table.insert(hidden, c) c.Parent = nil end
+
+            -- ===== INTERFACE CINEMATOGRÁFICA (flash, tarjas, título) =====
+            if near then
+                local pg = LocalPlayer:WaitForChild("PlayerGui", 3)
+                gui = Instance.new("ScreenGui")
+                gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = "GojoDomainGui", true, false, 60
+                gui.Parent = pg
+
+                barTop = Instance.new("Frame")
+                barTop.BackgroundColor3, barTop.BorderSizePixel = Color3.new(0, 0, 0), 0
+                barTop.Size = UDim2.new(1, 0, 0, 0)
+                barTop.Parent = gui
+                barBot = Instance.new("Frame")
+                barBot.BackgroundColor3, barBot.BorderSizePixel = Color3.new(0, 0, 0), 0
+                barBot.AnchorPoint, barBot.Position = Vector2.new(0, 1), UDim2.new(0, 0, 1, 0)
+                barBot.Size = UDim2.new(1, 0, 0, 0)
+                barBot.Parent = gui
+                tw(barTop, 0.6, { Size = UDim2.new(1, 0, 0.11, 0) })
+                tw(barBot, 0.6, { Size = UDim2.new(1, 0, 0.11, 0) })
+
+                title = Instance.new("TextLabel")
+                title.AnchorPoint, title.Position = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.3, 0)
+                title.Size = UDim2.new(0.9, 0, 0.12, 0)
+                title.BackgroundTransparency = 1
+                title.Text = "EXPANSÃO DE DOMÍNIO"
+                title.Font, title.TextScaled = Enum.Font.GothamBlack, true
+                title.TextColor3 = C_WHITE
+                title.TextTransparency, title.TextStrokeTransparency = 1, 1
+                title.TextStrokeColor3 = C_BLUE
+                title.Parent = gui
+                local tsc = Instance.new("UIScale")
+                tsc.Scale = 1.5
+                tsc.Parent = title
+
+                subtitle = Instance.new("TextLabel")
+                subtitle.AnchorPoint, subtitle.Position = Vector2.new(0.5, 0.5), UDim2.new(0.5, 0, 0.39, 0)
+                subtitle.Size = UDim2.new(0.7, 0, 0.07, 0)
+                subtitle.BackgroundTransparency = 1
+                subtitle.Text = "Vazio Ilimitado"
+                subtitle.Font, subtitle.TextScaled = Enum.Font.GothamBold, true
+                subtitle.TextColor3 = C_CYAN
+                subtitle.TextTransparency, subtitle.TextStrokeTransparency = 1, 1
+                subtitle.TextStrokeColor3 = C_BLUE
+                subtitle.Parent = gui
+
+                task.delay(0.5, function()
+                    if running and title.Parent then
+                        tw(tsc, 0.9, { Scale = 1 }, Enum.EasingStyle.Quint)
+                        tw(title, 0.7, { TextTransparency = 0, TextStrokeTransparency = 0.4 })
+                    end
+                end)
+                task.delay(1.2, function()
+                    if running and subtitle.Parent then
+                        tw(subtitle, 0.7, { TextTransparency = 0, TextStrokeTransparency = 0.5 })
+                    end
+                end)
+                task.delay(3.6, function()
+                    if running and title.Parent then
+                        tw(title, 0.8, { TextTransparency = 1, TextStrokeTransparency = 1 })
+                        tw(subtitle, 0.8, { TextTransparency = 1, TextStrokeTransparency = 1 })
+                    end
+                end)
+
+                flash = Instance.new("Frame")
+                flash.Size = UDim2.new(1, 0, 1, 0)
+                flash.BackgroundColor3, flash.BorderSizePixel = C_WHITE, 0
+                flash.Parent = gui
+                tw(flash, 1.3, { BackgroundTransparency = 1 })
+
+                -- soco de câmera (zoom) sem trocar o tipo da câmera
+                if cam then
+                    tw(cam, 0.25, { FieldOfView = oldFov - 22 })
+                    task.delay(0.3, function()
+                        if running and cam then tw(cam, 1.4, { FieldOfView = oldFov + 8 }, Enum.EasingStyle.Quint) end
+                    end)
+                    task.delay(1.9, function()
+                        if running and cam then tw(cam, 0.8, { FieldOfView = oldFov }) end
+                    end)
                 end
-            end)
-            local function setL(k, v) pcall(function() Lighting[k] = v end) end
-            setL("Ambient", Color3.fromRGB(35, 20, 80))
-            setL("OutdoorAmbient", Color3.fromRGB(25, 15, 60))
-            setL("Brightness", 0.5)
-            setL("ClockTime", 0)
-            setL("FogColor", Color3.fromRGB(6, 3, 18))
-            setL("FogStart", 40)
-            setL("FogEnd", 700)
-            setL("ExposureCompensation", -0.2)
-            cc = Instance.new("ColorCorrectionEffect")
-            cc.TintColor = Color3.fromRGB(190, 170, 255)
-            cc.Saturation, cc.Contrast = 0.2, 0.3
-            cc.Parent = Lighting
-            bloom = Instance.new("BloomEffect")
-            bloom.Intensity, bloom.Size, bloom.Threshold = 0.8, 30, 0.9
-            bloom.Parent = Lighting
-
-            -- ===== GUI (clarão + título) =====
-            local pg = LocalPlayer:WaitForChild("PlayerGui", 3)
-            gui = Instance.new("ScreenGui")
-            gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = "GojoDomainGui", true, false, 60
-            gui.Parent = pg
-
-            local flash = Instance.new("Frame")
-            flash.Size = UDim2.new(1, 0, 1, 0)
-            flash.BackgroundColor3 = Color3.new(1, 1, 1)
-            flash.BorderSizePixel = 0
-            flash.Parent = gui
-            TweenService:Create(flash, TweenInfo.new(0.9), { BackgroundTransparency = 1 }):Play()
-
-            local title = Instance.new("TextLabel")
-            title.Size, title.Position = UDim2.new(0.9, 0, 0.2, 0), UDim2.new(0.05, 0, 0.1, 0)
-            title.BackgroundTransparency = 1
-            title.Text = "EXPANSÃO DE DOMÍNIO\nVazio Imensurável"
-            title.Font, title.TextScaled = Enum.Font.GothamBlack, true
-            title.TextColor3 = Color3.fromRGB(200, 220, 255)
-            title.TextStrokeTransparency = 0
-            title.Parent = gui
-            task.delay(2.4, function()
-                if title.Parent then
-                    TweenService:Create(title, TweenInfo.new(0.8), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
-                end
-            end)
+            end
 
             if GOJO_SOUND ~= "" then
                 local snd = Instance.new("Sound")
                 snd.SoundId, snd.Volume = GOJO_SOUND, 5
                 snd.Parent = sh
                 snd:Play()
-                game:GetService("Debris"):AddItem(snd, 15)
+                game:GetService("Debris"):AddItem(snd, 20)
+            end
+
+            -- ===== ANIMAÇÃO DO PERSONAGEM (pose do Gojo) =====
+            casterTrack = safePlayAnimation(sc, CUSTOM_ANIM_ID)
+            if iAmCaster then sHum.WalkSpeed = 0 end
+
+            -- ===== ONDAS DE ENERGIA AZUL/BRANCA =====
+            for i = 1, 3 do
+                task.delay((i - 1) * 0.14, function()
+                    if not running then return end
+                    local w = mkp(folder, Vector3.new(0.3, 4, 4), CFrame.new(cx, gy + 0.3, cz) * CFrame.Angles(0, 0, math.rad(90)),
+                        (i == 2) and C_WHITE or C_CYAN, Enum.Material.Neon, 0.15, Enum.PartType.Cylinder)
+                    tw(w, 1.1, { Size = Vector3.new(0.3, 240, 240), Transparency = 1 }, Enum.EasingStyle.Quad)
+                end)
             end
 
             -- ===== CAIXA DO ESPAÇO =====
-            local SPACE = Color3.fromRGB(4, 2, 12)
+            local SPACE = Color3.fromRGB(3, 2, 10)
             local walls = {}
             local function wall(size, pos)
                 table.insert(walls, mkp(folder, size, CFrame.new(pos), SPACE, nil, 1))
@@ -4918,79 +5052,153 @@ do
             wall(Vector3.new(SIZE, SIZE, TH), Vector3.new(cx, cy, cz - half))
             wall(Vector3.new(SIZE, SIZE, TH), Vector3.new(cx, cy, cz + half))
             wall(Vector3.new(SIZE, TH, SIZE), Vector3.new(cx, cy + half, cz))
-            local floorP = mkp(folder, Vector3.new(SIZE, 0.2, SIZE), CFrame.new(cx, gy + 0.08, cz), Color3.fromRGB(12, 8, 30), nil, 1)
-            floorP.Reflectance = 0.25
+            local floorP = mkp(folder, Vector3.new(SIZE, 0.2, SIZE), CFrame.new(cx, gy + 0.08, cz), Color3.fromRGB(8, 6, 24), nil, 1)
+            floorP.Reflectance = 0.3
             table.insert(walls, floorP)
-            for _, w in ipairs(walls) do
-                TweenService:Create(w, TweenInfo.new(1.2), { Transparency = 0 }):Play()
-            end
+            for _, w in ipairs(walls) do tw(w, 1.4, { Transparency = 0 }) end
 
-            -- estrelas
-            local stars = {}
-            for i = 1, 140 do
-                local s = math.random(8, 25) / 10
-                local pos = Vector3.new(cx + (math.random() - 0.5) * (SIZE - 30), gy + 10 + math.random() * (SIZE - 60), cz + (math.random() - 0.5) * (SIZE - 30))
-                local col = (i % 5 == 0) and Color3.fromRGB(170, 190, 255) or ((i % 7 == 0) and Color3.fromRGB(210, 170, 255) or Color3.new(1, 1, 1))
-                local st = mkp(folder, Vector3.new(s, s, s), CFrame.new(pos), col, Enum.Material.Neon, 1, Enum.PartType.Ball)
-                TweenService:Create(st, TweenInfo.new(1.5), { Transparency = 0 }):Play()
-                stars[i] = st
-            end
+            -- estrelas (um emissor de volume em vez de centenas de peças)
+            local starPart = mkp(folder, Vector3.new(SIZE - 40, SIZE - 40, SIZE - 40), CFrame.new(cx, cy, cz), C_WHITE, nil, 1)
+            local starEm = Instance.new("ParticleEmitter")
+            pcall(function()
+                starEm.Shape = Enum.ParticleEmitterShape.Box
+                starEm.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+                starEm.ShapeInOut = Enum.ParticleEmitterShapeInOut.InAndOut
+            end)
+            starEm.Rate = LOW and 25 or 60
+            starEm.Lifetime = NumberRange.new(5, 9)
+            starEm.Speed = NumberRange.new(0, 2)
+            starEm.RotSpeed = NumberRange.new(-30, 30)
+            starEm.Size = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(0.2, 6),
+                NumberSequenceKeypoint.new(0.8, 6),
+                NumberSequenceKeypoint.new(1, 0) })
+            starEm.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, C_WHITE),
+                ColorSequenceKeypoint.new(0.5, C_CYAN),
+                ColorSequenceKeypoint.new(1, C_VIOLET) })
+            starEm.LightEmission, starEm.LightInfluence = 1, 0
+            starEm.Parent = starPart
+            starEm:Emit(LOW and 90 or 220)
 
             -- nebulosas
             local neb = { Color3.fromRGB(80, 60, 200), Color3.fromRGB(150, 60, 200), Color3.fromRGB(40, 110, 220) }
-            for i = 1, 8 do
-                local d = math.random(60, 140)
+            for i = 1, (LOW and 3 or 7) do
+                local d = math.random(70, 150)
                 mkp(folder, Vector3.new(d, d, d),
-                    CFrame.new(cx + (math.random() - 0.5) * (SIZE - 120), gy + 60 + math.random() * (SIZE - 160), cz + (math.random() - 0.5) * (SIZE - 120)),
-                    neb[(i % 3) + 1], Enum.Material.Neon, 0.88, Enum.PartType.Ball)
+                    CFrame.new(cx + (math.random() - 0.5) * (SIZE - 140), gy + 60 + math.random() * (SIZE - 180), cz + (math.random() - 0.5) * (SIZE - 140)),
+                    neb[(i % 3) + 1], Enum.Material.Neon, 0.9, Enum.PartType.Ball)
             end
 
-            -- ===== BURACO NEGRO + ANEL =====
+            -- ===== BURACO NEGRO + ANEL ARCO-ÍRIS =====
             local holeC = Vector3.new(cx, gy + 70, cz) + look * 150
             local hole = mkp(folder, Vector3.new(1, 1, 1), CFrame.new(holeC), Color3.new(0, 0, 0), nil, 0, Enum.PartType.Ball)
-            TweenService:Create(hole, TweenInfo.new(CAST_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { Size = Vector3.new(110, 110, 110) }):Play()
-            mkp(folder, Vector3.new(124, 124, 124), CFrame.new(holeC), Color3.fromRGB(190, 210, 255), Enum.Material.Neon, 0.9, Enum.PartType.Ball)
+            tw(hole, CAST_TIME, { Size = Vector3.new(110, 110, 110) }, Enum.EasingStyle.Quad)
+            local halo = mkp(folder, Vector3.new(126, 126, 126), CFrame.new(holeC), Color3.fromRGB(190, 210, 255), Enum.Material.Neon, 0.9, Enum.PartType.Ball)
+            local hl = Instance.new("PointLight")
+            hl.Color, hl.Range, hl.Brightness = C_CYAN, 120, 3
+            hl.Parent = halo
 
             local ring = {}
             local rightV = look:Cross(Vector3.yAxis).Unit
-            local N, R = 90, 74
+            local N, R = (LOW and 54 or 84), 74
             for i = 1, N do
                 local a = (i / N) * math.pi * 2
                 local pos = holeC + rightV * math.cos(a) * R + Vector3.yAxis * math.sin(a) * R
-                ring[i] = mkp(folder, Vector3.new(5, 5, 5), CFrame.new(pos), Color3.new(1, 1, 1), Enum.Material.Neon, 1, Enum.PartType.Ball)
+                ring[i] = mkp(folder, Vector3.new(5, 5, 5), CFrame.new(pos), C_WHITE, Enum.Material.Neon, 1, Enum.PartType.Ball)
+            end
+
+            -- ===== SOBRECARGA DE INFORMAÇÃO: painéis binários em órbita + riscos de luz =====
+            local cards = {}
+            for i = 1, (LOW and 8 or 18) do
+                local card = mkp(folder, Vector3.new(9, 5.5, 0.15), CFrame.new(focus), Color3.fromRGB(10, 20, 55), Enum.Material.Neon, 1)
+                local sg = Instance.new("SurfaceGui")
+                sg.Face, sg.LightInfluence, sg.PixelsPerStud = Enum.NormalId.Front, 0, 40
+                sg.Parent = card
+                local lb = Instance.new("TextLabel")
+                lb.Size, lb.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
+                lb.Text = randBinary()
+                lb.Font, lb.TextScaled, lb.TextColor3 = Enum.Font.Code, true, C_CYAN
+                lb.Parent = sg
+                cards[i] = {
+                    part = card, label = lb,
+                    a = math.random() * math.pi * 2,
+                    r = 24 + math.random() * 40,
+                    h = 4 + math.random() * 38,
+                    sp = (math.random() < 0.5 and -1 or 1) * (0.25 + math.random() * 0.4),
+                }
+            end
+
+            local streaks = {}
+            for i = 1, (LOW and 12 or 28) do
+                local len = 30 + math.random() * 60
+                local p = mkp(folder, Vector3.new(0.3, 0.3, len), CFrame.new(cx, cy, cz),
+                    (i % 3 == 0) and C_WHITE or C_CYAN, Enum.Material.Neon, 1)
+                local ang = math.random() * math.pi * 2
+                streaks[i] = {
+                    part = p,
+                    pos = Vector3.new(cx + (math.random() - 0.5) * (SIZE - 80), gy + 15 + math.random() * (SIZE - 80), cz + (math.random() - 0.5) * (SIZE - 80)),
+                    dir = Vector3.new(math.cos(ang), (math.random() - 0.5) * 0.3, math.sin(ang)).Unit,
+                    speed = 140 + math.random() * 220,
+                }
             end
 
             -- ===== BRILHO (Gojo = azul | alvos = roxo) =====
             local function glow(char, color)
-                local hl = Instance.new("Highlight")
-                hl.Adornee = char
-                hl.FillColor, hl.OutlineColor = color, Color3.new(1, 1, 1)
-                hl.FillTransparency, hl.OutlineTransparency = 0.75, 0.2
-                hl.Parent = folder
+                local h = Instance.new("Highlight")
+                h.Adornee = char
+                h.FillColor, h.OutlineColor = color, C_WHITE
+                h.FillTransparency, h.OutlineTransparency = 0.75, 0.2
+                h.Parent = folder
             end
-            glow(sc, Color3.fromRGB(90, 150, 255))
+            glow(sc, C_BLUE)
             for _, plr in ipairs(Players:GetPlayers()) do
                 local c = plr.Character
-                local h = c and c:FindFirstChild("HumanoidRootPart")
-                if plr ~= sp and h then
+                local hrp2 = c and c:FindFirstChild("HumanoidRootPart")
+                if plr ~= sp and hrp2 then
                     local hit
-                    if isAll then hit = (h.Position - casterPos).Magnitude <= RANGE else hit = matches(plr) end
-                    if hit then glow(c, Color3.fromRGB(180, 120, 255)) end
+                    if isAll then hit = (hrp2.Position - casterPos).Magnitude <= RANGE else hit = matches(plr) end
+                    if hit then glow(c, C_VIOLET) end
                 end
             end
 
-            -- ===== LOOP VISUAL (anel girando, estrelas, distorção no alvo) =====
+            -- ===== LOOP VISUAL (um só RenderStep pra tudo) =====
             local t0 = os.clock()
-            RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function()
+            local flickerT = 0
+            local cardsOn, streaksOn = false, false
+            RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
                 local t = os.clock() - t0
                 local alpha = math.clamp(t / CAST_TIME, 0, 1)
                 for i, s in ipairs(ring) do
                     s.Color = Color3.fromHSV((i / N + t * 0.12) % 1, 0.4, 1)
                     if alpha < 1 then s.Transparency = 1 - 0.9 * alpha end
                 end
-                if t > 1.6 then
-                    for _ = 1, 5 do stars[math.random(#stars)].Transparency = math.random() * 0.6 end
+                if not cardsOn and t > 0.8 then
+                    cardsOn = true
+                    for _, c in ipairs(cards) do tw(c.part, 0.8, { Transparency = 0.5 }) end
+                end
+                if not streaksOn and t > 1.0 then
+                    streaksOn = true
+                    for _, s in ipairs(streaks) do tw(s.part, 0.8, { Transparency = 0.2 }) end
+                end
+                for i, c in ipairs(cards) do
+                    c.a += c.sp * dt
+                    local pos = focus + Vector3.new(math.cos(c.a) * c.r, c.h + math.sin(t * 0.8 + i) * 2, math.sin(c.a) * c.r)
+                    c.part.CFrame = CFrame.lookAt(pos, focus + Vector3.new(0, c.h * 0.3, 0))
+                end
+                flickerT += dt
+                if flickerT > 0.15 then
+                    flickerT = 0
+                    for _ = 1, 4 do cards[math.random(#cards)].label.Text = randBinary() end
+                end
+                for _, s in ipairs(streaks) do
+                    s.pos += s.dir * s.speed * dt
+                    local d = s.pos - Vector3.new(cx, cy, cz)
+                    if math.abs(d.X) > half - 30 or math.abs(d.Z) > half - 30 then
+                        s.pos = Vector3.new(cx - s.dir.X * (half - 40), s.pos.Y, cz - s.dir.Z * (half - 40))
+                    end
+                    s.part.CFrame = CFrame.lookAt(s.pos, s.pos + s.dir)
                 end
                 if iAmTarget and paralyzed and cam then
                     cam.FieldOfView = oldFov + math.sin(t * 7) * 6 + math.sin(t * 19) * 3
@@ -4999,14 +5207,14 @@ do
                 end
             end)
 
-            -- ===== SOBRECARGA DE INFORMAÇÃO (só na tela do alvo) =====
-            if iAmTarget then
+            -- ===== SOBRECARGA NA TELA DO ALVO =====
+            if iAmTarget and gui then
                 local tint = Instance.new("Frame")
                 tint.Size = UDim2.new(1, 0, 1, 0)
                 tint.BackgroundTransparency, tint.BorderSizePixel = 0.88, 0
                 tint.Parent = gui
                 local noise = {}
-                for i = 1, 14 do
+                for i = 1, (LOW and 8 or 14) do
                     local f = Instance.new("Frame")
                     f.BorderSizePixel = 0
                     f.Parent = gui
@@ -5021,34 +5229,31 @@ do
                     im.Parent = gui
                 end
                 local lbl = Instance.new("TextLabel")
-                lbl.Size, lbl.Position = UDim2.new(0.9, 0, 0.08, 0), UDim2.new(0.05, 0, 0.86, 0)
+                lbl.Size, lbl.Position = UDim2.new(0.9, 0, 0.06, 0), UDim2.new(0.05, 0, 0.82, 0)
                 lbl.BackgroundTransparency = 1
                 lbl.Text = "Informação infinita... você não consegue se mexer."
                 lbl.Font, lbl.TextScaled = Enum.Font.GothamBold, true
-                lbl.TextColor3 = Color3.fromRGB(230, 230, 255)
+                lbl.TextColor3 = Color3.fromRGB(230, 235, 255)
                 lbl.TextStrokeTransparency = 0
                 lbl.Parent = gui
                 task.spawn(function()
                     while running and gui and gui.Parent do
-                        tint.BackgroundColor3 = Color3.fromHSV(math.random(), 0.7, 1)
+                        tint.BackgroundColor3 = Color3.fromHSV(0.5 + math.random() * 0.25, 0.6, 1)
                         for _, f in ipairs(noise) do
-                            f.Size = UDim2.new(math.random(2, 40) / 100, 0, math.random(1, 12) / 100, 0)
+                            f.Size = UDim2.new(math.random(2, 40) / 100, 0, math.random(1, 10) / 100, 0)
                             f.Position = UDim2.new(math.random() * 0.9, 0, math.random() * 0.95, 0)
-                            f.BackgroundColor3 = Color3.fromHSV(math.random(), 0.6, 1)
-                            f.BackgroundTransparency = 0.6 + math.random() * 0.35
+                            f.BackgroundColor3 = Color3.fromHSV(0.5 + math.random() * 0.25, 0.5, 1)
+                            f.BackgroundTransparency = 0.65 + math.random() * 0.3
                         end
                         task.wait(0.12)
                     end
                 end)
             end
 
-            -- ===== PUXA O ALVO E PARALISA =====
-            task.wait(0.25)
-            if iAmTarget then
-                if not isAll then
-                    local p = Vector3.new(cx, casterPos.Y, cz) - look * 14
-                    myHrp.CFrame = CFrame.lookAt(p, p + look)
-                end
+            -- ===== PUXA O ALVO (escondido pelo clarão) E PARALISA =====
+            task.wait(0.35)
+            if alive() and iAmTarget then
+                if not isAll then myHrp.CFrame = CFrame.lookAt(focus, focus + look) end
                 myHrp.AssemblyLinearVelocity = Vector3.zero
                 myHrp.Anchored = true
                 myHum.WalkSpeed, myHum.JumpPower = 0, 0
@@ -5063,46 +5268,274 @@ do
                 paralyzed = true
             end
 
-            task.wait(CAST_TIME)
+            -- espera o fim da abertura (cancelável)
+            local tc = os.clock()
+            while alive() and os.clock() - tc < CAST_TIME - 0.35 do task.wait() end
+            if casterTrack then pcall(function() casterTrack:Stop(0.4) end) end
+            if iAmCaster then pcall(function() sHum.WalkSpeed = oldCasterWS end) end
 
             -- ===== MORTE LENTA (HOLD_TIME segundos) =====
             local h0 = (iAmTarget and myHum) and myHum.Health or 0
             local st = os.clock()
-            while os.clock() - st < HOLD_TIME and folder.Parent do
+            while alive() and os.clock() - st < HOLD_TIME do
                 if iAmTarget and myHum and myHum.Parent and myHum.Health > 0 then
                     local a = (os.clock() - st) / HOLD_TIME
                     myHum.Health = math.min(myHum.Health, h0 * (1 - a))
                 end
                 task.wait()
             end
-            if iAmTarget and myHum and myHum.Parent then
+            if alive() and iAmTarget and myHum and myHum.Parent then
                 if myHrp then myHrp.Anchored = false end
                 paralyzed = false
                 myHum.Health = 0
             end
-            task.wait(0.6)
         end)
         if not ok then warn("[Gojo] " .. tostring(err)) end
 
-        -- ===== LIMPEZA =====
+        -- ===== FINALIZAÇÃO: solta todo mundo, colapsa o domínio e volta ao normal =====
         running = false
         pcall(function() RunService:UnbindFromRenderStep(renderName) end)
-        pcall(function() if cam then cam.FieldOfView = oldFov end end)
         pcall(function()
             if iAmTarget then
-                if myHrp and paralyzed then myHrp.Anchored = false end
-                if myHum then myHum.WalkSpeed, myHum.JumpPower = oldWS, oldJP end
+                if myHrp and myHrp.Parent and paralyzed then myHrp.Anchored = false end
+                if myHum and myHum.Parent then myHum.WalkSpeed, myHum.JumpPower = oldWS, oldJP end
                 for _, tr in ipairs(frozen) do pcall(function() tr:AdjustSpeed(1) end) end
+                paralyzed = false
             end
+            if iAmCaster then sHum.WalkSpeed = oldCasterWS end
+            if casterTrack then casterTrack:Stop(0.3) end
         end)
+        pcall(function()
+            for _, d in ipairs(folder:GetDescendants()) do
+                if d:IsA("BasePart") then pcall(tw, d, 0.9, { Transparency = 1 })
+                elseif d:IsA("ParticleEmitter") then d.Enabled = false end
+            end
+            if near then
+                if flash then
+                    flash.BackgroundColor3, flash.BackgroundTransparency = C_CYAN, 0.35
+                    tw(flash, 1.1, { BackgroundTransparency = 1 })
+                end
+                if barTop then tw(barTop, 0.9, { Size = UDim2.new(1, 0, 0, 0) }) end
+                if barBot then tw(barBot, 0.9, { Size = UDim2.new(1, 0, 0, 0) }) end
+                if title then tw(title, 0.5, { TextTransparency = 1, TextStrokeTransparency = 1 }) end
+                if subtitle then tw(subtitle, 0.5, { TextTransparency = 1, TextStrokeTransparency = 1 }) end
+                if next(saved) ~= nil then
+                    local back = {}
+                    for k, v in pairs(saved) do back[k] = v end
+                    tw(Lighting, 1.0, back)
+                end
+                if cc then tw(cc, 0.9, { Saturation = 0, Contrast = 0, TintColor = C_WHITE }) end
+                if bloom then tw(bloom, 0.9, { Intensity = 0 }) end
+                if cam then tw(cam, 0.9, { FieldOfView = oldFov }) end
+            end
+            task.wait(1.05)
+        end)
+
+        pcall(function() if cam then cam.FieldOfView = oldFov end end)
         pcall(function() folder:Destroy() end)
         pcall(function() if gui then gui:Destroy() end end)
         pcall(function() if cc then cc:Destroy() end end)
         pcall(function() if bloom then bloom:Destroy() end end)
         for k, v in pairs(saved) do pcall(function() Lighting[k] = v end) end
         for _, a in ipairs(hidden) do pcall(function() a.Parent = Lighting end) end
+        if iAmCaster then GOJO.cdEnd = os.clock() + COOLDOWN end
         GOJO.busy = false
     end
+
+    -- ===== HUD DA HABILIDADE (botão de toque, recarga, estado) =====
+    function GOJO.buildHud()
+        local pg = LocalPlayer:WaitForChild("PlayerGui")
+        local old = pg:FindFirstChild("GojoDomainHUD")
+        if old then old:Destroy() end
+
+        local sg = Instance.new("ScreenGui")
+        sg.Name, sg.ResetOnSpawn, sg.DisplayOrder = "GojoDomainHUD", false, 40
+        sg.Parent = pg
+
+        local function round(obj, r)
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, r)
+            c.Parent = obj
+        end
+
+        local root = Instance.new("Frame")
+        root.Name = "Root"
+        root.AnchorPoint, root.Position = Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -10)
+        root.Size = UDim2.new(0, 270, 0, 76)
+        root.BackgroundColor3, root.BorderSizePixel = C_WHITE, 0
+        root.BackgroundTransparency = 0.1
+        root.Parent = sg
+        round(root, 20)
+        local rg = Instance.new("UIGradient")
+        rg.Color = ColorSequence.new(Color3.fromRGB(16, 28, 66), Color3.fromRGB(4, 6, 16))
+        rg.Rotation = 90
+        rg.Parent = root
+        local rs = Instance.new("UIStroke")
+        rs.Thickness, rs.Color = 2, C_CYAN
+        rs.Parent = root
+        local ui = Instance.new("UIScale")
+        ui.Parent = root
+
+        local function fit()
+            local c = workspace.CurrentCamera
+            local vp = c and c.ViewportSize or Vector2.new(1280, 720)
+            ui.Scale = math.clamp(math.min(vp.X / 900, vp.Y / 520), 0.65, 1.25)
+        end
+        fit()
+        if workspace.CurrentCamera then
+            workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+        end
+
+        local btn = Instance.new("TextButton")
+        btn.Name = "Cast"
+        btn.AnchorPoint, btn.Position = Vector2.new(0, 0.5), UDim2.new(0, 10, 0.5, 0)
+        btn.Size = UDim2.new(0, 56, 0, 56)
+        btn.BackgroundColor3, btn.AutoButtonColor = C_WHITE, false
+        btn.Text, btn.Font, btn.TextSize, btn.TextColor3 = "∞", Enum.Font.GothamBlack, 34, C_WHITE
+        btn.Parent = root
+        round(btn, 28)
+        local bg = Instance.new("UIGradient")
+        bg.Color = ColorSequence.new(Color3.fromRGB(70, 130, 255), Color3.fromRGB(20, 40, 120))
+        bg.Rotation = 45
+        bg.Parent = btn
+        local bstroke = Instance.new("UIStroke")
+        bstroke.Thickness, bstroke.Color = 2, C_CYAN
+        bstroke.Parent = btn
+        local bsc = Instance.new("UIScale")
+        bsc.Parent = btn
+        btn.MouseEnter:Connect(function() tw(bsc, 0.15, { Scale = 1.08 }) end)
+        btn.MouseLeave:Connect(function() tw(bsc, 0.15, { Scale = 1 }) end)
+        btn.MouseButton1Down:Connect(function() tw(bsc, 0.1, { Scale = 0.92 }) end)
+        btn.MouseButton1Up:Connect(function() tw(bsc, 0.15, { Scale = 1.05 }) end)
+        btn.Activated:Connect(function() GOJO.cast("ALL") end)
+
+        local function label(text, y, h, size, font, color)
+            local l = Instance.new("TextLabel")
+            l.BackgroundTransparency = 1
+            l.Position, l.Size = UDim2.new(0, 76, 0, y), UDim2.new(1, -110, 0, h)
+            l.Text, l.Font, l.TextSize, l.TextColor3 = text, font, size, color
+            l.TextXAlignment = Enum.TextXAlignment.Left
+            l.Parent = root
+            return l
+        end
+        label("EXPANSÃO DE DOMÍNIO", 6, 18, 13, Enum.Font.GothamBlack, C_WHITE)
+        local status = label("DISPONÍVEL", 25, 16, 12, Enum.Font.GothamMedium, C_CYAN)
+
+        local barBg = Instance.new("Frame")
+        barBg.Position, barBg.Size = UDim2.new(0, 76, 0, 50), UDim2.new(1, -90, 0, 10)
+        barBg.BackgroundColor3, barBg.BorderSizePixel = Color3.fromRGB(20, 26, 50), 0
+        barBg.Parent = root
+        round(barBg, 5)
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(1, 0, 1, 0)
+        fill.BackgroundColor3, fill.BorderSizePixel = C_CYAN, 0
+        fill.Parent = barBg
+        round(fill, 5)
+        local fg = Instance.new("UIGradient")
+        fg.Color = ColorSequence.new(C_BLUE, C_WHITE)
+        fg.Parent = fill
+
+        local cancelBtn = Instance.new("TextButton")
+        cancelBtn.AnchorPoint, cancelBtn.Position = Vector2.new(1, 0), UDim2.new(1, -8, 0, 8)
+        cancelBtn.Size = UDim2.new(0, 24, 0, 24)
+        cancelBtn.BackgroundColor3, cancelBtn.Text = Color3.fromRGB(90, 40, 70), "✕"
+        cancelBtn.Font, cancelBtn.TextSize, cancelBtn.TextColor3 = Enum.Font.GothamBold, 14, C_WHITE
+        cancelBtn.Visible = false
+        cancelBtn.Parent = root
+        round(cancelBtn, 12)
+        cancelBtn.Activated:Connect(function() GOJO.cancelAll() end)
+
+        local lastState
+        local conn
+        conn = RunService.Heartbeat:Connect(function()
+            if not sg.Parent then conn:Disconnect() return end
+            local state, left = "READY", 0
+            if GOJO.busy then
+                state = "RUN"
+            else
+                left = GOJO.cooldownLeft()
+                if left > 0 then state = "CD" end
+            end
+            if state ~= lastState then
+                lastState = state
+                local col = (state == "READY" and C_CYAN) or (state == "RUN" and C_VIOLET) or Color3.fromRGB(130, 140, 175)
+                tw(rs, 0.25, { Color = col })
+                tw(bstroke, 0.25, { Color = col })
+                tw(fill, 0.25, { BackgroundColor3 = col })
+                status.TextColor3 = col
+                cancelBtn.Visible = (state == "RUN")
+            end
+            if state == "READY" then
+                status.Text = "DISPONÍVEL"
+                fill.Size = UDim2.new(1, 0, 1, 0)
+                rs.Thickness = 2 + math.sin(os.clock() * 4) * 0.6
+            elseif state == "RUN" then
+                status.Text = "EM EXECUÇÃO"
+                fill.Size = UDim2.new(1, 0, 1, 0)
+                rs.Thickness = 2.5 + math.sin(os.clock() * 9)
+            else
+                status.Text = string.format("RECARGA  %.1fs", left)
+                fill.Size = UDim2.new(math.clamp(1 - left / COOLDOWN, 0, 1), 0, 1, 0)
+                rs.Thickness = 2
+            end
+        end)
+    end
+end
+
+if IS_ADMIN then
+    task.spawn(function() pcall(GOJO.buildHud) end)
+end
+
+-- ================== COMANDOS ADM EXTRAS (FLOAT / LOOPKILL / REJOIN) ==================
+HUBCFG = { kickReason = "", floatBP = nil, floatToken = 0, loopToken = 0 }
+
+function HUBCFG.setFloat(on)
+    HUBCFG.floatToken += 1
+    local token = HUBCFG.floatToken
+    if HUBCFG.floatBP then
+        pcall(function() HUBCFG.floatBP:Destroy() end)
+        HUBCFG.floatBP = nil
+    end
+    local chr = LocalPlayer.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if not on or not hrp then return end
+    local baseY = hrp.Position.Y + 12
+    local bp = Instance.new("BodyPosition")
+    bp.Name = "F1L_Float"
+    bp.MaxForce = Vector3.new(0, 1e9, 0)   -- só controla a altura; você ainda anda
+    bp.P, bp.D = 12000, 1200
+    bp.Position = Vector3.new(0, baseY, 0)
+    bp.Parent = hrp
+    HUBCFG.floatBP = bp
+    task.spawn(function()
+        local t0 = os.clock()
+        while HUBCFG.floatToken == token and bp.Parent do
+            bp.Position = Vector3.new(0, baseY + math.sin((os.clock() - t0) * 2) * 1.2, 0)
+            task.wait(0.03)
+        end
+    end)
+end
+
+function HUBCFG.setLoopKill(on)
+    HUBCFG.loopToken += 1
+    local token = HUBCFG.loopToken
+    if not on then return end
+    task.spawn(function()
+        while HUBCFG.loopToken == token do
+            local chr = LocalPlayer.Character
+            local hum = chr and chr:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then hum.Health = 0 end
+            task.wait(0.2)
+        end
+    end)
+end
+
+function HUBCFG.rejoin()
+    local TeleportService = game:GetService("TeleportService")
+    local ok = pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+    end)
+    if not ok then pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end) end
 end
 
 -- ================== RECEPTOR ==================
@@ -5112,7 +5545,51 @@ function executeActionLocally(action, senderName, extraArg)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
 
     if action == "KILL" and hum then hum.Health = 0
-    elseif action == "KICK" then LocalPlayer:Kick("Expulso pelo Fantasma1l Hub.")
+    elseif action == "KICK" then
+        -- kick SEM motivo (quem envia nunca se expulsa)
+        if senderName ~= LocalPlayer.Name then LocalPlayer:Kick("Expulso pelo Fantasma1l Hub.") end
+    elseif action == "KICKR" then
+        -- kick COM motivo (o texto vem em extraArg)
+        if senderName ~= LocalPlayer.Name then
+            local why = (extraArg and extraArg ~= "") and extraArg or "Expulso pelo Fantasma1l Hub."
+            LocalPlayer:Kick(why)
+        end
+    elseif action == "KILLPLUS" then
+        -- kill forte: tira ForceField, arremessa pro alto e quebra o corpo
+        if senderName ~= LocalPlayer.Name and char and hum then
+            for _, c in ipairs(char:GetChildren()) do
+                if c:IsA("ForceField") then c:Destroy() end
+            end
+            if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, 250, 0) end
+            pcall(function() char:BreakJoints() end)
+            hum.Health = 0
+        end
+    elseif action == "FLING" then
+        -- arremessa o alvo longe e mata (quem envia nunca é atingido)
+        if senderName ~= LocalPlayer.Name and hrp and hum then
+            task.spawn(function()
+                pcall(function()
+                    for _, c in ipairs(char:GetChildren()) do
+                        if c:IsA("ForceField") then c:Destroy() end
+                    end
+                    hrp.Anchored = false
+                    local dir = Vector3.new(math.random() - 0.5, 0.6, math.random() - 0.5).Unit
+                    for _ = 1, 8 do
+                        hrp.AssemblyLinearVelocity = dir * 5000
+                        hrp.AssemblyAngularVelocity = Vector3.new(0, 9999, 0)
+                        task.wait()
+                    end
+                    hum.Health = 0
+                end)
+            end)
+        end
+    elseif action == "FLOAT" then pcall(HUBCFG.setFloat, true)
+    elseif action == "UNFLOAT" then pcall(HUBCFG.setFloat, false)
+    elseif action == "LOOPKILL" then
+        if senderName ~= LocalPlayer.Name then HUBCFG.setLoopKill(true) end
+    elseif action == "UNLOOPKILL" then HUBCFG.setLoopKill(false)
+    elseif action == "REJOIN" then
+        if senderName ~= LocalPlayer.Name then task.spawn(HUBCFG.rejoin) end
     elseif action == "FREEZE" and hrp and hum then hrp.Anchored, hum.WalkSpeed, hum.JumpPower = true, 0, 0
     elseif action == "UNFREEZE" and hrp and hum then hrp.Anchored, hum.WalkSpeed, hum.JumpPower = false, 16, 50
     elseif action == "CRASH" then while true do end
@@ -5328,6 +5805,11 @@ function processNetMessage(msg, senderName)
     end
 
     -- >>> EXPANSÃO DE DOMÍNIO DO GOJO: todos com o script veem a cena <<<
+    if action == "GOJO_CANCEL" then
+        GOJO.cancel()
+        return
+    end
+
     if action == "GOJO_DOMAIN" then
         if target and senderName ~= LocalPlayer.Name then
             task.spawn(function() pcall(GOJO.run, senderName, target) end)
@@ -5631,7 +6113,8 @@ end
 local function triggerCommand(action, target, extraArg)
     if not target or target == "" then return end
     if action == "GOJO_DOMAIN" then
-        task.spawn(function() pcall(GOJO.run, LocalPlayer.Name, target) end)
+        GOJO.cast(target)
+        return
     elseif BROADCAST_ACTIONS[action] then
         task.spawn(function() pcall(runBroadcast, action, LocalPlayer.Name, target) end)
     elseif target == LocalPlayer.Name or target == "ALL" then
@@ -5656,7 +6139,7 @@ if not ok or not WindUI then
     notify("Erro", "Falha ao carregar WindUI.")
 else
     local HUB_NAME   = "Fantasma1l hub"
-    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.16"
+    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.18"
     local HUB_AUTHOR = "By Fantasma1l / renegado6661l"
 
     -- chama método do WindUI tentando as duas assinaturas (obj:método e obj.método)
@@ -5806,6 +6289,26 @@ else
             section = "Admin", sectionIcon = "user",
             items = {
                 exec("kick",     "KICK"),
+                { kind = "input", title = "Motivo do Kick", placeholder = "Digite o motivo...",
+                  cb = function(t) HUBCFG.kickReason = t end },
+                cmd(";kickmotivo", "Runs ;Kick PlayerName Reason", function()
+                    if selectedPlayerName == LocalPlayer.Name then
+                        notify("ADM", "Selecione outro jogador como alvo.")
+                        return
+                    end
+                    local why = HUBCFG.kickReason ~= "" and HUBCFG.kickReason or nil
+                    triggerCommand("KICKR", selectedPlayerName, why)
+                end),
+                exec("killplus",   "KILLPLUS"),
+                exec("loopkill",   "LOOPKILL"),
+                exec("unloopkill", "UNLOOPKILL"),
+                exec("float",      "FLOAT"),
+                exec("unfloat",    "UNFLOAT"),
+                exec("rejoin",     "REJOIN"),
+                exec("fling",      "FLING"),
+                cmd(";flingall", "Fling em TODOS que usam o hub (menos você)", function()
+                    triggerCommand("FLING", "ALL")
+                end),
                 exec("kill",     "KILL"),
                 exec("freeze",   "FREEZE"),
                 exec("unfreeze", "UNFREEZE"),
@@ -5885,6 +6388,9 @@ else
                 end),
                 cmd(";gojodominioall", "Expansão de Domínio [Gojo] (todos perto)", function()
                     triggerCommand("GOJO_DOMAIN", "ALL")
+                end),
+                cmd(";gojocancel", "Cancelar a Expansão de Domínio", function()
+                    GOJO.cancelAll()
                 end),
                 cmd(";ak47",      "Pegar AK-47", function() giveAK47() end),
                 cmd(";yoru",      "Equipar Yoru", function() giveYoru() end),
@@ -6005,35 +6511,103 @@ else
 
     -- ---- Fundo (imagem) ----
     TabCfg:Section({ Title = "Fundo (imagem)", Icon = "image" })
-    local BG_IDS = { ["Gojo"] = 99188277568430, ["Toji"] = 99521340506230, ["Halloween"] = 72671289611166 }
-    local bgTransparency = 0.5
+    local BG_IDS = {
+        ["Gojo"] = 99188277568430,
+        ["Toji"] = 99521340506230,
+        ["Halloween"] = 72671289611166,
+        ["Dragon"] = 123754864736277,
+        ["Ilustração"] = 121502907054918,
+    }
+    local bgTransparency = 0.6
+    local bgLabel
+
+    -- acha o quadro principal do painel (o "corpo" da janela do WindUI)
+    local function findMainFrame()
+        local main
+        pcall(function() main = Window.UIElements.Main end)
+        if typeof(main) == "Instance" then return main end
+
+        local roots = {}
+        pcall(function() table.insert(roots, gethui()) end)
+        pcall(function() table.insert(roots, game:GetService("CoreGui")) end)
+        table.insert(roots, LocalPlayer:WaitForChild("PlayerGui"))
+        local best, bestArea = nil, 0
+        for _, r in ipairs(roots) do
+            local okc, kids = pcall(function() return r:GetChildren() end)
+            if okc then
+                for _, g in ipairs(kids) do
+                    if g:IsA("ScreenGui") and string.find(string.lower(g.Name), "windui") then
+                        for _, d in ipairs(g:GetDescendants()) do
+                            if d:IsA("Frame") and d.Name == "Main" then return d end
+                        end
+                        for _, d in ipairs(g:GetDescendants()) do
+                            if d:IsA("Frame") and d:FindFirstChildOfClass("UICorner") then
+                                local area = d.AbsoluteSize.X * d.AbsoluteSize.Y
+                                if d.AbsoluteSize.X < g.AbsoluteSize.X * 0.98 and area > bestArea then
+                                    best, bestArea = d, area
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return best
+    end
+
+    local function setBackground(name)
+        if bgLabel then
+            pcall(function() bgLabel:Destroy() end)
+            bgLabel = nil
+        end
+        local id = BG_IDS[name]
+        if not id then return end
+        local host = findMainFrame()
+        if not host then
+            notify("Fundo", "Não achei o painel pra colocar a imagem.")
+            return
+        end
+        local src = resolveImage(id)   -- converte Decal -> imagem real
+        local lbl = Instance.new("ImageLabel")
+        lbl.Name = "F1L_Background"
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Image = src
+        lbl.ImageTransparency = bgTransparency
+        lbl.ScaleType = Enum.ScaleType.Crop
+        lbl.ZIndex = 50            -- por cima do fundo do painel, pra sempre aparecer
+        lbl.Active = false
+        pcall(function() lbl.Interactable = false end)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 16)
+        corner.Parent = lbl
+        lbl.Parent = host
+        bgLabel = lbl
+        -- plano B: se a imagem não carregar em 4s, usa a miniatura do asset
+        task.delay(4, function()
+            if bgLabel == lbl and lbl.Parent and not lbl.IsLoaded then
+                lbl.Image = "rbxthumb://type=Asset&id=" .. tostring(id) .. "&w=420&h=420"
+            end
+        end)
+    end
+
     TabCfg:Dropdown({
         Title  = "Imagem de fundo",
-        Desc   = "Gojo, Toji ou Halloween",
-        Values = { "Nenhum", "Gojo", "Toji", "Halloween" },
+        Desc   = "Gojo, Toji, Halloween, Dragon ou Ilustração",
+        Values = { "Nenhum", "Gojo", "Toji", "Halloween", "Dragon", "Ilustração" },
         Value  = "Nenhum",
         Callback = function(name)
-            task.spawn(function()
-                local id = BG_IDS[name]
-                if not id then
-                    try(Window, "SetBackgroundImage", "")
-                    return
-                end
-                local img = "rbxassetid://" .. id
-                pcall(function() img = resolveImage(id) end)   -- converte decal -> textura
-                try(Window, "SetBackgroundImage", img)
-                try(Window, "SetBackgroundImageTransparency", bgTransparency)
-            end)
+            task.spawn(function() pcall(setBackground, name) end)
         end,
     })
     TabCfg:Slider({
         Title = "Transparência da imagem",
         Desc  = "0 = imagem forte | 1 = invisível",
         Step  = 0.05,
-        Value = { Min = 0, Max = 1, Default = 0.5 },
+        Value = { Min = 0, Max = 1, Default = 0.6 },
         Callback = function(v)
-            bgTransparency = tonumber(v) or 0.5
-            try(Window, "SetBackgroundImageTransparency", bgTransparency)
+            bgTransparency = tonumber(v) or 0.6
+            if bgLabel and bgLabel.Parent then bgLabel.ImageTransparency = bgTransparency end
         end,
     })
 
