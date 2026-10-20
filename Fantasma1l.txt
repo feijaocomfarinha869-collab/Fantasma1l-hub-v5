@@ -6586,8 +6586,8 @@ end
 
 end -- fim IS_ADMIN
 -- ==========================================================
--- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.6.2 - FIX SINTAXE)
--- Detecção WindUI + Webhook Discord com Foto de Perfil & Link do Servidor
+-- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.6.7)
+-- Prop Move Sozinho (Sem Teleportar o Player) + Retorno Automático
 -- ==========================================================
 
 local Players            = game:GetService("Players")
@@ -6600,29 +6600,39 @@ local LocalPlayer        = Players.LocalPlayer
 
 local ICON_ID = "rbxassetid://72455921762458"
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1561501648298188801/1seLFNFBSSjoOt9qZc2vs_gfirlf6pkvUjDkzsFYW7ozCVUGloPd9Jq1mXcUqDkajWbY"
+local DISCORD_INVITE = "https://discord.gg/Byk9KJmyP"
 
 -- ================== SISTEMA DE DETECÇÃO DE GUI ==================
 local IS_ADMIN = false
 local MY_ROLE = "Utilizador Comum"
-local DETECT_REASON = "Sem WindUI"
+local DETECT_REASON = "Sem Painel Admin"
+local HUB_NAME = "Fantasma1l Hub"
 
 local function detectarHub()
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if not pg then return false, "PlayerGui não encontrado", "Utilizador Comum" end
-
-    local wind = pg:FindFirstChild("WindUI")
-    if wind then
-        return true, "ScreenGui WindUI encontrada", "DONO 👑 (renegado6661l)"
+    local isOwner = (string.lower(LocalPlayer.Name) == "renegado6661l")
+    
+    if pg then
+        -- Procura por instâncias da interface WindUI / Fantasma1l Admin no PlayerGui
+        for _, gui in ipairs(pg:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                local guiName = gui.Name:lower()
+                if guiName:find("windui") or guiName:find("fantasma") or gui:FindFirstChild("WindUI", true) or gui:FindFirstChild("Main", true) then
+                    if isOwner then
+                        return true, "Painel Admin Detectado (WindUI)", "DONO 👑 (renegado6661l)", "Fantasma1l Hub Admin"
+                    else
+                        return true, "Painel Admin Detectado (WindUI)", "Admin / VIP 👑", "Fantasma1l Hub Admin"
+                    end
+                end
+            end
+        end
     end
 
-    if string.lower(LocalPlayer.Name) == "renegado6661l" then
-        return true, "Conta Oficial renegado6661l", "DONO 👑 (renegado6661l)"
-    end
-
-    return false, "Sem WindUI", "Utilizador Comum"
+    -- Se o painel não foi encontrado, mesmo que seja o dono, cai como utilizador comum
+    return false, "Sem Painel Admin", "Utilizador Comum", "Fantasma1l Hub"
 end
 
-IS_ADMIN, DETECT_REASON, MY_ROLE = detectarHub()
+IS_ADMIN, DETECT_REASON, MY_ROLE, HUB_NAME = detectarHub()
 
 -- ================== PEGAR FOTO DE PERFIL REAL (API ROBLOX) ==================
 local function getAvatarImageUrl()
@@ -6673,8 +6683,8 @@ local function sendDiscordWebhook()
                 ["content"] = "",
                 ["embeds"] = {
                     {
-                        ["title"] = "👻 Fantasma1l Hub - Nova Execução",
-                        ["description"] = "Um utilizador executou o hub no Brookhaven!",
+                        ["title"] = "👻 " .. HUB_NAME .. " - Nova Execução",
+                        ["description"] = "Um jogador executou o **" .. HUB_NAME .. "** no Brookhaven!",
                         ["color"] = embedColor,
                         ["thumbnail"] = {
                             ["url"] = avatarUrl
@@ -6684,13 +6694,15 @@ local function sendDiscordWebhook()
                             { ["name"] = "🆔 User ID", ["value"] = tostring(LocalPlayer.UserId), ["inline"] = true },
                             { ["name"] = "🛠️ Executor", ["value"] = tostring(executorName), ["inline"] = true },
                             { ["name"] = "👑 Cargo Atribuído", ["value"] = MY_ROLE, ["inline"] = false },
+                            { ["name"] = "🏷️ Hub Executado", ["value"] = "`" .. HUB_NAME .. "`", ["inline"] = true },
                             { ["name"] = "🔍 Status do Detetor", ["value"] = DETECT_REASON, ["inline"] = true },
                             { ["name"] = "🌐 Place ID", ["value"] = tostring(game.PlaceId), ["inline"] = true },
                             { ["name"] = "🔑 Server Job ID", ["value"] = "`" .. tostring(game.JobId) .. "`", ["inline"] = false },
-                            { ["name"] = "🔗 Link do Servidor", ["value"] = "[Clique para entrar no Servidor](" .. joinServerLink .. ")", ["inline"] = false }
+                            { ["name"] = "🔗 Link do Servidor", ["value"] = "[Clique para entrar no Servidor](" .. joinServerLink .. ")", ["inline"] = false },
+                            { ["name"] = "💬 Discord da Comunidade", ["value"] = "[Entrar no Servidor](" .. DISCORD_INVITE .. ")", ["inline"] = false }
                         },
                         ["footer"] = {
-                            ["text"] = "Fantasma1l Hub - Brookhaven v8.6.2"
+                            ["text"] = HUB_NAME .. " - Brookhaven v8.6.7"
                         },
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }
@@ -6719,7 +6731,7 @@ local function notify(t, txt, dur)
     end)
 end
 
-notify("Fantasma1l Hub", "Carregado! | Cargo: " .. MY_ROLE, 4)
+notify(HUB_NAME, "Carregado! | Cargo: " .. MY_ROLE, 3)
 
 local function getHRP()
     local c = LocalPlayer.Character
@@ -7137,8 +7149,8 @@ local function executeFlingBall(targetPlayer)
     pcall(function() ballTool:Destroy() end)
 end
 
--- ================== PROPMAKER KILL ==================
-local function executePropMakerKill(targetPlayer)
+-- ================== PROPMAKER KILL SOZINHO (SEM TELEPORTAR O PLAYER) ==================
+local function executePropMakerKill(targetPlayer, selectedProp)
     if not targetPlayer or targetPlayer == LocalPlayer then return end
     applyNetworkBypass()
 
@@ -7147,20 +7159,18 @@ local function executePropMakerKill(targetPlayer)
     local thum = tc and tc:FindFirstChildOfClass("Humanoid")
     if not tr or not thum then return end
 
-    local myHrp = getHRP()
-    if not myHrp then return end
-    local originalCFrame = myHrp.CFrame
-
-    local prop = getNearestProp()
+    local prop = selectedProp or getNearestProp()
     if not prop then
-        notify("PropMaker", "Nenhum prop no mapa! Spawna um objeto pelo menu do jogo.", 8)
+        notify("PropMaker", "Nenhum prop no mapa!", 3)
         return
     end
 
     local propRoot = getPropPart(prop)
     if not propRoot then return end
 
-    notify("PropMaker", "A travar " .. targetPlayer.Name .. "...")
+    local originalPropCFrame = propRoot.CFrame
+
+    notify("PropMaker", "Enviando prop para " .. targetPlayer.Name .. "...")
 
     local targetOffset = CFrame.new(0, -0.5, 0)
     pcall(function()
@@ -7177,11 +7187,8 @@ local function executePropMakerKill(targetPlayer)
         end
     end
 
-    myHrp.CFrame = tr.CFrame * CFrame.new(0, 0, 3)
-    task.wait(0.05)
-
     local snapStart = tick()
-    while tick() - snapStart < 0.3 do
+    while tick() - snapStart < 0.4 and tr and tr.Parent and thum.Health > 0 do
         applyNetworkBypass()
         pcall(function()
             if propRoot and propRoot.Parent then
@@ -7194,14 +7201,11 @@ local function executePropMakerKill(targetPlayer)
         task.wait(0.02)
     end
 
-    myHrp.CFrame = originalCFrame
-    myHrp.AssemblyLinearVelocity = Vector3.zero
-
-    notify("PropMaker", "Puxando para o Void...")
+    notify("PropMaker", "Puxando alvo para o Void...")
     local dropStart = tick()
     local curTargetCF = tr.CFrame
 
-    while tick() - dropStart < 3.0 do
+    while tick() - dropStart < 2.5 do
         if not tr or not tr.Parent or thum.Health <= 0 then break end
         applyNetworkBypass()
 
@@ -7217,20 +7221,49 @@ local function executePropMakerKill(targetPlayer)
         task.wait(0.02)
     end
 
+    pcall(function() thum.Health = 0; tr:BreakJoints() end)
+
     if propRoot and propRoot.Parent then
-        local propDropStart = tick()
-        while tick() - propDropStart < 1.0 and propRoot and propRoot.Parent do
-            applyNetworkBypass()
-            pcall(function()
-                propRoot.AssemblyLinearVelocity = Vector3.new(0, -FALL_SPEED, 0)
-                local currentCF = propRoot.CFrame
-                moveProp(prop, currentCF * CFrame.new(0, -400, 0))
-            end)
-            task.wait()
+        pcall(function()
+            propRoot.AssemblyLinearVelocity = Vector3.zero
+            propRoot.AssemblyAngularVelocity = Vector3.zero
+            moveProp(prop, originalPropCFrame)
+        end)
+        task.wait(0.1)
+    end
+end
+
+-- ================== SEQUENTIAL KILL PROP ALL (UM POR UM SOZINHO) ==================
+local function executeKillPropAll()
+    local prop = getNearestProp()
+    if not prop then
+        notify("Kill Prop All", "Nenhum prop foi encontrado no mapa!")
+        return
+    end
+
+    local targets = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(targets, p)
         end
     end
 
-    pcall(function() thum.Health = 0; tr:BreakJoints() end)
+    if #targets == 0 then
+        notify("Kill Prop All", "Não há outros jogadores no servidor.")
+        return
+    end
+
+    notify("Kill Prop All", "A iniciar Kill Prop All (Prop vai sozinho)...")
+
+    task.spawn(function()
+        for i, target in ipairs(targets) do
+            if target and target.Parent then
+                executePropMakerKill(target, prop)
+                task.wait(0.2)
+            end
+        end
+        notify("Kill Prop All", "Todos os alvos foram eliminados!")
+    end)
 end
 
 -- ================== REDZ LIBRARY ==================
@@ -7250,8 +7283,8 @@ task.spawn(function()
     end
 
     local Window = redz:MakeWindow({
-        Title = "Fantasma1l Hub",
-        SubTitle = "Brookhaven Edition v8.6.2 | " .. MY_ROLE,
+        Title = HUB_NAME,
+        SubTitle = "Brookhaven Edition v8.6.7 | " .. MY_ROLE,
         SaveFolder = "Fantasma1l_Brookhaven"
     })
     Window:AddMinimizeButton({
@@ -7268,8 +7301,22 @@ task.spawn(function()
     Window:SelectTab(TabHome)
 
     TabHome:AddSection({ "Informacoes" })
-    TabHome:AddParagraph({ "Bem-vindo", "Fantasma1l Hub - Brookhaven v8.6.2" })
+    TabHome:AddParagraph({ "Bem-vindo", HUB_NAME .. " - Brookhaven v8.6.7" })
     TabHome:AddParagraph({ "Cargo Atribuído", MY_ROLE })
+    
+    TabHome:AddSection({ "Comunidade Discord" })
+    TabHome:AddParagraph({ "Discord do Servidor", DISCORD_INVITE })
+    TabHome:AddButton({ "Copiar Link do Discord", function()
+        pcall(function()
+            if setclipboard then
+                setclipboard(DISCORD_INVITE)
+                notify("Discord", "Link do Discord copiado!", 3)
+            else
+                notify("Discord", DISCORD_INVITE, 5)
+            end
+        end)
+    end })
+
     TabHome:AddButton({ "Rejoin Server", function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end })
@@ -7343,39 +7390,23 @@ task.spawn(function()
         local tr = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
         local thum = tp.Character and tp.Character:FindFirstChildOfClass("Humanoid")
         if not tr or not thum then return end
-        local myChr = LocalPlayer.Character
-        local myHrp = getHRP()
-        local myHum = myChr and myChr:FindFirstChildOfClass("Humanoid")
-        if not myHrp or not myHum then return end
-        local originalCFrame = myHrp.CFrame
 
-        if method == "Couch" then
+        if method == "Prop" then
+            executePropMakerKill(tp)
+        elseif method == "Couch" then
             local item = getCouch()
             if item then
-                pcall(function() myHum:EquipTool(item) end)
+                local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if myHum then pcall(function() myHum:EquipTool(item) end) end
                 task.wait(0.3)
                 local handle = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart", true)
                 if handle then
-                    myHrp.CFrame = tr.CFrame * CFrame.new(0, -1, 0)
-                    task.wait(0.1)
                     item.Parent = workspace
                     local SAFE_Y, RETURN_TIME, saved, startTime = -60, 1.0, false, tick()
-                    local function safeReturn()
-                        if saved then return end
-                        saved = true
-                        pcall(function() myHum:UnequipTools() end)
-                        pcall(function() myHum.Sit = false end)
-                        if myHrp and myHrp.Parent then
-                            myHrp.CFrame = originalCFrame
-                            myHrp.AssemblyLinearVelocity = Vector3.zero
-                            myHrp.AssemblyAngularVelocity = Vector3.zero
-                        end
-                    end
                     local dropLoop
                     dropLoop = RunService.Heartbeat:Connect(function()
                         if not tr or not tr.Parent or thum.Health <= 0 or tick() - startTime > 3.5 then
                             if dropLoop then dropLoop:Disconnect() end
-                            safeReturn()
                             pcall(function() thum.Health = 0; tr:BreakJoints() end)
                             if item and item.Parent then pcall(function() item:Destroy() end) end
                             return
@@ -7386,26 +7417,14 @@ task.spawn(function()
                             handle.AssemblyLinearVelocity = Vector3.new(0, -FALL_SPEED, 0)
                             handle.CFrame = tr.CFrame
                         end)
-                        if not saved and (tr.Position.Y <= SAFE_Y or tick() - startTime >= RETURN_TIME) then
-                            safeReturn()
-                        end
                     end)
                     task.wait(3.8)
                 end
-            else
-                notify("Erro", "Nao foi possivel pegar o Couch.")
             end
-        elseif method == "Prop" then
-            executePropMakerKill(tp)
         elseif method == "Bus" then
             doBusDriverKill(tp)
         elseif method == "Fling" then
             executeFlingBall(tp)
-        end
-
-        if myHrp and myHrp.Parent then
-            myHrp.CFrame = originalCFrame
-            myHrp.AssemblyLinearVelocity = Vector3.zero
         end
     end
 
@@ -7434,13 +7453,7 @@ task.spawn(function()
     end })
 
     TabTroll:AddButton({ "KILL PROP ALL (Move Prop ate o Alvo)", function()
-        notify("Kill Prop All", "Props a enviar ate aos alvos!")
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                task.spawn(function() executePropMakerKill(p) end)
-                task.wait(0.3)
-            end
-        end
+        executeKillPropAll()
     end })
 
     -- Proteção & Anti-Lag
@@ -7523,5 +7536,5 @@ task.spawn(function()
         end)
     end })
 
-    notify("Fantasma1l Hub", "Brookhaven Edition v8.6.2 carregado com sucesso!")
+    notify(HUB_NAME, "Brookhaven Edition v8.6.7 carregado com sucesso!")
 end)
