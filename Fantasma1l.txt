@@ -6602,33 +6602,51 @@ local ICON_ID = "rbxassetid://72455921762458"
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1561501648298188801/1seLFNFBSSjoOt9qZc2vs_gfirlf6pkvUjDkzsFYW7ozCVUGloPd9Jq1mXcUqDkajWbY"
 local DISCORD_INVITE = "https://discord.gg/Byk9KJmyP"
 
--- ================== SISTEMA DE DETECÇÃO DE GUI ==================
+-- ================== SISTEMA DE DETECÇÃO DE GUI (PERFEITO) ==================
 local IS_ADMIN = false
 local MY_ROLE = "Utilizador Comum"
 local DETECT_REASON = "Sem Painel Admin"
 local HUB_NAME = "Fantasma1l Hub"
 
 local function detectarHub()
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
     local isOwner = (string.lower(LocalPlayer.Name) == "renegado6661l")
+    local temWindUI = false
     
-    if pg then
-        -- Procura por instâncias da interface WindUI / Fantasma1l Admin no PlayerGui
-        for _, gui in ipairs(pg:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                local guiName = gui.Name:lower()
-                if guiName:find("windui") or guiName:find("fantasma") or gui:FindFirstChild("WindUI", true) or gui:FindFirstChild("Main", true) then
-                    if isOwner then
-                        return true, "Painel Admin Detectado (WindUI)", "DONO 👑 (renegado6661l)", "Fantasma1l Hub Admin"
-                    else
-                        return true, "Painel Admin Detectado (WindUI)", "Admin / VIP 👑", "Fantasma1l Hub Admin"
-                    end
-                end
+    -- 1. Verifica se a variável do WindUI está carregada na memória global do executor
+    pcall(function()
+        if (getgenv and getgenv().WindUI) or _G.WindUI or WindUI then
+            temWindUI = true
+        end
+    end)
+
+    -- 2. Se não achou na memória, varre o PlayerGui procurando os textos/interfaces exatas do script
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not temWindUI and pg then
+        for _, gui in ipairs(pg:GetDescendants()) do
+            local itemText = ""
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
+                itemText = gui.Text:lower()
+            end
+            local itemName = gui.Name:lower()
+
+            -- Procura por "administrator version", "renegado6661l", "windui" ou "fantasma1l hub"
+            if itemText:find("administrator version") or itemText:find("renegado6661l") or itemName:find("windui") or itemText:find("fantasma1l hub") then
+                temWindUI = true
+                break
             end
         end
     end
 
-    -- Se o painel não foi encontrado, mesmo que seja o dono, cai como utilizador comum
+    -- Retorno baseado na presença REAL da interface de Admin
+    if temWindUI then
+        if isOwner then
+            return true, "Painel Admin Ativo (WindUI)", "DONO 👑 (renegado6661l)", "Fantasma1l Hub Admin"
+        else
+            return true, "Painel Admin Ativo (WindUI)", "Admin / VIP 👑", "Fantasma1l Hub Admin"
+        end
+    end
+
+    -- Mesmo se for o dono, se o painel admin não estiver rodando, cai como sem painel
     return false, "Sem Painel Admin", "Utilizador Comum", "Fantasma1l Hub"
 end
 
