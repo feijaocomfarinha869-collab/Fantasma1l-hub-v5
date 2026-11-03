@@ -8643,31 +8643,16 @@ else
 end
 end -- fim IS_ADMIN
 
--- ==========================================================
--- FANTASMA1L BROOKHAVEN — carregado via loadstring
--- Se falhar, o Hub 1 continua funcionando normalmente.
--- ==========================================================
+-- ==========================================
+-- HUB 2 (Brookhaven) via loadstring
+-- ==========================================
 task.spawn(function()
     local ok, err = pcall(function()
+        
+        -- COLE O SEU LOADSTRING AQUI:
         loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"))()
+        
     end)
-
-    if not ok then
-        warn("[Brookhaven] " .. tostring(err))
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title    = "Brookhaven",
-                Text     = "Erro: " .. tostring(err):sub(1, 200),
-                Duration = 15,
-            })
-        end)
-    else
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title    = "Brookhaven",
-                Text     = "Carregado com sucesso!",
-                Duration = 5,
-            })
-        end)
-    end
+    if not ok then warn("Hub 2 erro: " .. tostring(err)) end
 end)
+
