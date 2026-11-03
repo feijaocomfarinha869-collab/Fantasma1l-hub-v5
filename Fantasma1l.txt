@@ -8641,6 +8641,33 @@ else
     Players.PlayerAdded:Connect(refreshPlayers)
     Players.PlayerRemoving:Connect(function() task.defer(refreshPlayers) end)
 end
-
 end -- fim IS_ADMIN
-loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"))() 
+
+-- ==========================================================
+-- FANTASMA1L BROOKHAVEN — carregado via loadstring
+-- Se falhar, o Hub 1 continua funcionando normalmente.
+-- ==========================================================
+task.spawn(function()
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"))()
+    end)
+
+    if not ok then
+        warn("[Brookhaven] " .. tostring(err))
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title    = "Brookhaven",
+                Text     = "Erro: " .. tostring(err):sub(1, 200),
+                Duration = 15,
+            })
+        end)
+    else
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title    = "Brookhaven",
+                Text     = "Carregado com sucesso!",
+                Duration = 5,
+            })
+        end)
+    end
+end)
