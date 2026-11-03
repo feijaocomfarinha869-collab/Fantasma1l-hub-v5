@@ -8647,12 +8647,61 @@ end -- fim IS_ADMIN
 -- HUB 2 (Brookhaven) via loadstring
 -- ==========================================
 task.spawn(function()
-    local ok, err = pcall(function()
-        
-        -- COLE O SEU LOADSTRING AQUI:
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"))()
-        
-    end)
-    if not ok then warn("Hub 2 erro: " .. tostring(err)) end
-end)
+    task.wait(3) -- deixa o painel principal abrir primeiro
 
+    -- Seu link do GitHub já está aqui:
+    local LINK_DIRETO = "https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"
+
+    -- Se o link acima falhar, ele procura no repositório por nomes comuns de arquivo.
+    local REPO = "feijaocomfarinha869-collab/Fantasma1l-hub-v2"
+    local NOMES = { "main.lua", "script.lua", "loader.lua", "init.lua", "hub.lua", "Fantasma1l-hub-v2.lua" }
+    local BRANCHES = { "main", "master" }
+
+    local function aviso(txt)
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Hub 2", Text = txt, Duration = 7,
+            })
+        end)
+    end
+
+    local links = {}
+    if LINK_DIRETO ~= "" then table.insert(links, LINK_DIRETO) end
+    for _, b in ipairs(BRANCHES) do
+        for _, n in ipairs(NOMES) do
+            table.insert(links, "https://raw.githubusercontent.com/" .. REPO .. "/refs/heads/" .. b .. "/" .. n)
+        end
+    end
+    -- o link antigo (LICENSE) fica por último: só roda se tiver Lua de verdade dentro
+    table.insert(links, "https://raw.githubusercontent.com/" .. REPO .. "/refs/heads/main/LICENSE")
+
+    aviso("Procurando o Hub 2...")
+    local motivo = "não achei nenhum arquivo .lua no repositório (cole o link raw em LINK_DIRETO)"
+
+    for _, url in ipairs(links) do
+        local okGet, src = pcall(function() return game:HttpGet(url) end)
+        if okGet and type(src) == "string" and #src > 30 then
+            local fn = loadstring(src) -- se não for Lua (ex.: texto da licença), volta nil
+            if fn then
+                local done, okRun, rerr = false, false, nil
+                task.spawn(function()
+                    okRun, rerr = pcall(fn)
+                    done = true
+                end)
+                local t0 = os.clock()
+                while not done and os.clock() - t0 < 4 do task.wait(0.1) end
+                -- ainda rodando depois de 4s = hub com loop próprio, então está carregado
+                if not done or okRun then
+                    aviso("Hub 2 carregado!")
+                    return
+                end
+                motivo = "erro dentro do Hub 2: " .. tostring(rerr):sub(1, 80)
+                warn("[Hub 2] " .. url .. " -> " .. tostring(rerr))
+                break
+            end
+        end
+    end
+
+    aviso("Não carregou: " .. motivo)
+    warn("[Hub 2] " .. motivo)
+end)
