@@ -23,7 +23,7 @@ local WHITELIST = {
     
     -- SUB DONO (2 VAGAS)
     ["BaconSigmaaura67420"]  = { Role = "SUB DONO" },
-    ["darkADM_ofc"]  = { Role = "SUB DONO" },
+    ["darkADM_ofc"]  = { Role = "SUB DONO" },d
     
     -- ADMS (9 VAGAS)
     ["Fantasma1lhack"]       = { Role = "ADM" },
@@ -8643,65 +8643,152 @@ else
 end
 end -- fim IS_ADMIN
 
--- ==========================================
--- HUB 2 (Brookhaven) via loadstring
--- ==========================================
-task.spawn(function()
-    task.wait(3) -- deixa o painel principal abrir primeiro
+ocal REPO = "feijaocomfarinha869-collab/Fantasma1l-hub-v2" -- o repositório precisa ser PÚBLICO
+    -- Opcional: link RAW de um .lua específico. Deixe "" para ele achar sozinho.
+    local LINK_DIRETO = https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v3/refs/heads/main/Script.txt""
 
-    -- Seu link do GitHub já está aqui:
-    local LINK_DIRETO = "https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v2/refs/heads/main/LICENSE"
-
-    -- Se o link acima falhar, ele procura no repositório por nomes comuns de arquivo.
-    local REPO = "feijaocomfarinha869-collab/Fantasma1l-hub-v2"
-    local NOMES = { "main.lua", "script.lua", "loader.lua", "init.lua", "hub.lua", "Fantasma1l-hub-v2.lua" }
-    local BRANCHES = { "main", "master" }
+    local HttpService = game:GetService("HttpService")
 
     local function aviso(txt)
+        print("[Hub 2] " .. txt)
         pcall(function()
             game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "Hub 2", Text = txt, Duration = 7,
+                Title = "Hub 2", Text = string.sub(txt, 1, 140), Duration = 8,
             })
         end)
     end
 
-    local links = {}
-    if LINK_DIRETO ~= "" then table.insert(links, LINK_DIRETO) end
-    for _, b in ipairs(BRANCHES) do
-        for _, n in ipairs(NOMES) do
-            table.insert(links, "https://raw.githubusercontent.com/" .. REPO .. "/refs/heads/" .. b .. "/" .. n)
-        end
+    -- duas formas de baixar (algumas pedem User-Agent, como a API do GitHub)
+    local function viaHttpGet(url)
+        local ok, body = pcall(function() return game:HttpGet(url) end)
+        if ok and type(body) == "string" and #body > 0 then return body end
+        return nil
     end
-    -- o link antigo (LICENSE) fica por último: só roda se tiver Lua de verdade dentro
-    table.insert(links, "https://raw.githubusercontent.com/" .. REPO .. "/refs/heads/main/LICENSE")
 
-    aviso("Procurando o Hub 2...")
-    local motivo = "não achei nenhum arquivo .lua no repositório (cole o link raw em LINK_DIRETO)"
+    local function viaRequest(url)
+        local req = (syn and syn.request) or request or http_request
+        if not req then return nil end
+        local ok, res = pcall(req, { Url = url, Method = "GET", Headers = { ["User-Agent"] = "Mozilla/5.0" } })
+        if ok and type(res) == "table" and res.StatusCode == 200 and type(res.Body) == "string" then
+            return res.Body
+        end
+        return nil
+    end
 
-    for _, url in ipairs(links) do
-        local okGet, src = pcall(function() return game:HttpGet(url) end)
-        if okGet and type(src) == "string" and #src > 30 then
-            local fn = loadstring(src) -- se não for Lua (ex.: texto da licença), volta nil
-            if fn then
-                local done, okRun, rerr = false, false, nil
-                task.spawn(function()
-                    okRun, rerr = pcall(fn)
-                    done = true
-                end)
-                local t0 = os.clock()
-                while not done and os.clock() - t0 < 4 do task.wait(0.1) end
-                -- ainda rodando depois de 4s = hub com loop próprio, então está carregado
-                if not done or okRun then
-                    aviso("Hub 2 carregado!")
-                    return
+    local function baixar(url)
+        return viaHttpGet(url) or viaRequest(url)
+    end
+
+    -- baixa e roda. Devolve "ok", "nao_lua", "falhou" ou "erro" (+ mensagem)
+    local function tentar(url)
+        local src = baixar(url)
+        if not src or #src < 30 then return "falhou" end
+        local okc, fn = pcall(loadstring, src)
+        if not okc or not fn then return "nao_lua" end -- ex.: texto de licença ou README
+        local done, okRun, rerr = false, false, nil
+        task.spawn(function()
+            okRun, rerr = pcall(fn)
+            done = true
+        end)
+        local t0 = os.clock()
+        while not done and os.clock() - t0 < 4 do task.wait(0.1) end
+        -- ainda rodando depois de 4s = hub com loop próprio, então está carregado
+        if not done or okRun then return "ok" end
+        return "erro", string.sub(tostring(rerr), 1, 90)
+    end
+
+    local function codifica(s)
+        local ok, r = pcall(function() return HttpService:UrlEncode(s) end)
+        return (ok and r) or s
+    end
+
+    local function urlRaw(ref, path)
+        local partes = {}
+        for seg in string.gmatch(path, "[^/]+") do table.insert(partes, codifica(seg)) end
+        return "https://raw.githubusercontent.com/" .. REPO .. "/" .. ref .. "/" .. table.concat(partes, "/")
+    end
+
+    local function decodificar(body)
+        if not body then return nil end
+        local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
+        if ok and type(data) == "table" and type(data.tree) == "table" then return data.tree end
+        return nil
+    end
+
+    -- lista os arquivos do repositório pela API do GitHub
+    local function listar()
+        for _, ref in ipairs({ "main", "master", "HEAD" }) do
+            local url = "https://api.github.com/repos/" .. REPO .. "/git/trees/" .. ref .. "?recursive=1"
+            local tree = decodificar(viaHttpGet(url)) or decodificar(viaRequest(url))
+            if tree then
+                local arq = {}
+                for _, it in ipairs(tree) do
+                    if it.type == "blob" and type(it.path) == "string" then
+                        table.insert(arq, { path = it.path, size = tonumber(it.size) or 0 })
+                    end
                 end
-                motivo = "erro dentro do Hub 2: " .. tostring(rerr):sub(1, 80)
-                warn("[Hub 2] " .. url .. " -> " .. tostring(rerr))
-                break
+                return arq, ref
             end
         end
+        return nil
     end
 
-    aviso("Não carregou: " .. motivo)
-    warn("[Hub 2] " .. motivo)
+    -- 1) link direto (se você preencheu)
+    if LINK_DIRETO ~= "https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub-v3/refs/heads/main/Script.txt" then
+        aviso("Carregando o Hub 2...")
+        local r, msg = tentar(LINK_DIRETO)
+        if r == "ok" then aviso("Hub 2 carregado!") return end
+        if r == "erro" then aviso("Erro dentro do Hub 2: " .. tostring(msg)) return end
+        aviso("O LINK_DIRETO não é um script Lua. Procurando no repositório...")
+    else
+        aviso("Procurando o Hub 2 no GitHub...")
+    end
+
+    -- 2) acha o script pela lista de arquivos do repositório
+    local arq, ref = listar()
+    if arq then
+        local cands = {}
+        for _, a in ipairs(arq) do
+            local p = string.lower(a.path)
+            local score = 0
+            if p:match("%.luau?$") then score = 3
+            elseif p:match("%.txt$") then score = 2
+            elseif not p:match("%.%w+$") then score = 1 end -- sem extensão (ex.: LICENSE)
+            if score > 0 and a.size > 20 then
+                local bonus = 0
+                for _, k in ipairs({ "hub", "main", "init", "load", "script", "fantasma", "brook" }) do
+                    if p:find(k, 1, true) then bonus = bonus + 1 end
+                end
+                table.insert(cands, { path = a.path, score = score, bonus = bonus, size = a.size })
+            end
+        end
+        table.sort(cands, function(x, y)
+            if x.score ~= y.score then return x.score > y.score end
+            if x.bonus ~= y.bonus then return x.bonus > y.bonus end
+            return x.size > y.size
+        end)
+
+        for i = 1, math.min(#cands, 6) do
+            local c = cands[i]
+            local r, msg = tentar(urlRaw(ref, c.path))
+            if r == "ok" then aviso("Hub 2 carregado! (" .. c.path .. ")") return end
+            if r == "erro" then aviso("Erro dentro de " .. c.path .. ": " .. tostring(msg)) return end
+        end
+
+        local nomes = {}
+        for i = 1, math.min(#arq, 8) do table.insert(nomes, arq[i].path) end
+        aviso("Nenhum script Lua no repositório. Arquivos: " .. table.concat(nomes, ", "))
+        return
+    end
+
+    -- 3) plano B (a API do GitHub não respondeu): tenta nomes comuns de arquivo
+    for _, b in ipairs({ "main", "master" }) do
+        for _, n in ipairs({ "main.lua", "script.lua", "loader.lua", "init.lua", "hub.lua" }) do
+            local r, msg = tentar("https://raw.githubusercontent.com/" .. REPO .. "/" .. b .. "/" .. n)
+            if r == "ok" then aviso("Hub 2 carregado! (" .. n .. ")") return end
+            if r == "erro" then aviso("Erro dentro de " .. n .. ": " .. tostring(msg)) return end
+        en
+    end
+
+    aviso("Não achei o repositório ou o script (repositório privado, nome errado ou limite do GitHub).")
 end)
