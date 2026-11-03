@@ -8643,7 +8643,10 @@ else
 end
 
 end -- fim IS_ADMIN
--- ==========================================================
+task.spawn(function()
+    local ok, err = pcall(function()
+
+     -- ==========================================================
 -- FANTASMA1L HUB - BROOKHAVEN EDITION (v8.8.0)
 -- RGB Nome + Bio (Spectra), RP animado e cartão do Discord
 -- Kill Prop All: todos os props atacam todos os alvos ao mesmo tempo
@@ -11763,4 +11766,8 @@ task.spawn(function()
     end })
 
     notify(HUB_NAME, "Brookhaven Edition v8.8.0 carregado com sucesso!")
+end)
+
+    end)
+    if not ok then warn("Hub 2 erro: " .. tostring(err)) end
 end)
