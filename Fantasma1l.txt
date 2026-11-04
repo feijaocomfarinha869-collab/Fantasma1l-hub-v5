@@ -1,6 +1,6 @@
 --[[
     ==========================================================
-    FANTASMA1L HUB - COMPLETO UNIFICADO v42
+    FANTASMA1L HUB - COMPLETO UNIFICADO v51
     (+ LOCUST COM REDE | POOLROOMS | PREFIXO ; | TORNADO EF5
      | IMAGENS CORRIGIDAS | EXPANSAO DE DOMINIO DO GOJO)
     ==========================================================
@@ -26,7 +26,7 @@ local WHITELIST = {
     ["darkADM_ofc"]  = { Role = "SUB DONO" },
     
     -- ADMS (9 VAGAS)
-    ["PREENCHA_AQUI_ADM_1"]       = { Role = "ADM" },
+    ["Fantasma1lhack"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
@@ -57,15 +57,7 @@ if entry then
     MY_ROLE = entry.Role
 end
 
-print("[Fantasma1l Hub] Modo: " .. (IS_ADMIN and ("ADMIN - " .. MY_ROLE) or "Brookhaven Only"))
-
-pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "Fantasma1l Hub",
-        Text = IS_ADMIN and (MY_ROLE) or "Brookhaven RP Edition",
-        Duration = 5
-    })
-end)
+if IS_ADMIN then print("[Fantasma1l Hub] Modo: ADMIN - " .. MY_ROLE) end
 
 -- ================== IDs ==================
 local ICON_ID          = "rbxassetid://72455921762458"
@@ -230,75 +222,270 @@ local function sendNetCmd(cmd)
 end
 
 -- ================== TAG ==================
-function applyOverheadTag(player)
+-- Regras:
+--  * usuário comum NÃO vê a própria tag e não recebe mensagem nenhuma ao abrir o hub
+--    (só recebe aviso se tiver DONO / SUB DONO / ADM no servidor);
+--  * usuário vê a tag dos admins; admin vê a tag de todo mundo que usa o hub (e a própria).
+FantasmaTag = { enabled = true, colorIdx = nil, peers = {}, hooked = {}, aliases = {}, usedAlias = {}, wl = {}, lastAnnounce = 0 }
+for name, data in pairs(WHITELIST) do FantasmaTag.wl[string.lower(name)] = data.Role end
+
+FantasmaTag.PRESETS = {
+    { name = "Roxo → Azul",        a = Color3.fromRGB(168, 85, 247), b = Color3.fromRGB(59, 130, 246) },
+    { name = "Dourado brilhante",  gold = true },
+    { name = "Vermelho → Laranja", a = Color3.fromRGB(239, 68, 68),  b = Color3.fromRGB(251, 146, 60) },
+    { name = "Verde → Ciano",      a = Color3.fromRGB(34, 197, 94),  b = Color3.fromRGB(6, 182, 212) },
+    { name = "Rosa → Roxo",        a = Color3.fromRGB(236, 72, 153), b = Color3.fromRGB(139, 92, 246) },
+    { name = "Azul → Ciano",       a = Color3.fromRGB(37, 99, 235),  b = Color3.fromRGB(34, 211, 238) },
+    { name = "Branco → Cinza",     a = Color3.fromRGB(255, 255, 255), b = Color3.fromRGB(148, 163, 184) },
+}
+
+function FantasmaTag.presetNames()
+    local t = {}
+    for _, pr in ipairs(FantasmaTag.PRESETS) do table.insert(t, pr.name) end
+    return t
+end
+function FantasmaTag.indexOf(name)
+    for i, pr in ipairs(FantasmaTag.PRESETS) do if pr.name == name then return i end end
+    return 1
+end
+function FantasmaTag.roleOf(name) return FantasmaTag.wl[string.lower(name or "")] end
+function FantasmaTag.myColor() return FantasmaTag.colorIdx or (IS_ADMIN and 2 or 1) end
+function FantasmaTag.colorOf(player)
+    if player == LocalPlayer then return FantasmaTag.myColor() end
+    local peer = FantasmaTag.peers[player.Name]
+    if peer and peer.color and FantasmaTag.PRESETS[peer.color] then return peer.color end
+    return FantasmaTag.roleOf(player.Name) and 2 or 1
+end
+
+function FantasmaTag.shouldShow(player)
+    if not FantasmaTag.enabled then return false end
+    if player == LocalPlayer then return IS_ADMIN end          -- usuário não vê a própria tag
+    if not activeScriptUsers[player.Name] then return false end
+    local peer = FantasmaTag.peers[player.Name]
+    if peer and peer.off then return false end                 -- a pessoa desligou a tag dela
+    if IS_ADMIN then return true end                           -- admin vê todos
+    return FantasmaTag.roleOf(player.Name) ~= nil              -- usuário só vê admins
+end
+
+function FantasmaTag.remove(player)
+    local ch = player and player.Character
+    local head = ch and ch:FindFirstChild("Head")
+    local old = head and head:FindFirstChild("FantasmaOverhead")
+    if old then old:Destroy() end
+end
+
+function FantasmaTag.seq(...)
+    local kp = {}
+    for _, v in ipairs({ ... }) do table.insert(kp, ColorSequenceKeypoint.new(v[1], v[2])) end
+    return ColorSequence.new(kp)
+end
+
+function FantasmaTag.build(player)
     pcall(function()
-        if not player or not player.Character then return end
-        local head = player.Character:WaitForChild("Head", 3)
+        local ch = player.Character
+        local head = ch and (ch:FindFirstChild("Head") or ch:WaitForChild("Head", 3))
         if not head then return end
-        if head:FindFirstChild("FantasmaOverhead") then head.FantasmaOverhead:Destroy() end
+        local old = head:FindFirstChild("FantasmaOverhead")
+        if old then old:Destroy() end
 
-        local cargo = "USUARIO"
-        if WHITELIST[player.Name] then cargo = WHITELIST[player.Name].Role
-        elseif NETWORK_ROLES[player.Name] then cargo = NETWORK_ROLES[player.Name] end
-        if player == LocalPlayer then cargo = cargo .. " (VOCÊ)" end
+        local pr = FantasmaTag.PRESETS[FantasmaTag.colorOf(player)] or FantasmaTag.PRESETS[1]
+        local role = (player == LocalPlayer and IS_ADMIN) and MY_ROLE or FantasmaTag.roleOf(player.Name)
+        local text = role and ("FANTASMA1L • " .. role) or "Fantasma1l usuário"
 
-        local bb = Instance.new("BillboardGui", head)
-        bb.Name, bb.Size, bb.StudsOffset, bb.AlwaysOnTop = "FantasmaOverhead", UDim2.new(0, 240, 0, 50), Vector3.new(0, 3, 0), true
+        -- cores (dourado = preto + ouro brilhante | demais = degradê)
+        local fillSeq, edgeSeq, textSeq, glow
+        if pr.gold then
+            fillSeq = FantasmaTag.seq({ 0, Color3.fromRGB(0, 0, 0) }, { 0.5, Color3.fromRGB(34, 26, 6) }, { 1, Color3.fromRGB(0, 0, 0) })
+            edgeSeq = FantasmaTag.seq({ 0, Color3.fromRGB(184, 134, 11) }, { 0.35, Color3.fromRGB(255, 215, 0) },
+                { 0.5, Color3.fromRGB(255, 250, 200) }, { 0.65, Color3.fromRGB(255, 215, 0) }, { 1, Color3.fromRGB(184, 134, 11) })
+            textSeq = edgeSeq
+            glow = Color3.fromRGB(255, 200, 40)
+        else
+            fillSeq = FantasmaTag.seq({ 0, pr.a:Lerp(Color3.new(0, 0, 0), 0.62) }, { 1, pr.b:Lerp(Color3.new(0, 0, 0), 0.62) })
+            edgeSeq = FantasmaTag.seq({ 0, pr.a }, { 1, pr.b })
+            textSeq = FantasmaTag.seq({ 0, pr.a:Lerp(Color3.new(1, 1, 1), 0.35) }, { 1, pr.b:Lerp(Color3.new(1, 1, 1), 0.35) })
+            glow = pr.a
+        end
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name, bb.Adornee = "FantasmaOverhead", head
+        bb.Size, bb.StudsOffset = UDim2.new(0, 268, 0, 62), Vector3.new(0, 3.4, 0)
+        bb.AlwaysOnTop, bb.MaxDistance, bb.LightInfluence = true, 160, 0
+
+        -- brilho (glow) atrás do cartão
+        local gl = Instance.new("Frame", bb)
+        gl.Size, gl.BackgroundTransparency = UDim2.fromScale(1, 1), 1
+        Instance.new("UICorner", gl).CornerRadius = UDim.new(0, 18)
+        local gs = Instance.new("UIStroke", gl)
+        gs.Color, gs.Thickness, gs.Transparency = glow, 5, 0.72
 
         local fr = Instance.new("Frame", bb)
-        fr.Size, fr.BackgroundColor3 = UDim2.new(1, 0, 1, 0), Color3.fromRGB(15, 12, 22)
-        fr.BackgroundTransparency, fr.BorderSizePixel = 0.25, 0
-        Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+        fr.Position, fr.Size = UDim2.new(0, 6, 0, 6), UDim2.new(1, -12, 1, -12)
+        fr.BackgroundColor3, fr.BackgroundTransparency, fr.BorderSizePixel = Color3.new(1, 1, 1), 0.05, 0
+        Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 14)
+        local fg = Instance.new("UIGradient", fr)
+        fg.Color, fg.Rotation = fillSeq, 20
 
         local st = Instance.new("UIStroke", fr)
-        st.Color, st.Thickness = Color3.fromRGB(168, 85, 247), 1.8
+        st.Thickness, st.Color = 2.2, Color3.new(1, 1, 1)
+        local sg = Instance.new("UIGradient", st)
+        sg.Color = edgeSeq
 
-        local ic = Instance.new("ImageLabel", fr)
-        ic.Size, ic.Position, ic.BackgroundTransparency, ic.Image = UDim2.new(0, 32, 0, 32), UDim2.new(0, 8, 0.5, -16), 1, ICON_ID
-        task.spawn(function()
-            local r = resolveImage(ICON_ID)
-            if ic.Parent then ic.Image = r end
-        end)
+        -- foto de perfil do jogador
+        local av = Instance.new("ImageLabel", fr)
+        av.Size, av.Position, av.BackgroundColor3 = UDim2.new(0, 36, 0, 36), UDim2.new(0, 8, 0.5, -18), Color3.fromRGB(20, 20, 28)
+        av.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
+        Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
+        local avs = Instance.new("UIStroke", av)
+        avs.Thickness, avs.Color = 1.8, Color3.new(1, 1, 1)
+        Instance.new("UIGradient", avs).Color = edgeSeq
 
         local lbl = Instance.new("TextLabel", fr)
-        lbl.Size, lbl.Position, lbl.BackgroundTransparency = UDim2.new(1, -50, 1, 0), UDim2.new(0, 45, 0, 0), 1
-        lbl.Text = "FANTASMA1L | " .. cargo
-        lbl.TextColor3, lbl.TextSize = Color3.fromRGB(220, 200, 255), 13
-        lbl.Font, lbl.TextXAlignment = Enum.Font.GothamBold, Enum.TextXAlignment.Left
+        lbl.Size, lbl.Position, lbl.BackgroundTransparency = UDim2.new(1, -58, 1, 0), UDim2.new(0, 52, 0, 0), 1
+        lbl.Text, lbl.TextColor3, lbl.TextSize = text, Color3.new(1, 1, 1), role and 15 or 16
+        lbl.Font, lbl.TextXAlignment, lbl.TextTruncate = Enum.Font.GothamBlack, Enum.TextXAlignment.Left, Enum.TextTruncate.AtEnd
+        local lg = Instance.new("UIGradient", lbl)
+        lg.Color = textSeq
+
+        -- brilho correndo (só no dourado, leve: 2 tweens por tag)
+        if pr.gold then
+            local TS = game:GetService("TweenService")
+            local info = TweenInfo.new(2.4, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1)
+            sg.Offset, lg.Offset = Vector2.new(-1, 0), Vector2.new(-1, 0)
+            TS:Create(sg, info, { Offset = Vector2.new(1, 0) }):Play()
+            TS:Create(lg, info, { Offset = Vector2.new(1, 0) }):Play()
+        end
+
+        bb.Parent = head
     end)
 end
 
-local function setupPlayerTag(plr)
-    plr.CharacterAdded:Connect(function()
-        task.wait(1)
-        if plr == LocalPlayer then applyOverheadTag(plr)
-        elseif IS_ADMIN and activeScriptUsers[plr.Name] then applyOverheadTag(plr) end
-    end)
-    if plr.Character then
-        if plr == LocalPlayer then applyOverheadTag(plr)
-        elseif IS_ADMIN and activeScriptUsers[plr.Name] then applyOverheadTag(plr) end
-    end
+function FantasmaTag.refresh(player)
+    if not player then return end
+    if FantasmaTag.shouldShow(player) then FantasmaTag.build(player) else FantasmaTag.remove(player) end
 end
-setupPlayerTag(LocalPlayer)
+function FantasmaTag.refreshByName(name)
+    local p = Players:FindFirstChild(name)
+    if p then FantasmaTag.refresh(p) end
+end
+function FantasmaTag.refreshAll()
+    for _, p in ipairs(Players:GetPlayers()) do FantasmaTag.refresh(p) end
+end
 
-if IS_ADMIN then
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            p.CharacterAdded:Connect(function()
-                task.wait(1.5)
-                if activeScriptUsers[p.Name] then applyOverheadTag(p) end
-            end)
-            if p.Character and activeScriptUsers[p.Name] then applyOverheadTag(p) end
+function FantasmaTag.hook(player)
+    if FantasmaTag.hooked[player] then return end
+    FantasmaTag.hooked[player] = true
+    player.CharacterAdded:Connect(function()
+        task.wait(1.2)
+        FantasmaTag.refresh(player)
+    end)
+    if player.Character then FantasmaTag.refresh(player) end
+end
+
+-- avisa a rede (cargo é conferido pelo NOME de quem enviou, então não dá para forjar)
+function FantasmaTag.announce(force)
+    local now = os.clock()
+    if not force and now - FantasmaTag.lastAnnounce < 2 then return end
+    FantasmaTag.lastAnnounce = now
+    sendNetCmd(";PONG " .. LocalPlayer.Name .. " COL_" .. FantasmaTag.myColor() .. " TAG_" .. (FantasmaTag.enabled and 1 or 0))
+end
+
+function FantasmaTag.setEnabled(v)
+    FantasmaTag.enabled = v and true or false
+    FantasmaTag.refreshAll()
+    FantasmaTag.announce(true)
+end
+function FantasmaTag.setColor(idx)
+    if not FantasmaTag.PRESETS[idx] then return end
+    FantasmaTag.colorIdx = idx
+    FantasmaTag.refreshAll()
+    FantasmaTag.announce(true)
+end
+
+-- nome falso fixo por jogador: Fantasma1lhub_1234
+function FantasmaTag.alias(name)
+    if FantasmaTag.aliases[name] then return FantasmaTag.aliases[name] end
+    local n
+    repeat n = math.random(1000, 9999) until not FantasmaTag.usedAlias[n]
+    FantasmaTag.usedAlias[n] = true
+    FantasmaTag.aliases[name] = "Fantasma1lhub_" .. n
+    return FantasmaTag.aliases[name]
+end
+
+-- ;verificar -> lista só os apelidos de quem está usando o hub
+function FantasmaTag.verify()
+    sendNetCmd(";PING ALL")
+    task.wait(2.5)
+    local list = {}
+    for n in pairs(activeScriptUsers) do
+        if Players:FindFirstChild(n) then table.insert(list, FantasmaTag.alias(n)) end
+    end
+    table.sort(list)
+    notify("Hub", table.concat(list, "\n"))
+end
+
+-- aviso de início: usuário comum só recebe se houver DONO / SUB DONO / ADM no servidor
+function FantasmaTag.notice(text)
+    pcall(function() StarterGui:SetCore("SendNotification", { Title = "Fantasma1l Hub", Text = text, Duration = 5 }) end)
+end
+task.spawn(function()
+    if IS_ADMIN then FantasmaTag.notice(MY_ROLE) return end
+    task.wait(2)
+    for _, p in ipairs(Players:GetPlayers()) do
+        local r = p ~= LocalPlayer and FantasmaTag.roleOf(p.Name)
+        if r then FantasmaTag.notice("Hub ativo • " .. r .. " no servidor") break end
+    end
+end)
+Players.PlayerAdded:Connect(function(p)
+    FantasmaTag.hook(p)
+    if not IS_ADMIN then
+        local r = FantasmaTag.roleOf(p.Name)
+        if r then task.wait(1.5) FantasmaTag.notice("Hub ativo • " .. r .. " entrou no servidor") end
+    end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    FantasmaTag.peers[p.Name] = nil
+    FantasmaTag.hooked[p] = nil
+    activeScriptUsers[p.Name] = nil
+end)
+for _, p in ipairs(Players:GetPlayers()) do FantasmaTag.hook(p) end
+
+-- ================== ANTI-LAG (desempenho) ==================
+FantasmaPerf = { level = "Desligado", saved = nil }
+function FantasmaPerf.save()
+    if FantasmaPerf.saved then return end
+    local sv = { shadows = Lighting.GlobalShadows, fx = {} }
+    pcall(function() sv.quality = settings().Rendering.QualityLevel end)
+    for _, e in ipairs(Lighting:GetChildren()) do
+        if e:IsA("BloomEffect") or e:IsA("BlurEffect") or e:IsA("SunRaysEffect") or e:IsA("DepthOfFieldEffect") then
+            sv.fx[e] = e.Enabled
         end
     end
-    Players.PlayerAdded:Connect(function(p)
-        if p ~= LocalPlayer then
-            p.CharacterAdded:Connect(function()
-                task.wait(1.5)
-                if activeScriptUsers[p.Name] then applyOverheadTag(p) end
-            end)
-        end
-    end)
+    local t = workspace:FindFirstChildOfClass("Terrain")
+    if t then sv.deco = t.Decoration end
+    FantasmaPerf.saved = sv
+end
+function FantasmaPerf.set(level)
+    FantasmaPerf.save()
+    local sv = FantasmaPerf.saved
+    FantasmaPerf.level = level
+    local t = workspace:FindFirstChildOfClass("Terrain")
+    if level == "Desligado" then
+        pcall(function() Lighting.GlobalShadows = sv.shadows end)
+        for e, v in pairs(sv.fx) do if e.Parent then e.Enabled = v end end
+        if t and sv.deco ~= nil then pcall(function() t.Decoration = sv.deco end) end
+        if sv.quality then pcall(function() settings().Rendering.QualityLevel = sv.quality end) end
+        return
+    end
+    -- Leve / Forte: só reduz gráficos do mapa (nenhuma função do hub é removida)
+    pcall(function() Lighting.GlobalShadows = false end)
+    for e in pairs(sv.fx) do if e.Parent then e.Enabled = false end end
+    if level == "Forte" then
+        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+        if t then pcall(function() t.Decoration = false end) end
+    else
+        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level05 end)
+    end
 end
 
 -- ================== C00LKIDD EFFECT ==================
@@ -4312,7 +4499,7 @@ local function handleNet(senderName, msg)
     local cmd, arg = string.match(msg, "^;%s*(%S+)%s*(.-)%s*$")
     if not cmd then return end
     cmd = string.upper(cmd)
-    if cmd ~= "TORNADO_SPAWN" and cmd ~= "TORNADO_CLEAR" then return end
+    if cmd ~= "TORNADO_SPAWN" and cmd ~= "TORNADO_CLEAR" and cmd ~= "GONER_TURN" then return end
 
     -- evita executar 2x a mesma mensagem (chat antigo + novo)
     local key = senderName .. "|" .. msg
@@ -4327,6 +4514,10 @@ local function handleNet(senderName, msg)
     local ok, isAll = matchesTarget(arg)
     if not ok then return end
 
+    if cmd == "GONER_TURN" then
+        if not isAll and FantasmaGoner then task.spawn(FantasmaGoner.turnSelf) end
+        return
+    end
     if cmd == "TORNADO_SPAWN" then
         task.spawn(function() TORNADO.spawn(isAll and senderName or nil) end)
     else
@@ -4511,12 +4702,964 @@ local function runBroadcast(action, senderName, targetName)
     end
 end
 
+-- ================== SUKUNA: CORTES (CLEAVE) + CENÁRIO SOMBRIO (usados no domínio e no choque) ==================
+SHRINE_YAW = 0   -- ajuste da direção do santuário (0/90/180/270) — também no painel > Configuração
+CLEAVE_LOW = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- corte do Sukuna: núcleo branco/prateado + rastro preto + brilho vermelho, risca o ar e deixa rastro
+function cleaveLine(parent, a, b, w, life)
+    life = life or 0.4
+    local TSv = game:GetService("TweenService")
+    local DBv = game:GetService("Debris")
+    local holder = Instance.new("Part")
+    holder.Anchored, holder.CanCollide, holder.CanQuery, holder.CanTouch, holder.CastShadow = true, false, false, false, false
+    holder.Transparency = 1
+    holder.Size = Vector3.new(0.2, 0.2, 0.2)
+    holder.CFrame = CFrame.new(a)
+    holder.Parent = parent
+    local function att(pos)
+        local at = Instance.new("Attachment")
+        at.Parent = holder
+        at.WorldPosition = pos
+        return at
+    end
+    local a0, am, a1 = att(a), att(a), att(a)
+    local beams = {}
+    local function bm(x0, x1, w0, w1, color, emis, tr)
+        local m = Instance.new("Beam")
+        m.Attachment0, m.Attachment1 = x0, x1
+        m.Width0, m.Width1 = w0, w1
+        m.FaceCamera, m.Segments = true, 1
+        m.Color = ColorSequence.new(color)
+        m.Transparency = NumberSequence.new(tr)
+        m.LightEmission, m.LightInfluence = emis, 0
+        m.Parent = holder
+        beams[#beams + 1] = m
+    end
+    local RED, BLK, WHT = Color3.fromRGB(235, 0, 12), Color3.new(0, 0, 0), Color3.fromRGB(245, 248, 255)
+    bm(a0, am, 0, w * 4, RED, 1, 0.6)
+    bm(am, a1, w * 4, 0, RED, 1, 0.6)
+    bm(a0, am, 0, w * 2.2, BLK, 0, 0.05)
+    bm(am, a1, w * 2.2, 0, BLK, 0, 0.05)
+    bm(a0, am, 0, w, WHT, 1, 0)
+    bm(am, a1, w, 0, WHT, 1, 0)
+    local trail
+    if not CLEAVE_LOW then
+        trail = Instance.new("Beam")
+        trail.Attachment0, trail.Attachment1 = a0, a1
+        trail.Width0, trail.Width1 = w * 0.5, w * 0.5
+        trail.FaceCamera, trail.Segments = true, 1
+        trail.Color = ColorSequence.new(Color3.fromRGB(150, 0, 10))
+        trail.Transparency = NumberSequence.new(0.4)
+        trail.LightEmission, trail.LightInfluence = 0, 0
+        trail.Parent = holder
+    end
+    DBv:AddItem(holder, life + 1.6)
+    task.spawn(function()
+        pcall(function()
+            for i = 1, 5 do
+                local p1 = a + (b - a) * (i / 5)
+                a1.WorldPosition = p1
+                am.WorldPosition = (a + p1) / 2
+                RunService.Heartbeat:Wait()
+            end
+            -- faíscas no fim do corte
+            local sp = Instance.new("Part")
+            sp.Anchored, sp.CanCollide, sp.CanQuery, sp.CanTouch, sp.CastShadow = true, false, false, false, false
+            sp.Transparency = 1
+            sp.Size = Vector3.new(0.2, 0.2, 0.2)
+            sp.Position = b
+            sp.Parent = parent
+            local e = Instance.new("ParticleEmitter")
+            e.Rate = 0
+            e.Lifetime = NumberRange.new(0.3, 0.7)
+            e.Speed = NumberRange.new(10, 35)
+            e.SpreadAngle = Vector2.new(180, 180)
+            e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 0) })
+            e.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 30, 30))
+            e.LightEmission, e.LightInfluence = 1, 0
+            e.Parent = sp
+            e:Emit(CLEAVE_LOW and 4 or 10)
+            DBv:AddItem(sp, 1)
+            for _, m in ipairs(beams) do
+                TSv:Create(m, TweenInfo.new(life, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Width0 = 0, Width1 = 0 }):Play()
+            end
+            if trail then
+                TSv:Create(trail, TweenInfo.new(life + 0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Width0 = 0, Width1 = 0 }):Play()
+            end
+        end)
+    end)
+end
+
+-- cenário do Santuário Malevolente: chão rachado brilhando, entulho, pilares e montanhas cortados ao meio
+function buildSukunaScenery(parent, center, halfX, halfZ, count, avoid)
+    avoid = avoid or 0
+    local function mk(size, cf, color, mat, transp)
+        local p = Instance.new("Part")
+        p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, true
+        p.Size, p.CFrame, p.Color = size, cf, color
+        p.Material = mat or Enum.Material.Slate
+        p.Transparency = transp or 0
+        p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+        p.Parent = parent
+        return p
+    end
+    local function rpos()
+        local pos
+        for _ = 1, 8 do
+            pos = center + Vector3.new((math.random() * 2 - 1) * halfX, 0, (math.random() * 2 - 1) * halfZ)
+            if (Vector3.new(pos.X - center.X, 0, pos.Z - center.Z)).Magnitude >= avoid then break end
+        end
+        return pos
+    end
+    local ROCK, ROCK2 = Color3.fromRGB(34, 28, 30), Color3.fromRGB(22, 18, 20)
+    local GLOW = Color3.fromRGB(255, 25, 25)
+
+    -- rachaduras brilhando no chão
+    for _ = 1, count * 5 do
+        local p = rpos()
+        local c = mk(Vector3.new(0.5 + math.random() * 0.8, 0.15, 18 + math.random() * 60),
+            CFrame.new(p + Vector3.new(0, 0.12, 0)) * CFrame.Angles(0, math.random() * math.pi, 0), GLOW, Enum.Material.Neon, 0.1)
+        c.CastShadow = false
+    end
+    -- entulho espalhado
+    for _ = 1, count * 12 do
+        local p = rpos()
+        local s = 0.8 + math.random() * 4
+        mk(Vector3.new(s * (0.6 + math.random()), s * (0.4 + math.random() * 0.8), s * (0.6 + math.random())),
+            CFrame.new(p + Vector3.new(0, s * 0.3, 0)) * CFrame.Angles(math.random() * 0.8, math.random() * 6.28, math.random() * 0.8),
+            (math.random() < 0.5) and ROCK or ROCK2)
+    end
+    -- bloco cortado ao meio (parte de cima desliza), com a linha do corte brilhando
+    local function sliced(p, w, h, d)
+        local base = CFrame.new(p) * CFrame.Angles(0, math.random() * math.pi, 0)
+        local cutH = h * (0.35 + math.random() * 0.3)
+        mk(Vector3.new(w, cutH, d), base * CFrame.new(0, cutH / 2, 0), ROCK)
+        local slide = (math.random() < 0.5 and 1 or -1) * (w * 0.06 + math.random() * 4)
+        mk(Vector3.new(w * 0.97, h - cutH, d * 0.97),
+            base * CFrame.new(slide, cutH + (h - cutH) / 2 + 1.5, slide * 0.4) * CFrame.Angles(0, 0, math.rad(slide * 0.8)), ROCK)
+        local g = mk(Vector3.new(w * 1.02, 0.35, d * 1.02), base * CFrame.new(0, cutH + 0.2, 0), GLOW, Enum.Material.Neon, 0.1)
+        g.CastShadow = false
+    end
+    for _ = 1, count do
+        sliced(rpos(), 12 + math.random() * 16, 40 + math.random() * 70, 12 + math.random() * 16)
+    end
+    -- montanhas cortadas ao fundo
+    for _ = 1, 3 do
+        local ang = math.random() * math.pi * 2
+        local p = center + Vector3.new(math.cos(ang) * halfX * 0.9, 0, math.sin(ang) * halfZ * 0.9)
+        sliced(p, 90 + math.random() * 60, 110 + math.random() * 80, 90 + math.random() * 60)
+    end
+    -- pedaços de terra flutuando
+    for _ = 1, count * 2 do
+        local p = rpos() + Vector3.new(0, 15 + math.random() * 55, 0)
+        local s = 2 + math.random() * 7
+        mk(Vector3.new(s * 1.3, s * 0.7, s), CFrame.new(p) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6), ROCK2)
+    end
+end
+
+SUKUNA_BUSY, SUKUNA_ABORT, SUKUNA_CASTER = false, false, nil
+DOMAIN_BATTLE = { active = false, token = 0, count = 0 }
+
+-- ======== CHOQUE DE DOMÍNIOS 3D (Sukuna vermelho x Gojo azul) ========
+do
+    local TS = game:GetService("TweenService")
+    local DB = game:GetService("Debris")
+    local LOWFX = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+    local function part(parent, size, cf, color, mat, transp, shape)
+        local p = Instance.new("Part")
+        p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+        if shape then p.Shape = shape end
+        p.Size, p.CFrame, p.Color = size, cf, color
+        p.Material = mat or Enum.Material.SmoothPlastic
+        p.Transparency = transp or 0
+        p.Parent = parent
+        return p
+    end
+
+    local function tween(o, t, props, style, dir)
+        local tw = TS:Create(o, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
+        tw:Play()
+        return tw
+    end
+
+    -- pedaços de vidro caindo (domínio destruído)
+    local function shatter(center, radius, count, glowC, baseC)
+        local folder = Instance.new("Folder")
+        folder.Name = "DomainShatter"
+        folder.Parent = workspace
+        for _ = 1, count do
+            task.delay(math.random() * 0.5, function()
+                local pc = Instance.new("Part")
+                pc.Size = Vector3.new(1 + math.random() * 6, 1 + math.random() * 5, 0.12 + math.random() * 0.3)
+                pc.Material = Enum.Material.Neon
+                pc.Color = glowC
+                pc.Transparency = 0.05
+                pc.CanCollide, pc.CanQuery, pc.CanTouch, pc.CastShadow = false, false, false, false
+                local ang, elev = math.random() * math.pi * 2, (math.random() - 0.5) * math.pi
+                local r = radius * (0.25 + 0.75 * math.random())
+                local off = Vector3.new(math.cos(ang) * math.cos(elev) * r, math.sin(elev) * r * 0.7, math.sin(ang) * math.cos(elev) * r)
+                pc.CFrame = CFrame.new(center + off) * CFrame.Angles(math.random() * 6.28, math.random() * 6.28, math.random() * 6.28)
+                pc.Anchored = false
+                pc.Parent = folder
+                pc.AssemblyLinearVelocity = off.Unit * (4 + math.random() * 16) + Vector3.new(0, -2 - math.random() * 18, 0)
+                pc.AssemblyAngularVelocity = Vector3.new((math.random() - 0.5) * 14, (math.random() - 0.5) * 14, (math.random() - 0.5) * 14)
+                task.delay(0.12, function()
+                    if pc.Parent then
+                        pc.Material = Enum.Material.Glass
+                        pc.Color = baseC
+                        pc.Transparency = 0.3
+                    end
+                end)
+                task.delay(2.2, function()
+                    if pc.Parent then tween(pc, 0.9, { Transparency = 1 }) end
+                end)
+                DB:AddItem(pc, 4)
+            end)
+        end
+        pcall(function()
+            local sn = Instance.new("Sound")
+            sn.SoundId, sn.Volume = "rbxassetid://5221180459", 3.5
+            sn.Parent = workspace
+            sn:Play()
+            DB:AddItem(sn, 4)
+        end)
+        DB:AddItem(folder, 6)
+    end
+
+    local function runBattle(token, gojoName, sukunaName, targetL)
+        -- cancela os domínios individuais e espera eles se limparem
+        GOJO.cancelFlag = true
+        SUKUNA_ABORT = true
+        local w0 = os.clock()
+        while (GOJO.busy or SUKUNA_BUSY) and os.clock() - w0 < 6 do task.wait(0.05) end
+        GOJO.cancelFlag = false
+        SUKUNA_ABORT = false
+        if DOMAIN_BATTLE.token ~= token then return end
+
+        local me = LocalPlayer.Name
+        local meL, myDisp = string.lower(me), string.lower(LocalPlayer.DisplayName)
+        local isSukuna = (sukunaName == me)
+        local isGojo = (gojoName == me)
+        local isTarget = (not isSukuna) and (not isGojo) and targetL ~= nil and targetL ~= ""
+            and (targetL == meL or targetL == myDisp)
+        local participant = isSukuna or isGojo or isTarget
+
+        local myChar = LocalPlayer.Character
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if participant and (not myHrp or not myHum or myHum.Health <= 0) then participant = false end
+
+        local gp = gojoName and Players:FindFirstChild(gojoName)
+        local gHrp = gp and gp.Character and gp.Character:FindFirstChild("HumanoidRootPart")
+        local near = participant or (gHrp ~= nil and myHrp ~= nil and (myHrp.Position - gHrp.Position).Magnitude <= 300)
+
+        -- resultado igual pra todo mundo (calculado com os nomes)
+        local sum = DOMAIN_BATTLE.count
+        for _, nm in ipairs({ gojoName or "", sukunaName or "" }) do
+            for i = 1, #nm do sum += string.byte(nm, i) end
+        end
+        DOMAIN_BATTLE.count += 1
+        local sukunaWins = (sum % 100) < 65
+
+        local C = Vector3.new(0, 8000, 0)
+        local folder = Instance.new("Folder")
+        folder.Name = "DomainBattleWorld"
+        folder.Parent = workspace
+
+        local cam = workspace.CurrentCamera
+        local oldFov = cam and cam.FieldOfView or 70
+        local oldLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+        local renderName = "DomainBattle" .. tostring(math.random(1, 1000000))
+        local saved, hiddenAtm, hiddenSky = {}, {}, {}
+        local cc, bloom, gui, flash, ttl, sky, bb, L, shrine, wall
+        local teleported, returnCF = false, nil
+        local aimFrames = 0
+        local arenaOn, redOn, blueOn = false, true, true
+        local smokesRed, smokesBlue = {}, {}
+        local barrier = {}
+        local lineData, wallX, techSaved, atm, dof, dome = {}, 0, nil, nil, nil, nil
+        local T0 = os.clock()
+
+        local function alive() return DOMAIN_BATTLE.token == token end
+        local function waitUntil(t)
+            while alive() and os.clock() - T0 < t do task.wait() end
+            return alive()
+        end
+
+        local function crack()
+            if not gui then return end
+            local cx, cy = 0.2 + math.random() * 0.6, 0.25 + math.random() * 0.5
+            for i = 1, 16 do
+                local f = Instance.new("Frame")
+                f.AnchorPoint = Vector2.new(0, 0.5)
+                f.Position = UDim2.fromScale(cx, cy)
+                f.Size = UDim2.new(0, 0, 0, 2 + math.random() * 2)
+                f.Rotation = (i / 16) * 360 + math.random(-10, 10)
+                f.BackgroundColor3, f.BorderSizePixel, f.ZIndex = Color3.new(1, 1, 1), 0, 40
+                f.Parent = gui
+                tween(f, 0.18 + math.random() * 0.12, { Size = UDim2.new(0, 260 + math.random() * 700, 0, f.Size.Y.Offset) })
+                task.delay(0.55, function()
+                    if f.Parent then tween(f, 0.3, { BackgroundTransparency = 1 }) end
+                end)
+                DB:AddItem(f, 1.2)
+            end
+        end
+
+        -- risco afilado (feixe): grosso no meio, pontudo nas pontas, branco com borda preta
+        local function beamLine(a, b, w, coreC, outC, life)
+            local holder = part(folder, Vector3.new(0.2, 0.2, 0.2), CFrame.new(a), Color3.new(1, 1, 1), nil, 1)
+            local a0 = Instance.new("Attachment")
+            a0.Parent = holder
+            a0.WorldPosition = a
+            local am = Instance.new("Attachment")
+            am.Parent = holder
+            am.WorldPosition = (a + b) / 2
+            local a1 = Instance.new("Attachment")
+            a1.Parent = holder
+            a1.WorldPosition = b
+            local made = {}
+            local function bm(x0, x1, w0, w1, color, emis, tr)
+                local m = Instance.new("Beam")
+                m.Attachment0, m.Attachment1 = x0, x1
+                m.Width0, m.Width1 = w0, w1
+                m.FaceCamera, m.Segments = true, 1
+                m.Color = ColorSequence.new(color)
+                m.Transparency = NumberSequence.new(tr or 0)
+                m.LightEmission, m.LightInfluence = emis, 0
+                m.Parent = holder
+                made[#made + 1] = m
+            end
+            if outC then
+                bm(a0, am, 0, w * 2.2, outC, 0, 0.25)
+                bm(am, a1, w * 2.2, 0, outC, 0, 0.25)
+            end
+            bm(a0, am, 0, w, coreC, 1, 0)
+            bm(am, a1, w, 0, coreC, 1, 0)
+            for _, m in ipairs(made) do
+                tween(m, life, { Width0 = 0, Width1 = 0 })
+            end
+            DB:AddItem(holder, life + 0.15)
+        end
+
+        local function randDir()
+            local d = Vector3.new(math.random() - 0.5, (math.random() - 0.5) * 1.4, math.random() - 0.5)
+            if d.Magnitude < 0.05 then d = Vector3.new(1, 0.3, 0) end
+            return d.Unit
+        end
+
+        -- cortes do Sukuna (lado vermelho)
+        local function slashRed()
+            local base = C + Vector3.new(-130 + math.random() * 150, 5 + math.random() * 95, -120 + math.random() * 150)
+            local d = randDir()
+            local len = 60 + math.random() * 150
+            local thin = math.random() < 0.45
+            local w = thin and (0.25 + math.random() * 0.3) or (2 + math.random() * 3.5)
+            cleaveLine(folder, base - d * len / 2, base + d * len / 2, thin and 0.35 or (1.2 + math.random() * 1.6), 0.45)
+        end
+
+        -- riscos finos vermelhos/roxos na borda esquerda (como na referência)
+        local function edgeStreak()
+            local base = C + Vector3.new(-170 + math.random() * 60, 5 + math.random() * 100, -120 + math.random() * 150)
+            local d = Vector3.new(1, (math.random() - 0.5) * 0.6, (math.random() - 0.5) * 0.3).Unit
+            local len = 90 + math.random() * 110
+            local col = (math.random() < 0.5) and Color3.fromRGB(255, 30, 50) or Color3.fromRGB(90, 70, 255)
+            beamLine(base - d * len / 2, base + d * len / 2, 0.6 + math.random() * 1.2, col, nil, 0.35)
+        end
+
+        -- riscos azuis/rosa do lado do Gojo
+        local BLUES = { Color3.fromRGB(60, 120, 255), Color3.fromRGB(150, 90, 255), Color3.fromRGB(255, 80, 170), Color3.fromRGB(180, 230, 255) }
+        local function streakBlue()
+            local base = C + Vector3.new(10 + math.random() * 180, 5 + math.random() * 100, -150 + math.random() * 170)
+            local d = Vector3.new(1, (math.random() - 0.5) * 0.15, (math.random() - 0.5) * 0.3).Unit
+            local len = 80 + math.random() * 120
+            beamLine(base - d * len / 2, base + d * len / 2, 0.7 + math.random() * 1.3, BLUES[math.random(#BLUES)], nil, 0.35)
+        end
+
+        -- rachadura / raio branco atravessando a parede de choque
+        local function crackBolt()
+            local a = C + Vector3.new(wallX + (math.random() - 0.5) * 6, 5 + math.random() * 100, -150 + math.random() * 170)
+            local b = a + Vector3.new((math.random() - 0.5) * 8, (math.random() - 0.5) * 120, (math.random() - 0.5) * 160)
+            local segs = 9
+            local holder = part(folder, Vector3.new(0.2, 0.2, 0.2), CFrame.new(a), Color3.new(1, 1, 1), nil, 1)
+            local atts = {}
+            local dir = b - a
+            for i = 0, segs do
+                local at = Instance.new("Attachment")
+                at.Parent = holder
+                local jit = (i == 0 or i == segs) and 0 or 7
+                at.WorldPosition = a + dir * (i / segs)
+                    + Vector3.new((math.random() - 0.5) * jit, (math.random() - 0.5) * jit, (math.random() - 0.5) * jit)
+                atts[#atts + 1] = at
+            end
+            local glow = (math.random() < 0.5) and Color3.fromRGB(255, 40, 60) or Color3.fromRGB(70, 110, 255)
+            local made = {}
+            for i = 1, segs do
+                for _, spec in ipairs({ { glow, 1.8, 0.45 }, { Color3.new(1, 1, 1), 0.5, 0 } }) do
+                    local m = Instance.new("Beam")
+                    m.Attachment0, m.Attachment1 = atts[i], atts[i + 1]
+                    m.Width0, m.Width1 = spec[2], spec[2]
+                    m.FaceCamera, m.Segments = true, 1
+                    m.Color = ColorSequence.new(spec[1])
+                    m.Transparency = NumberSequence.new(spec[3])
+                    m.LightEmission, m.LightInfluence = 1, 0
+                    m.Parent = holder
+                    made[#made + 1] = m
+                end
+            end
+            for _, m in ipairs(made) do tween(m, 0.3, { Width0 = 0, Width1 = 0 }) end
+            DB:AddItem(holder, 0.4)
+        end
+
+        local ok, err = pcall(function()
+            -- ===== 1) BOLINHA PRETA DO GOJO (todo mundo perto vê) =====
+            if near and gHrp then
+                local pos = gHrp.Position + Vector3.new(0, 4, 0)
+                local ball = part(folder, Vector3.new(1, 1, 1), CFrame.new(pos), Color3.new(0, 0, 0), nil, 0, Enum.PartType.Ball)
+                local shell = part(folder, Vector3.new(1, 1, 1), CFrame.new(pos), Color3.fromRGB(150, 220, 255), Enum.Material.Neon, 0.8, Enum.PartType.Ball)
+                local rshell = part(folder, Vector3.new(1, 1, 1), CFrame.new(pos), Color3.fromRGB(255, 40, 40), Enum.Material.Neon, 0.85, Enum.PartType.Ball)
+                tween(ball, 0.7, { Size = Vector3.new(7, 7, 7) }, Enum.EasingStyle.Back)
+                tween(shell, 0.7, { Size = Vector3.new(9, 9, 9) }, Enum.EasingStyle.Back)
+                tween(rshell, 0.9, { Size = Vector3.new(12, 12, 12) }, Enum.EasingStyle.Back)
+                task.delay(1.6, function()
+                    pcall(function()
+                        tween(ball, 0.3, { Size = Vector3.new(1, 1, 1) })
+                        tween(shell, 0.3, { Size = Vector3.new(1, 1, 1), Transparency = 1 })
+                        tween(rshell, 0.3, { Size = Vector3.new(1, 1, 1), Transparency = 1 })
+                    end)
+                end)
+            end
+
+            -- ===== preparação de quem vai pro choque =====
+            if participant then
+                for _, k in ipairs({ "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogColor", "FogStart", "FogEnd", "ExposureCompensation" }) do
+                    pcall(function() saved[k] = Lighting[k] end)
+                end
+                pcall(function()
+                    for _, c in ipairs(Lighting:GetChildren()) do
+                        if c:IsA("Atmosphere") then table.insert(hiddenAtm, c) c.Parent = nil
+                        elseif c:IsA("Sky") then table.insert(hiddenSky, c) c.Parent = nil end
+                    end
+                end)
+
+                local pg = LocalPlayer:WaitForChild("PlayerGui", 3)
+                gui = Instance.new("ScreenGui")
+                gui.Name, gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = "DomainBattleGui", true, false, 70
+                gui.Parent = pg
+                flash = Instance.new("Frame")
+                flash.Size = UDim2.new(1, 0, 1, 0)
+                flash.BackgroundColor3, flash.BorderSizePixel, flash.BackgroundTransparency, flash.ZIndex = Color3.new(1, 1, 1), 0, 1, 100
+                flash.Parent = gui
+
+                ttl = Instance.new("TextLabel")
+                ttl.Size, ttl.Position, ttl.BackgroundTransparency = UDim2.new(0.9, 0, 0, 40), UDim2.new(0.05, 0, 0.03, 0), 1
+                ttl.Text, ttl.TextColor3, ttl.Font, ttl.TextSize = "", Color3.new(1, 1, 1), Enum.Font.GothamBlack, 28
+                ttl.TextStrokeTransparency, ttl.ZIndex = 0, 30
+                ttl.Parent = gui
+
+                local ls = Instance.new("TextLabel")
+                ls.Size, ls.Position, ls.BackgroundTransparency = UDim2.new(0.4, 0, 0, 34), UDim2.new(0.04, 0, 0.9, 0), 1
+                ls.Text, ls.TextColor3, ls.Font, ls.TextSize, ls.TextStrokeTransparency, ls.ZIndex = "SUKUNA", Color3.fromRGB(255, 70, 70), Enum.Font.GothamBlack, 26, 0, 30
+                ls.Parent = gui
+                local rs = Instance.new("TextLabel")
+                rs.Size, rs.Position, rs.BackgroundTransparency = UDim2.new(0.4, 0, 0, 34), UDim2.new(0.56, 0, 0.9, 0), 1
+                rs.Text, rs.TextColor3, rs.Font, rs.TextSize, rs.TextStrokeTransparency, rs.ZIndex = "GOJO SATORU", Color3.fromRGB(80, 180, 255), Enum.Font.GothamBlack, 26, 0, 30
+                rs.Parent = gui
+
+                cc = Instance.new("ColorCorrectionEffect")
+                cc.Parent = Lighting
+                bloom = Instance.new("BloomEffect")
+                bloom.Intensity, bloom.Size, bloom.Threshold = 0, 40, 0.8
+                bloom.Parent = Lighting
+                tween(bloom, 1.0, { Intensity = 2.2, Size = 60 })
+
+                -- realismo: luz Future (sombras de luzes), névoa roxa, profundidade de campo, luzes de contorno
+                pcall(function() techSaved = gethiddenproperty(Lighting, "Technology") end)
+                pcall(function() sethiddenproperty(Lighting, "Technology", Enum.Technology.Future) end)
+                pcall(function()
+                    atm = Instance.new("Atmosphere")
+                    atm.Name = "DomainBattleAtm"
+                    atm.Density, atm.Offset, atm.Glare, atm.Haze = 0.3, 0.1, 0, 1.2
+                    atm.Color, atm.Decay = Color3.fromRGB(90, 30, 100), Color3.fromRGB(40, 10, 50)
+                    atm.Parent = Lighting
+                    dof = Instance.new("DepthOfFieldEffect")
+                    dof.Name = "DomainBattleDOF"
+                    dof.FarIntensity, dof.NearIntensity, dof.FocusDistance, dof.InFocusRadius = 0.3, 0, 40, 70
+                    dof.Parent = Lighting
+                end)
+                for _, sx in ipairs({ -1, 1 }) do
+                    local lp = part(folder, Vector3.new(1, 1, 1), CFrame.new(C + Vector3.new(sx * 34, 14, 20)), Color3.new(1, 1, 1), nil, 1)
+                    local pl = Instance.new("PointLight")
+                    pl.Color = sx < 0 and Color3.fromRGB(255, 25, 30) or Color3.fromRGB(70, 130, 255)
+                    pl.Range, pl.Brightness, pl.Shadows = 45, 7, true
+                    pl.Parent = lp
+                end
+
+                -- ---------- ARENA ----------
+                local function solid(size, off)
+                    local b = part(folder, size, CFrame.new(C + off), Color3.new(1, 1, 1), nil, 1)
+                    b.CanCollide = true
+                end
+                solid(Vector3.new(300, 4, 260), Vector3.new(0, -2, -20))
+                solid(Vector3.new(4, 300, 260), Vector3.new(-150, 140, -20))
+                solid(Vector3.new(4, 300, 260), Vector3.new(150, 140, -20))
+                solid(Vector3.new(300, 300, 4), Vector3.new(0, 140, -150))
+                solid(Vector3.new(300, 300, 4), Vector3.new(0, 140, 110))
+                solid(Vector3.new(300, 4, 260), Vector3.new(0, 290, -20))
+
+                sky = Instance.new("Sky")
+                sky.Name = "DomainBattleSky"
+                sky.StarCount = 4000
+                sky.CelestialBodiesShown = false
+                sky.Parent = Lighting
+
+                local function setL(k, v) pcall(function() Lighting[k] = v end) end
+                setL("Ambient", Color3.fromRGB(40, 10, 48))
+                setL("OutdoorAmbient", Color3.fromRGB(25, 5, 35))
+                setL("Brightness", 0.3)
+                setL("ClockTime", 0)
+                setL("FogColor", Color3.fromRGB(16, 0, 26))
+                setL("FogStart", 250)
+                setL("FogEnd", 1800)
+                setL("ExposureCompensation", 0)
+                setL("GlobalShadows", true)
+                setL("EnvironmentDiffuseScale", 0.4)
+                setL("EnvironmentSpecularScale", 0.6)
+
+                -- luzes coloridas (vermelho à esquerda, azul à direita)
+                for i = 1, 4 do
+                    local rl = part(folder, Vector3.new(1, 1, 1), CFrame.new(C + Vector3.new(-40 - i * 35, 30, -120 + i * 45)), Color3.new(1, 1, 1), nil, 1)
+                    local pl = Instance.new("PointLight")
+                    pl.Color, pl.Range, pl.Brightness = Color3.fromRGB(255, 20, 20), 60, 5
+                    pl.Parent = rl
+                    local bl = part(folder, Vector3.new(1, 1, 1), CFrame.new(C + Vector3.new(40 + i * 35, 30, -120 + i * 45)), Color3.new(1, 1, 1), nil, 1)
+                    local pl2 = Instance.new("PointLight")
+                    pl2.Color, pl2.Range, pl2.Brightness = Color3.fromRGB(60, 140, 255), 60, 5
+                    pl2.Parent = bl
+                end
+
+                -- fumaça: vermelha manchada (Sukuna) e azul-turquesa igual ao domínio normal do Gojo
+                local function puff(pos, seq, list, glow, szA, szB, rate, tr0)
+                    local sp = part(folder, Vector3.new(4, 4, 4), CFrame.new(pos), Color3.new(1, 1, 1), nil, 1)
+                    local e = Instance.new("ParticleEmitter")
+                    e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+                    e.Rate = rate
+                    e.Lifetime = NumberRange.new(7, 11)
+                    e.Speed = NumberRange.new(2, 7)
+                    e.SpreadAngle = Vector2.new(180, 180)
+                    e.Rotation = NumberRange.new(0, 360)
+                    e.RotSpeed = NumberRange.new(-10, 10)
+                    e.Drag = 0.5
+                    e.LightEmission, e.LightInfluence = glow, 0
+                    e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, szA), NumberSequenceKeypoint.new(1, szB) })
+                    e.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.18, tr0),
+                        NumberSequenceKeypoint.new(0.8, math.min(tr0 + 0.1, 1)), NumberSequenceKeypoint.new(1, 1) })
+                    e.Color = seq
+                    e.Parent = sp
+                    list[#list + 1] = e
+                    return sp
+                end
+
+                local redBright = ColorSequence.new(Color3.fromRGB(235, 10, 12), Color3.fromRGB(170, 0, 8))
+                local redDark   = ColorSequence.new(Color3.fromRGB(110, 0, 10), Color3.fromRGB(60, 0, 6))
+                local redBlack  = ColorSequence.new(Color3.fromRGB(18, 0, 6), Color3.fromRGB(8, 0, 4))
+                local redGlow   = ColorSequence.new(Color3.fromRGB(255, 40, 30), Color3.fromRGB(200, 0, 0))
+                local tealSeq   = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 140, 170)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 80, 115)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 30, 55)) })
+
+                -- lado vermelho SOMBRIO: nuvens densas escuras e névoa baixa (sem fumaça vermelha viva)
+                local mistRed = ColorSequence.new(Color3.fromRGB(70, 0, 6), Color3.fromRGB(25, 0, 3))
+                local cloudBlack = ColorSequence.new(Color3.fromRGB(10, 2, 4), Color3.fromRGB(28, 4, 8))
+                for _ = 1, (LOWFX and 6 or 10) do
+                    local pos = C + Vector3.new(-190 + math.random() * 182, 150 + math.random() * 110, -190 + math.random() * 230)
+                    puff(pos, cloudBlack, smokesRed, 0, 120, 240, 1.4, 0.35)
+                    puff(pos, mistRed, smokesRed, 0.05, 110, 220, 1.0, 0.5)
+                end
+                for _ = 1, (LOWFX and 4 or 7) do
+                    puff(C + Vector3.new(-190 + math.random() * 182, 4 + math.random() * 18, -180 + math.random() * 210),
+                        mistRed, smokesRed, 0, 90, 170, 1.0, 0.65)
+                end
+                local moon = part(folder, Vector3.new(90, 90, 90), CFrame.new(C + Vector3.new(-110, 230, -170)),
+                    Color3.fromRGB(150, 0, 10), Enum.Material.Neon, 0.1, Enum.PartType.Ball)
+                moon.CastShadow = false
+
+                -- lado azul: o mesmo cosmos do domínio normal do Gojo
+                for i = 1, (LOWFX and 7 or 12) do
+                    local a = (i / 12) * math.pi * 2
+                    local pos = C + Vector3.new(120 + math.cos(a) * 90, 20 + math.random() * 110, -90 + math.sin(a) * 110)
+                    puff(pos, tealSeq, smokesBlue, 0.35, 160, 320, LOWFX and 1.2 or 2.5, 0.55)
+                end
+                for _, off in ipairs({ Vector3.new(120, 40, -100), Vector3.new(55, -5, -95), Vector3.new(105, 75, -120) }) do
+                    local sp = part(folder, Vector3.new(4, 4, 4), CFrame.new(C + off), Color3.new(1, 1, 1), nil, 1)
+                    local e = Instance.new("ParticleEmitter")
+                    e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+                    e.Rate = LOWFX and 3 or 6
+                    e.Lifetime = NumberRange.new(4, 7)
+                    e.Speed = NumberRange.new(4, 14)
+                    e.SpreadAngle = Vector2.new(180, 180)
+                    e.Rotation = NumberRange.new(0, 360)
+                    e.RotSpeed = NumberRange.new(-40, 40)
+                    e.Drag = 1.2
+                    e.LightEmission, e.LightInfluence = 0.8, 0
+                    e.Size = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 14), NumberSequenceKeypoint.new(0.5, 32), NumberSequenceKeypoint.new(1, 44) })
+                    e.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.15, 0.1),
+                        NumberSequenceKeypoint.new(0.7, 0.45), NumberSequenceKeypoint.new(1, 1) })
+                    e.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 225, 245))
+                    e.Parent = sp
+                    smokesBlue[#smokesBlue + 1] = e
+                end
+
+                -- estrelas (fundo do cosmos do Gojo)
+                local starPart = part(folder, Vector3.new(460, 460, 460), CFrame.new(C + Vector3.new(0, 100, -20)), Color3.new(1, 1, 1), nil, 1)
+                local stars = Instance.new("ParticleEmitter")
+                pcall(function()
+                    stars.Shape = Enum.ParticleEmitterShape.Box
+                    stars.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+                    stars.ShapeInOut = Enum.ParticleEmitterShapeInOut.InAndOut
+                end)
+                stars.Rate = LOWFX and 20 or 45
+                stars.Lifetime = NumberRange.new(6, 10)
+                stars.Speed = NumberRange.new(0, 2)
+                stars.Size = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.2, 5),
+                    NumberSequenceKeypoint.new(0.8, 5), NumberSequenceKeypoint.new(1, 0) })
+                stars.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(150, 220, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(190, 150, 255)) })
+                stars.LightEmission, stars.LightInfluence = 1, 0
+                stars.Parent = starPart
+                stars:Emit(LOWFX and 80 or 200)
+
+                -- fogo e brasas no lado vermelho
+                for _ = 1, (LOWFX and 5 or 10) do
+                    local fp = part(folder, Vector3.new(4, 4, 4), CFrame.new(C + Vector3.new(-170 + math.random() * 150, 2 + math.random() * 30, -160 + math.random() * 190)), Color3.new(1, 1, 1), nil, 1)
+                    local fe = Instance.new("ParticleEmitter")
+                    fe.Texture = "rbxasset://textures/particles/fire_main.dds"
+                    fe.Rate = LOWFX and 3 or 6
+                    fe.Lifetime = NumberRange.new(1, 2)
+                    fe.Speed = NumberRange.new(6, 16)
+                    fe.SpreadAngle = Vector2.new(25, 25)
+                    fe.EmissionDirection = Enum.NormalId.Top
+                    fe.Acceleration = Vector3.new(0, 10, 0)
+                    fe.Rotation = NumberRange.new(0, 360)
+                    fe.RotSpeed = NumberRange.new(-60, 60)
+                    fe.LightEmission, fe.LightInfluence = 1, 0
+                    fe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 7), NumberSequenceKeypoint.new(1, 0) })
+                    fe.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+                    fe.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 190, 80)),
+                        ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 50, 20)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 0, 0)) })
+                    fe.Parent = fp
+                    smokesRed[#smokesRed + 1] = fe
+                end
+
+                -- domo vermelho enorme na borda esquerda (domínio do Sukuna visto de longe)
+                dome = part(folder, Vector3.new(300, 300, 300), CFrame.new(C + Vector3.new(-250, 60, -50)), Color3.fromRGB(95, 0, 8), Enum.Material.Neon, 0.1, Enum.PartType.Ball)
+                buildSukunaScenery(folder, C + Vector3.new(-85, 0, -115), 70, 75, LOWFX and 3 or 6, 0)
+
+                -- linhas de velocidade vermelhas/azuis saindo do buraco negro
+                local holeC = C + Vector3.new(80, 45, -140)
+                local LC = { Color3.fromRGB(255, 30, 60), Color3.fromRGB(255, 30, 60), Color3.fromRGB(60, 80, 255),
+                    Color3.fromRGB(60, 80, 255), Color3.fromRGB(150, 90, 255), Color3.new(1, 1, 1) }
+                for i = 1, (LOWFX and 30 or 60) do
+                    local tgt = C + Vector3.new(-130 + math.random() * 260, math.random() * 100, math.random() * 60)
+                    local d = (tgt - holeC).Unit
+                    local len = 60 + math.random() * 120
+                    local pt = part(folder, Vector3.new(0.35, 0.35, len), CFrame.new(holeC), LC[math.random(#LC)], Enum.Material.Neon, 0.1)
+                    lineData[i] = { part = pt, d = d, r = 30 + math.random() * 400, sp = 260 + math.random() * 420, V = holeC }
+                end
+
+                -- parede de choque no meio
+                wall = part(folder, Vector3.new(2.5, 260, 260), CFrame.new(C + Vector3.new(0, 110, -20)), Color3.fromRGB(255, 235, 200), Enum.Material.Neon, 0.75)
+                local sparks = Instance.new("ParticleEmitter")
+                pcall(function()
+                    sparks.Shape = Enum.ParticleEmitterShape.Box
+                    sparks.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+                end)
+                sparks.Rate = LOWFX and 40 or 90
+                sparks.Lifetime = NumberRange.new(0.4, 0.9)
+                sparks.Speed = NumberRange.new(20, 60)
+                sparks.SpreadAngle = Vector2.new(180, 180)
+                sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.4), NumberSequenceKeypoint.new(1, 0) })
+                sparks.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 150, 60))
+                sparks.LightEmission, sparks.LightInfluence = 1, 0
+                sparks.Parent = wall
+
+                -- BARREIRA: parede de fumaça (vermelha do lado do Sukuna, azul do lado do Gojo)
+                for _, zz in ipairs({ -170, -120, -70, -20, 30 }) do
+                    for _, yy in ipairs({ 20, 60, 100 }) do
+                        if not LOWFX or ((zz + yy) % 100 == 0) then
+                            local hr = puff(C + Vector3.new(-8, yy, zz), mistRed, smokesRed, 0.05, 40, 90, 1.0, 0.45)
+                            local hb = puff(C + Vector3.new(8, yy, zz), tealSeq, smokesBlue, 0.35, 40, 90, 1.2, 0.3)
+                            barrier[#barrier + 1] = { part = hr, dx = -8, y = yy, z = zz }
+                            barrier[#barrier + 1] = { part = hb, dx = 8, y = yy, z = zz }
+                        end
+                    end
+                end
+
+                -- santuário do Sukuna (lado vermelho)
+                task.spawn(function()
+                    local sm = fetchAssetAsModel(SUK_SHRINE)
+                    if not sm or not alive() then return end
+                    shrine = sm
+                    sm.Parent = folder
+                    pcall(function() sm:ScaleTo(7) end)
+                    for _, p in ipairs(sm:GetDescendants()) do
+                        if p:IsA("BasePart") then p.Anchored, p.CanCollide = true, false end
+                    end
+                    local bcf, bs = sm:GetBoundingBox()
+                    local bo = sm:GetPivot().Position.Y - (bcf.Position.Y - bs.Y / 2)
+                    local tcf = CFrame.new(C.X - 85, C.Y + bo + SHRINE_Y, C.Z - 150)
+                        * CFrame.lookAt(Vector3.zero, Vector3.new(0, 0, 1)).Rotation * CFrame.Angles(0, math.rad(SHRINE_YAW), 0)
+                    local scf = tcf * CFrame.new(0, -40, 0)
+                    sm:PivotTo(scf)
+                    for i = 1, 50 do
+                        if not sm.Parent then return end
+                        local a = i / 50
+                        sm:PivotTo(scf:Lerp(tcf, a * a * (3 - 2 * a)))
+                        task.wait(0.015)
+                    end
+                    if sm.Parent then sm:PivotTo(tcf) end
+                end)
+
+                -- loop visual
+                RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
+                    local t = os.clock() - T0
+                    if aimFrames > 0 and cam and myHrp and myHrp.Parent then
+                        aimFrames -= 1
+                        local p = myHrp.Position
+                        cam.CFrame = CFrame.lookAt(p + Vector3.new(0, 5, 16), p + Vector3.new(0, 9, -60))
+                    end
+                    if L then
+                        L.rainbowGrad.Rotation = (L.rainbowGrad.Rotation + 22 * dt) % 360
+                        L.swirlGrad.Rotation = (L.swirlGrad.Rotation - 12 * dt) % 360
+                        for _, w in ipairs(L.wisps) do w.g.Rotation = (w.g.Rotation + w.speed * dt) % 360 end
+                    end
+                    if wall and wall.Parent and arenaOn then
+                        local pr = math.clamp((t - 1.9) / 7.5, 0, 1)
+                        local k = pr * pr * (3 - 2 * pr)
+                        local x = (sukunaWins and 1 or -1) * 62 * k + math.sin(t * 6.5) * 7 * (1 - k * 0.6)
+                        wallX = x
+                        wall.CFrame = CFrame.new(C + Vector3.new(x, 110, -20))
+                        for _, bz in ipairs(barrier) do
+                            if bz.part.Parent then bz.part.CFrame = CFrame.new(C + Vector3.new(x + bz.dx, bz.y, bz.z)) end
+                        end
+                        if pr < 1 then wall.Transparency = 0.7 + 0.15 * math.sin(t * 17) end
+                    end
+                    if arenaOn then
+                        for _, ln in ipairs(lineData) do
+                            ln.r += ln.sp * dt
+                            if ln.r > 460 then ln.r = 30 end
+                            local pos = ln.V + ln.d * ln.r
+                            ln.part.CFrame = CFrame.lookAt(pos, pos + ln.d)
+                        end
+                    end
+                    if arenaOn and cam then
+                        local sh = 0.012
+                        cam.CFrame = cam.CFrame * CFrame.Angles(
+                            (math.random() - 0.5) * sh, (math.random() - 0.5) * sh, (math.random() - 0.5) * sh * 0.4)
+                    end
+                end)
+
+                -- cortes vermelhos (esquerda) e riscos azuis (direita)
+                task.spawn(function()
+                    while alive() and gui and gui.Parent do
+                        if arenaOn then
+                            if redOn then
+                                for _ = 1, (LOWFX and 1 or 2) do slashRed() end
+                                if math.random() < 0.7 then edgeStreak() end
+                            end
+                            if blueOn then for _ = 1, (LOWFX and 1 or 2) do streakBlue() end end
+                            if math.random() < 0.45 then crackBolt() end
+                        end
+                        task.wait(0.07)
+                    end
+                end)
+            end
+
+            -- ===== 2) TELA BRANCA -> TELEPORTE PRO CHOQUE =====
+            if not waitUntil(1.4) then return end
+            if flash then tween(flash, 0.25, { BackgroundTransparency = 0 }) end
+            if not waitUntil(1.75) then return end
+
+            if participant then
+                returnCF = myHrp.CFrame
+                local spot
+                if isSukuna then
+                    spot = CFrame.lookAt(C + Vector3.new(-24, 4, 0), C + Vector3.new(-24, 4, -80))
+                elseif isGojo then
+                    spot = CFrame.lookAt(C + Vector3.new(24, 4, 0), C + Vector3.new(24, 4, -80))
+                else
+                    spot = CFrame.lookAt(C + Vector3.new(36, 4, 10), C + Vector3.new(36, 4, -80))
+                end
+                myHrp.AssemblyLinearVelocity = Vector3.zero
+                myHrp.CFrame = spot
+                teleported = true
+                aimFrames = 12
+                arenaOn = true
+
+                tween(cc, 0.6, { TintColor = Color3.fromRGB(235, 200, 245), Saturation = 0.3, Contrast = 0.3 })
+                tween(bloom, 0.6, { Intensity = 1.2, Size = 30 })
+                tween(flash, 1.0, { BackgroundTransparency = 1 })
+                if ttl then ttl.Text = "CHOQUE DE DOMINIOS" end
+                if cam then tween(cam, 1.2, { FieldOfView = oldFov - 6 }) end
+
+                -- buraco negro do Gojo (lado azul)
+                local holeAnchor = part(folder, Vector3.new(1, 1, 1), CFrame.new(C + Vector3.new(80, 45, -140)), Color3.new(1, 1, 1), nil, 1)
+                local rootF
+                bb, rootF, L = GOJO.buildHole(holeAnchor, 190)
+                tween(rootF, 0.9, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Back)
+                task.delay(0.6, function()
+                    if L then
+                        for _, sp in ipairs(L.splash) do
+                            task.delay(math.random() * 0.25, function()
+                                if sp.f.Parent then tween(sp.f, 0.35, { Size = UDim2.fromScale(sp.w, sp.h) }, Enum.EasingStyle.Back) end
+                            end)
+                        end
+                    end
+                end)
+            end
+
+            -- ===== 3) A DISPUTA (7.5s) =====
+            if not waitUntil(9.4) then return end
+
+            -- ===== 4) RESULTADO: o domínio perdedor quebra como vidro =====
+            if sukunaWins then
+                if ttl then ttl.Text, ttl.TextColor3, ttl.TextSize = "SUKUNA VENCE! O DOMINIO DO GOJO QUEBROU!", Color3.fromRGB(255, 60, 60), 22 end
+                blueOn = false
+                if dome then tween(dome, 1.5, { Size = Vector3.new(420, 420, 420) }) end
+                for _, e in ipairs(smokesBlue) do e.Enabled = false end
+                if participant then
+                    crack()
+                    if flash then
+                        flash.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+                        flash.BackgroundTransparency = 0.3
+                        tween(flash, 1.2, { BackgroundTransparency = 1 })
+                    end
+                    if L and bb then
+                        pcall(function() tween(bb.Root, 0.5, { Size = UDim2.fromScale(0, 0) }, Enum.EasingStyle.Back, Enum.EasingDirection.In) end)
+                    end
+                    shatter(C + Vector3.new(85, 55, -80), 130, LOWFX and 60 or 110, Color3.fromRGB(150, 210, 255), Color3.fromRGB(60, 130, 255))
+                    if not isSukuna and myHum and myHum.Parent then
+                        task.spawn(function()
+                            for _ = 1, 4 do
+                                task.wait(0.38)
+                                if myHum and myHum.Parent and myHum.Health > 0 then
+                                    pcall(function() myHum:TakeDamage(myHum.MaxHealth * 0.17) end)
+                                end
+                            end
+                        end)
+                    end
+                end
+            else
+                if ttl then ttl.Text, ttl.TextColor3, ttl.TextSize = "GOJO VENCE! O DOMINIO DO SUKUNA QUEBROU!", Color3.fromRGB(90, 200, 255), 22 end
+                redOn = false
+                if dome then tween(dome, 0.6, { Transparency = 1 }) end
+                for _, e in ipairs(smokesRed) do e.Enabled = false end
+                if participant then
+                    crack()
+                    if flash then
+                        flash.BackgroundColor3 = Color3.fromRGB(0, 70, 190)
+                        flash.BackgroundTransparency = 0.3
+                        tween(flash, 1.2, { BackgroundTransparency = 1 })
+                    end
+                    if shrine then
+                        for _, p in ipairs(shrine:GetDescendants()) do
+                            if p:IsA("BasePart") then
+                                p.Anchored = false
+                                p.AssemblyLinearVelocity = Vector3.new((math.random() - 0.5) * 20, -5 - math.random() * 15, (math.random() - 0.5) * 20)
+                                p.AssemblyAngularVelocity = Vector3.new((math.random() - 0.5) * 6, (math.random() - 0.5) * 6, (math.random() - 0.5) * 6)
+                            end
+                        end
+                    end
+                    shatter(C + Vector3.new(-85, 55, -80), 130, LOWFX and 60 or 110, Color3.fromRGB(255, 90, 90), Color3.fromRGB(170, 20, 20))
+                    if isSukuna and myHum and myHum.Parent and myHum.Health > 0 then
+                        task.delay(0.5, function()
+                            if myHum and myHum.Parent then pcall(function() myHum:TakeDamage(myHum.MaxHealth * 0.55) end) end
+                        end)
+                    end
+                end
+            end
+            if wall and wall.Parent then tween(wall, 0.6, { Transparency = 1 }) end
+
+            if not waitUntil(13.2) then return end
+        end)
+        if not ok then warn("[DomainBattle] " .. tostring(err)) end
+
+        -- ===== 5) FINAL: clarão, todo mundo volta, tudo é limpo =====
+        arenaOn = false
+        pcall(function() RunService:UnbindFromRenderStep(renderName) end)
+        pcall(function()
+            if flash then
+                flash.BackgroundColor3, flash.BackgroundTransparency = Color3.new(1, 1, 1), 0.15
+            end
+            task.wait(0.2)
+            if participant and teleported and returnCF and myHrp and myHrp.Parent and myHum and myHum.Health > 0 then
+                myHrp.AssemblyLinearVelocity = Vector3.zero
+                myHrp.CFrame = returnCF
+                if cam then
+                    for _ = 1, 6 do
+                        local p = myHrp.Position
+                        cam.CFrame = CFrame.lookAt(p - oldLook * 12 + Vector3.new(0, 3, 0), p + oldLook * 40)
+                        RunService.RenderStepped:Wait()
+                    end
+                end
+            end
+        end)
+        pcall(function() if cam then cam.FieldOfView = oldFov end end)
+        pcall(function() folder:Destroy() end)
+        pcall(function() if bb then bb:Destroy() end end)
+        pcall(function() if sky then sky:Destroy() end end)
+        pcall(function() if atm then atm:Destroy() end end)
+        pcall(function() if dof then dof:Destroy() end end)
+        if techSaved ~= nil then pcall(function() sethiddenproperty(Lighting, "Technology", techSaved) end) end
+        pcall(function() if cc then cc:Destroy() end end)
+        pcall(function() if bloom then bloom:Destroy() end end)
+        for k, v in pairs(saved) do pcall(function() Lighting[k] = v end) end
+        for _, a in ipairs(hiddenAtm) do pcall(function() a.Parent = Lighting end) end
+        for _, a in ipairs(hiddenSky) do pcall(function() a.Parent = Lighting end) end
+        if flash then pcall(function() tween(flash, 0.9, { BackgroundTransparency = 1 }) end) end
+        task.delay(1.0, function() pcall(function() if gui then gui:Destroy() end end) end)
+        if isGojo then GOJO.cdEnd = os.clock() + 20 end
+    end
+
+    function startDomainBattle(gojoName, sukunaName, targetL)
+        if DOMAIN_BATTLE.active then return end
+        DOMAIN_BATTLE.active = true
+        DOMAIN_BATTLE.token += 1
+        local token = DOMAIN_BATTLE.token
+        task.spawn(function()
+            local ok, err = pcall(runBattle, token, gojoName, sukunaName, targetL)
+            if not ok then warn("[DomainBattle] " .. tostring(err)) end
+            DOMAIN_BATTLE.active = false
+            SUKUNA_BUSY = false
+        end)
+    end
+end
+
 -- ================== EXPANSÃO DE DOMÍNIO (SUKUNA) - CAIXA ESCURA VERMELHA ==================
 local function runSukunaDomain(senderName)
     local sp = Players:FindFirstChild(senderName)
     local sc = sp and sp.Character
     local sh = sc and sc:FindFirstChild("HumanoidRootPart")
     if not sh then return end
+    -- Choque de Domínios: se Gojo também está ativo, batalha!
+    if type(GOJO)=="table" and GOJO.busy and not DOMAIN_BATTLE.active then
+        SUKUNA_CASTER = senderName
+        startDomainBattle(GOJO.casterName, senderName, GOJO.currentTarget)
+        return
+    end
+    if DOMAIN_BATTLE.active then return end
+    SUKUNA_BUSY = true
+    SUKUNA_ABORT = false
+    SUKUNA_CASTER = senderName
 
     local TweenService = game:GetService("TweenService")
     local Debris = game:GetService("Debris")
@@ -4583,6 +5726,61 @@ local function runSukunaDomain(senderName)
         end
     end
 
+    -- ===== CENÁRIO SOMBRIO: chão destruído, ruínas cortadas, nuvens densas, lua vermelha, brasas =====
+    do
+        local LOWS = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+        buildSukunaScenery(folder, Vector3.new(cx, gy, cz), 190, 190, LOWS and 6 or 12, 32)
+        local topY = cy + half
+        local function cloudAt(pos, c1, c2, tr)
+            local cp = boxPart(Vector3.new(4, 4, 4), pos, Color3.new(1, 1, 1), 1)
+            local e = Instance.new("ParticleEmitter")
+            e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+            e.Rate = LOWS and 1 or 1.6
+            e.Lifetime = NumberRange.new(9, 14)
+            e.Speed = NumberRange.new(2, 6)
+            e.SpreadAngle = Vector2.new(180, 180)
+            e.Rotation = NumberRange.new(0, 360)
+            e.RotSpeed = NumberRange.new(-6, 6)
+            e.Drag = 0.5
+            e.LightEmission, e.LightInfluence = 0.03, 0
+            e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 180), NumberSequenceKeypoint.new(1, 340) })
+            e.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, tr),
+                NumberSequenceKeypoint.new(0.8, math.min(tr + 0.1, 1)), NumberSequenceKeypoint.new(1, 1) })
+            e.Color = ColorSequence.new(c1, c2)
+            e.Parent = cp
+        end
+        for _ = 1, (LOWS and 7 or 12) do
+            local pos = Vector3.new(cx + (math.random() - 0.5) * 420, topY - 40 - math.random() * 70, cz + (math.random() - 0.5) * 420)
+            cloudAt(pos, Color3.fromRGB(10, 2, 4), Color3.fromRGB(32, 4, 8), 0.35)
+            cloudAt(pos, Color3.fromRGB(80, 0, 8), Color3.fromRGB(30, 0, 4), 0.55)
+        end
+        local moon = boxPart(Vector3.new(130, 130, 130), Vector3.new(cx + 110, topY - 100, cz - 170), Color3.fromRGB(140, 0, 8), 0.1, true)
+        moon.Shape = Enum.PartType.Ball
+        -- luzes vermelhas baixas pra iluminar as ruínas
+        for _, o in ipairs({ Vector3.new(60, 22, 60), Vector3.new(-60, 22, 60), Vector3.new(60, 22, -60), Vector3.new(-60, 22, -60) }) do
+            local lp = boxPart(Vector3.new(1, 1, 1), Vector3.new(cx, gy, cz) + o, Color3.new(1, 1, 1), 1)
+            local pl = Instance.new("PointLight")
+            pl.Color, pl.Range, pl.Brightness = Color3.fromRGB(255, 20, 20), 60, 3
+            pl.Parent = lp
+        end
+        -- brasas subindo
+        local ep = boxPart(Vector3.new(380, 120, 380), Vector3.new(cx, gy + 60, cz), Color3.new(1, 1, 1), 1)
+        local em = Instance.new("ParticleEmitter")
+        pcall(function()
+            em.Shape = Enum.ParticleEmitterShape.Box
+            em.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+        end)
+        em.Rate = LOWS and 25 or 60
+        em.Lifetime = NumberRange.new(4, 7)
+        em.Speed = NumberRange.new(3, 9)
+        em.Acceleration = Vector3.new(0, 5, 0)
+        em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0) })
+        em.Color = ColorSequence.new(Color3.fromRGB(255, 120, 60), Color3.fromRGB(200, 0, 0))
+        em.LightEmission, em.LightInfluence = 1, 0
+        em.Parent = ep
+    end
+
     -- ===== ILUMINAÇÃO VERMELHA / ESCURA =====
     local saved, hidden = {}, {}
     for _, k in ipairs({ "Ambient", "OutdoorAmbient", "Brightness", "ClockTime", "FogColor", "FogStart", "FogEnd", "ExposureCompensation" }) do
@@ -4594,24 +5792,24 @@ local function runSukunaDomain(senderName)
         end
     end)
     local function setL(k, v) pcall(function() Lighting[k] = v end) end
-    setL("Ambient", Color3.fromRGB(70, 0, 0))
-    setL("OutdoorAmbient", Color3.fromRGB(50, 0, 0))
-    setL("Brightness", 0.6)
+    setL("Ambient", Color3.fromRGB(32, 0, 2))
+    setL("OutdoorAmbient", Color3.fromRGB(22, 0, 2))
+    setL("Brightness", 0.25)
     setL("ClockTime", 0)
-    setL("FogColor", Color3.fromRGB(25, 0, 0))
-    setL("FogStart", 20)
-    setL("FogEnd", 450)
-    setL("ExposureCompensation", -0.3)
+    setL("FogColor", Color3.fromRGB(12, 0, 2))
+    setL("FogStart", 10)
+    setL("FogEnd", 380)
+    setL("ExposureCompensation", -0.5)
 
     local cc = Instance.new("ColorCorrectionEffect")
     cc.Name = "SukunaCC"
-    cc.TintColor = Color3.fromRGB(255, 120, 120)
-    cc.Saturation, cc.Contrast, cc.Brightness = 0.1, 0.25, -0.05
+    cc.TintColor = Color3.fromRGB(255, 140, 140)
+    cc.Saturation, cc.Contrast, cc.Brightness = 0, 0.35, -0.08
     cc.Parent = Lighting
     local atm = Instance.new("Atmosphere")
     atm.Name = "SukunaAtmosphere"
-    atm.Color, atm.Decay = Color3.fromRGB(120, 0, 0), Color3.fromRGB(40, 0, 0)
-    atm.Density, atm.Haze, atm.Offset = 0.35, 1.5, 0
+    atm.Color, atm.Decay = Color3.fromRGB(80, 0, 0), Color3.fromRGB(20, 0, 0)
+    atm.Density, atm.Haze, atm.Offset = 0.45, 2.2, 0
     atm.Parent = Lighting
 
     -- ===== TREMOR DE CÂMERA + FLASH VERMELHO =====
@@ -4646,25 +5844,7 @@ local function runSukunaDomain(senderName)
 
     -- ===== CORTES VERMELHOS =====
     local function slash(pos, dir, len, thick)
-        local cf = CFrame.lookAt(pos, pos + dir)
-        local function mkPart(size, color, transp)
-            local p = Instance.new("Part")
-            p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
-            p.Material = Enum.Material.Neon
-            p.Color = color
-            p.Transparency = transp
-            p.Size = size
-            p.CFrame = cf
-            p.Parent = folder
-            return p
-        end
-        local core = mkPart(Vector3.new(thick * 0.4, thick * 0.4, len), Color3.fromRGB(255, 45, 45), 0)
-        local glow = mkPart(Vector3.new(thick * 1.6, thick * 1.6, len), Color3.fromRGB(170, 0, 0), 0.5)
-        local ti = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(core, ti, { Transparency = 1, Size = Vector3.new(0.02, 0.02, len * 1.1) }):Play()
-        TweenService:Create(glow, ti, { Transparency = 1, Size = Vector3.new(0.05, 0.05, len * 1.1) }):Play()
-        Debris:AddItem(core, 0.3)
-        Debris:AddItem(glow, 0.3)
+        cleaveLine(folder, pos - dir * (len / 2), pos + dir * (len / 2), math.max(thick * 1.1, 0.5), 0.4)
     end
 
     local function bloodBurst(pos)
@@ -4699,14 +5879,18 @@ local function runSukunaDomain(senderName)
     local shrine = fetchAssetAsModel(SUK_SHRINE)
     if shrine then
         shrine.Parent = folder
-        pcall(function() shrine:ScaleTo(5.5) end)
+        pcall(function() shrine:ScaleTo(7) end)
         for _, p in ipairs(shrine:GetDescendants()) do
             if p:IsA("BasePart") then p.Anchored, p.CanCollide = true, false end
         end
-        local tb = sh.CFrame * CFrame.new(0, 0, 10)
+        -- santuário reto, 55 studs à frente de quem lançou, virado pra ele
+        local lk = Vector3.new(sh.CFrame.LookVector.X, 0, sh.CFrame.LookVector.Z)
+        lk = lk.Magnitude > 0.1 and lk.Unit or Vector3.new(0, 0, -1)
+        local tpos = sh.Position + lk * 55
         local bcf, bs = shrine:GetBoundingBox()
         local bo = shrine:GetPivot().Position.Y - (bcf.Position.Y - (bs.Y / 2))
-        local tcf = CFrame.new(tb.X, gy + bo + SHRINE_Y, tb.Z) * sh.CFrame.Rotation
+        local tcf = CFrame.new(tpos.X, gy + bo + SHRINE_Y, tpos.Z)
+            * CFrame.lookAt(Vector3.zero, -lk).Rotation * CFrame.Angles(0, math.rad(SHRINE_YAW), 0)
         local scf = tcf * CFrame.new(0, -35, 0)
         shrine:PivotTo(scf)
         for i = 1, 50 do
@@ -4720,7 +5904,7 @@ local function runSukunaDomain(senderName)
 
     -- ===== LOOP DOS CORTES =====
     local st, n = tick(), 0
-    while tick() - st < DURATION and folder.Parent do
+    while tick() - st < DURATION and folder.Parent and not SUKUNA_ABORT do
         n += 1
         local center = sh.Position
 
@@ -4771,6 +5955,7 @@ local function runSukunaDomain(senderName)
     pcall(function() atm:Destroy() end)
     for k, v in pairs(saved) do pcall(function() Lighting[k] = v end) end
     for _, a in ipairs(hidden) do pcall(function() a.Parent = Lighting end) end
+    SUKUNA_BUSY = false
 end
 
 -- ================== EXPANSÃO DE DOMÍNIO (GOJO) - VAZIO ILIMITADO v3 (estilo Jujutsu Shenanigans) ==================
@@ -4788,11 +5973,11 @@ do
 
     -- ======== CONFIGURAÇÃO ========
     local COOLDOWN    = 20     -- recarga (s) depois que a expansão termina
-    local HOLD_TIME   = 5      -- tempo que o alvo leva pra morrer (paralisado)
+    local HOLD_TIME   = 9.5    -- tempo do domínio depois da abertura (alvo paralisado até o fim) -> duração total ~15s
     local MAX_DIST    = 600    -- distância máxima pra achar o alvo mais próximo
     local HOLE_STUDS  = 150    -- diâmetro do buraco negro (como na imagem de referência)
-    local GOJO_SOUND  = ""     -- opcional: "rbxassetid://ID_DA_MUSICA_DO_DOMINIO"
-    local COSMOS_SKY  = ""     -- opcional: ID de uma skybox de galáxia (decal/imagem)
+    local GOJO_SOUND  = "rbxassetid://6667923288"   -- música que toca quando a expansão ativa
+    local COSMOS_SKY  = "108682468477856"          -- skybox do domínio (some quando a expansão termina)
     local LOW         = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
     local C_WHITE  = Color3.new(1, 1, 1)
@@ -4971,6 +6156,8 @@ do
         return bb, rootF, L
     end
 
+    GOJO.buildHole = buildBlackHoleBillboard
+
     -- ======== CONTROLE ========
     function GOJO.cancel()
         if GOJO.busy then GOJO.cancelFlag = true end
@@ -5033,12 +6220,20 @@ do
         local sh = sc and sc:FindFirstChild("HumanoidRootPart")
         local sHum = sc and sc:FindFirstChildOfClass("Humanoid")
         if GOJO.busy or not sh or not sHum or sHum.Health <= 0 then return end
+        -- Choque de Domínios: se Sukuna está ativo, batalha!
+        if SUKUNA_BUSY and not DOMAIN_BATTLE.active then
+            startDomainBattle(senderName, SUKUNA_CASTER, string.lower(tostring(targetName or "")))
+            return
+        end
+        if DOMAIN_BATTLE.active then return end
         GOJO.busy = true
         GOJO.cancelFlag = false
         GOJO.token += 1
         local token = GOJO.token
 
         local tname = string.lower(tostring(targetName or ""))
+        GOJO.casterName = senderName
+        GOJO.currentTarget = tname
         local iAmCaster = (senderName == LocalPlayer.Name)
         local nameIsMe = (string.lower(LocalPlayer.Name) == tname or string.lower(LocalPlayer.DisplayName) == tname)
         local selfCast = iAmCaster and nameIsMe          -- você escolheu o seu próprio nome: só pra ver o domínio (não paralisa nem mata você)
@@ -5078,7 +6273,7 @@ do
         local oldFov = cam and cam.FieldOfView or 70
         local renderName = "GojoRender" .. tostring(math.random(1, 1000000))
         local saved, hiddenAtm, hiddenSky = {}, {}, {}
-        local cc, bloom, gui, flash, domainSky, bb
+        local cc, bloom, gui, flash, domainSky, bb, domainSnd
         local running, paralyzed, teleported = true, false, false
         local frozen = {}
         local casterTrack
@@ -5110,15 +6305,18 @@ do
             if iAmCaster then sHum.WalkSpeed = 0 end
 
             if GOJO_SOUND ~= "" and near then
-                local snd = Instance.new("Sound")
-                snd.SoundId, snd.Volume = GOJO_SOUND, 5
-                snd.Parent = sh
-                snd:Play()
-                Debris:AddItem(snd, 40)
+                domainSnd = Instance.new("Sound")
+                domainSnd.SoundId, domainSnd.Volume = GOJO_SOUND, 4
+                domainSnd.Looped = false
+                -- quem vai pro domínio ouve sem perder volume pela distância; os outros ouvem do Gojo
+                domainSnd.Parent = participant and game:GetService("SoundService") or sh
+                domainSnd:Play()
+                Debris:AddItem(domainSnd, 60)
             end
 
             -- ===== preparação de quem vai pro domínio (você e o alvo) =====
             local lineData, smokes, splashE, stars = {}, {}, {}, nil
+            local inkGroup
             local holeOpened, linesOn, ringT0 = false, false, 0
             local L
 
@@ -5278,6 +6476,45 @@ do
                     splashE[#splashE + 1] = e
                 end
 
+                -- --- tinta branca pintada ao fundo do domínio (manchas brancas como na referência) ---
+                do
+                    local backWall = mkp(folder, Vector3.new(900, 450, 1), CFrame.new(C + Vector3.new(0, 90, 360)), C_WHITE, nil, 1)
+                    local sgui = Instance.new("SurfaceGui")
+                    sgui.Face = Enum.NormalId.Front
+                    sgui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+                    sgui.CanvasSize = Vector2.new(1800, 900)
+                    sgui.LightInfluence = 0
+                    sgui.AlwaysOnTop = false
+                    sgui.Parent = backWall
+                    inkGroup = Instance.new("CanvasGroup")
+                    inkGroup.Size = UDim2.fromScale(1, 1)
+                    inkGroup.BackgroundTransparency = 1
+                    inkGroup.GroupTransparency = 1
+                    inkGroup.Parent = sgui
+                    local function blob(cx, cy, px, col, tr)
+                        local f = Instance.new("Frame")
+                        f.AnchorPoint = Vector2.new(0.5, 0.5)
+                        f.Position = UDim2.fromScale(cx, cy)
+                        f.Size = UDim2.fromOffset(px, px * (0.7 + math.random() * 0.6))
+                        f.Rotation = math.random(0, 360)
+                        f.BackgroundColor3 = col
+                        f.BackgroundTransparency = tr
+                        f.BorderSizePixel = 0
+                        Instance.new("UICorner", f).CornerRadius = UDim.new(1, 0)
+                        f.Parent = inkGroup
+                    end
+                    for _ = 1, (LOW and 7 or 12) do
+                        local cx, cy = 0.06 + math.random() * 0.88, 0.1 + math.random() * 0.8
+                        for _ = 1, 9 do
+                            local a, d = math.random() * math.pi * 2, math.random() * 0.07
+                            local bx, by = cx + math.cos(a) * d * 0.5, cy + math.sin(a) * d
+                            local px = 40 + math.random() * 150
+                            blob(bx, by, px * 1.5, Color3.fromRGB(190, 225, 255), 0.6)   -- brilho azulado em volta
+                            blob(bx, by, px, C_WHITE, 0.03)                                -- mancha branca
+                        end
+                    end
+                end
+
                 -- --- loop visual único ---
                 local rt0 = os.clock()
                 RunService:BindToRenderStep(renderName, Enum.RenderPriority.Camera.Value + 1, function(dt)
@@ -5362,6 +6599,7 @@ do
                 local rootF
                 bb, rootF, L = buildBlackHoleBillboard(holeAnchor, HOLE_STUDS)
                 tw(rootF, 0.9, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Back)   -- abertura com impacto
+                if inkGroup then tw(inkGroup, 1.4, { GroupTransparency = 0 }) end
                 if cam then
                     tw(cam, 0.3, { FieldOfView = oldFov - 8 })
                     task.delay(0.35, function()
@@ -5435,6 +6673,12 @@ do
         pcall(function() folder:Destroy() end)
         pcall(function() if bb then bb:Destroy() end end)
         pcall(function() if domainSky then domainSky:Destroy() end end)
+        pcall(function()
+            if domainSnd then
+                tw(domainSnd, 0.8, { Volume = 0 })
+                Debris:AddItem(domainSnd, 1)
+            end
+        end)
         pcall(function() if cc then cc:Destroy() end end)
         pcall(function() if bloom then bloom:Destroy() end end)
         for k, v in pairs(saved) do pcall(function() Lighting[k] = v end) end
@@ -5737,14 +6981,40 @@ function processNetMessage(msg, senderName)
     local extraArg = parts[3] and table.concat(parts, " ", 3) or nil
 
     if action == "PING" then
-        local role = (WHITELIST[LocalPlayer.Name] and WHITELIST[LocalPlayer.Name].Role) or "USER"
-        sendNetCmd(";PONG " .. LocalPlayer.Name .. " ROLE_" .. role)
+        if senderName and senderName ~= LocalPlayer.Name then
+            activeScriptUsers[senderName] = true
+            FantasmaTag.refreshByName(senderName)
+        end
+        FantasmaTag.announce()
     elseif action == "PONG" and target then
-        activeScriptUsers[target] = true
-        local roleExtra = parts[3] or "ROLE_USER"
-        NETWORK_ROLES[target] = roleExtra:gsub("ROLE_", "")
-        local pt = Players:FindFirstChild(target)
-        if pt and IS_ADMIN then applyOverheadTag(pt) end
+        -- só vale se quem mandou é mesmo o jogador citado (evita forjar)
+        if senderName == target and target ~= LocalPlayer.Name then
+            activeScriptUsers[target] = true
+            local peer = FantasmaTag.peers[target] or {}
+            FantasmaTag.peers[target] = peer
+            for _, part in ipairs(parts) do
+                local c = part:match("^COL_(%d+)$")
+                if c then peer.color = tonumber(c) end
+                local t = part:match("^TAG_(%d)$")
+                if t then peer.off = (t == "0") end
+            end
+            FantasmaTag.refreshByName(target)
+        end
+    end
+
+    -- comandos digitados por mim mesmo (admin)
+    if senderName == LocalPlayer.Name and IS_ADMIN then
+        if action == "VERIFICAR" or action == "VERIFY" then
+            task.spawn(FantasmaTag.verify)
+            return
+        elseif action == "TAG" then
+            local v = string.lower(target or "")
+            FantasmaTag.setEnabled(not (v == "off" or v == "0" or v == "desligar"))
+            return
+        elseif action == "TAGCOR" then
+            FantasmaTag.setColor(tonumber(target) or 1)
+            return
+        end
     end
 
     if action ~= "PING" and action ~= "PONG" then
@@ -5814,6 +7084,7 @@ task.spawn(function()
         end
     end)
     task.wait(1)
+    FantasmaTag.announce(true)
     sendNetCmd(";PING ALL")
 end)
 
@@ -6071,6 +7342,760 @@ local function giveYoru()
     end)
 end
 
+-- ================== GONER PLAYER ==================
+FantasmaGoner = {
+    CLOTHES    = {17812417356, 17770317484, 17822722698, 17822749561, 17772174303, 17771175724},
+    GONER_ANIM = "rbxassetid://71611618090433",
+    CLICK_ANIM = "rbxassetid://118273721275238",   -- animação ao clicar com o machado
+    CLICK_ID   = 118273721275238,
+    ANIM_ID    = 97005849733115,                   -- animação do goner parado (idle)
+    WALK_ID    = 108059497211872,                  -- animação do goner andando
+    AXE_ID     = 14054756735,
+    ICON       = "rbxassetid://130540399630094",
+    SWING_ONLY = true,   -- true: só transforma se acertar durante o golpe (clique). false: qualquer encostada
+    SWING_TIME = 1.0,
+    TURN_DELAY = 3,      -- tempo da animação antes de virar goner
+    hit = {},
+}
+
+FantasmaGoner.specs = setmetatable({}, { __mode = "k" })
+FantasmaGoner.retired = setmetatable({}, { __mode = "k" })
+
+function FantasmaGoner.getSpec(char)
+    local sp = FantasmaGoner.specs[char]
+    if not sp then
+        sp = { items = {}, worn = {} }   -- items[id] = lista de instâncias que esse ID colocou
+        FantasmaGoner.specs[char] = sp
+    end
+    return sp
+end
+
+-- ====== APRENDER COMO O BROOKHAVEN EQUIPA (captura o remote do próprio menu) ======
+FantasmaGoner.armed = false          -- false | "wear" | "anim"
+FantasmaGoner.templates = {}
+
+function FantasmaGoner.findId(args)
+    for i, v in ipairs(args) do
+        if type(v) == "number" and v >= 1e6 and v % 1 == 0 then return { i }, v end
+        if type(v) == "string" and #v >= 7 and v:match("^%d+$") then return { i }, v end
+        if type(v) == "table" then
+            for k, x in pairs(v) do
+                if type(x) == "number" and x >= 1e6 and x % 1 == 0 then return { i, k }, x end
+                if type(x) == "string" and #x >= 7 and x:match("^%d+$") then return { i, k }, x end
+            end
+        end
+    end
+end
+
+FantasmaGoner.hookOK = pcall(function()
+    local old
+    old = hookmetamethod(game, "__namecall", (newcclosure or function(f) return f end)(function(self, ...)
+        if FantasmaGoner.armed then
+            local m = getnamecallmethod()
+            if (m == "FireServer" or m == "InvokeServer") and not checkcaller() then
+                local cn = typeof(self) == "Instance" and self.ClassName or ""
+                if cn == "RemoteEvent" or cn == "RemoteFunction" then
+                    local nm = string.lower(self.Name)
+                    if not (nm:find("chat") or nm:find("say") or nm:find("message")) then
+                        local args = { ... }
+                        local path, val = FantasmaGoner.findId(args)
+                        if path then
+                            FantasmaGoner.templates[FantasmaGoner.armed] = { remote = self, method = m, args = args, path = path, vtype = type(val) }
+                            FantasmaGoner.armed = false
+                        end
+                    end
+                end
+            end
+        end
+        return old(self, ...)
+    end))
+end)
+
+-- dispara o remote aprendido trocando só o ID
+function FantasmaGoner.fireTemplate(kind, id)
+    local t = FantasmaGoner.templates[kind]
+    if not t or not t.remote or not t.remote.Parent then return false end
+    local args = {}
+    for i, v in ipairs(t.args) do
+        if type(v) == "table" then
+            local c = {}
+            for k, x in pairs(v) do c[k] = x end
+            args[i] = c
+        else
+            args[i] = v
+        end
+    end
+    local val = (t.vtype == "string") and tostring(id) or id
+    if #t.path == 1 then args[t.path[1]] = val else args[t.path[1]][t.path[2]] = val end
+    local n = table.maxn(args)
+    pcall(function()
+        if t.method == "FireServer" then t.remote:FireServer(table.unpack(args, 1, n))
+        else task.spawn(function() pcall(function() t.remote:InvokeServer(table.unpack(args, 1, n)) end) end) end
+    end)
+    return true
+end
+
+-- carrega um asset (GetObjects, com fallback InsertService)
+function FantasmaGoner.load(id)
+    for attempt = 1, 3 do
+        local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. id) end)
+        if ok and objs and #objs > 0 then return objs end
+        local ok2, model = pcall(function() return game:GetService("InsertService"):LoadAsset(id) end)
+        if ok2 and model then return { model } end
+        task.wait(0.4)
+    end
+    return nil
+end
+
+function FantasmaGoner.retire(inst)
+    FantasmaGoner.retired[inst] = true
+    pcall(function() inst:Destroy() end)
+end
+
+function FantasmaGoner.meshOf(acc)
+    local h = acc:FindFirstChild("Handle")
+    if not h then return "" end
+    if h:IsA("MeshPart") and h.MeshId ~= "" then return h.MeshId end
+    local sm = h:FindFirstChildOfClass("SpecialMesh")
+    return sm and sm.MeshId or ""
+end
+
+-- aplica UM ID localmente. Cada item é rastreado pelo ID (sem comparar aparência,
+-- então acessórios parecidos como as duas asas NÃO são tratados como repetidos).
+-- retorna -1 se não carregou
+function FantasmaGoner.applyId(char, id)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return 0 end
+    local objs = FantasmaGoner.load(id)
+    if not objs then return -1 end
+    local spec = FantasmaGoner.getSpec(char)
+
+    -- remove o que ESTE id colocou antes (reaplicar nunca duplica)
+    for _, inst in ipairs(spec.items[id] or {}) do
+        if inst.Parent then FantasmaGoner.retire(inst) end
+    end
+    local mine = {}
+    spec.items[id] = mine
+
+    local list = {}
+    for _, o in ipairs(objs) do
+        table.insert(list, o)
+        for _, d in ipairs(o:GetDescendants()) do table.insert(list, d) end
+    end
+
+    local accs = {}
+    for _, o in ipairs(list) do
+        if o:IsA("Shirt") or o:IsA("Pants") or o:IsA("ShirtGraphic") or o:IsA("BodyColors") then
+            for _, old in ipairs(char:GetChildren()) do
+                if old.ClassName == o.ClassName then FantasmaGoner.retire(old) end
+            end
+            local c = o:Clone()
+            c:SetAttribute("GonerLocal", true)
+            c.Parent = char
+            table.insert(mine, c)
+        elseif o:IsA("Accessory") then
+            local c = o:Clone()
+            c:SetAttribute("GonerLocal", true)
+            -- já existe igual desenhado pelo servidor? então não duplica
+            local dup = false
+            local mesh = FantasmaGoner.meshOf(c)
+            if mesh ~= "" then
+                for _, ex in ipairs(char:GetChildren()) do
+                    if ex:IsA("Accessory") and not ex:GetAttribute("GonerLocal") and FantasmaGoner.meshOf(ex) == mesh then
+                        dup = true break
+                    end
+                end
+            end
+            local ok = (not dup) and pcall(function() hum:AddAccessory(c) end)
+            if ok and c.Parent == char then
+                table.insert(mine, c)
+                table.insert(accs, c)
+            else
+                pcall(function() c:Destroy() end)
+            end
+        elseif o:IsA("Decal") and o.Name == "face" and char:FindFirstChild("Head") then
+            local f = char.Head:FindFirstChild("face")
+            if f then f:Destroy() end
+            o:Clone().Parent = char.Head
+        end
+    end
+
+    -- acessório que não prendeu no corpo cai no chão: apaga
+    if #accs > 0 then
+        task.wait(0.4)
+        for i = #mine, 1, -1 do
+            local inst = mine[i]
+            if inst:IsA("Accessory") then
+                local h = inst:FindFirstChild("Handle")
+                local welded = h and (h:FindFirstChildWhichIsA("Weld") or h:FindFirstChildWhichIsA("WeldConstraint")
+                    or h:FindFirstChildWhichIsA("Motor6D"))
+                if not welded then
+                    FantasmaGoner.retire(inst)
+                    table.remove(mine, i)
+                end
+            end
+        end
+    end
+    return #mine
+end
+
+-- repõe só o que sumiu (por ID); o que já está no personagem não é mexido
+function FantasmaGoner.ensure(char)
+    local spec = FantasmaGoner.specs[char]
+    if not spec or not char or not char.Parent then return end
+    local rebuild = {}
+    for id, list in pairs(spec.items) do
+        for i = #list, 1, -1 do
+            if FantasmaGoner.retired[list[i]] then table.remove(list, i) end
+        end
+        for _, inst in ipairs(list) do
+            if inst.Parent ~= char then rebuild[id] = true break end
+        end
+    end
+    for id in pairs(rebuild) do
+        FantasmaGoner.applyId(char, id)
+        task.wait(0.1)
+    end
+end
+
+function FantasmaGoner.startWatcher()
+    if FantasmaGoner.watcher then return end
+    FantasmaGoner.watcher = true
+    task.spawn(function()
+        while true do
+            task.wait(1.5)
+            for char in pairs(FantasmaGoner.specs) do
+                if char and char.Parent then pcall(FantasmaGoner.ensure, char) end
+            end
+        end
+    end)
+end
+
+-- aplica todos os IDs localmente, um de cada vez (usado no alvo do machado)
+function FantasmaGoner.applyLocal(char)
+    if not char then return end
+    local failed = {}
+    for _, id in ipairs(FantasmaGoner.CLOTHES) do
+        if FantasmaGoner.applyId(char, id) == -1 then table.insert(failed, id) end
+        task.wait(0.15)
+    end
+    FantasmaGoner.startWatcher()
+    if #failed > 0 then notify("Goner", "Falhou carregar: " .. table.concat(failed, ", ")) end
+end
+
+-- ===== MÉTODO CERTO DO BROOKHAVEN (visto em scripts da comunidade) =====
+-- ReplicatedStorage.Remotes.Wear:InvokeServer(assetId)  -> UM item por chamada (roupa, acessório,
+-- rosto e até animação). Chamar rápido demais é ignorado pelo servidor (tem cooldown), então
+-- é uma chamada por vez, esperando a resposta, com pausa entre elas.
+FantasmaGoner.WEAR_GAP = 1.3
+-- opcional: se algum ID for parte do corpo, preencha {torso, bracoDir, bracoEsq, pernaDir, pernaEsq, cabeca} (0 = nenhum)
+FantasmaGoner.BODY = nil
+
+function FantasmaGoner.getWear()
+    local RS = game:GetService("ReplicatedStorage")
+    local holder = RS:FindFirstChild("Remotes") or RS:WaitForChild("Remotes", 5)
+    if not holder then return nil end
+    return holder:FindFirstChild("Wear") or holder:WaitForChild("Wear", 5)
+end
+
+-- uma chamada de Wear que espera o servidor responder (máx 8s)
+function FantasmaGoner.wearId(id)
+    local r = FantasmaGoner.getWear()
+    if not r then return false end
+    local done, ok = false, false
+    task.spawn(function()
+        ok = pcall(function()
+            if r:IsA("RemoteFunction") then return r:InvokeServer(id) else r:FireServer(id) end
+        end)
+        done = true
+    end)
+    local t0 = os.clock()
+    while not done and os.clock() - t0 < 8 do task.wait(0.1) end
+    return ok
+end
+
+-- conjunto de IDs que o personagem JÁ está usando (evita chamar Wear de novo e desequipar)
+function FantasmaGoner.appliedSet(char)
+    local set = {}
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return set end
+    local ok, d = pcall(function() return hum:GetAppliedDescription() end)
+    if not ok or not d then return set end
+    local function add(v) v = tonumber(v) if v and v > 0 then set[v] = true end end
+    for _, prop in ipairs({ "Shirt", "Pants", "GraphicTShirt", "Face", "Head", "Torso", "LeftArm", "RightArm",
+        "LeftLeg", "RightLeg", "IdleAnimation", "RunAnimation", "WalkAnimation", "JumpAnimation",
+        "FallAnimation", "ClimbAnimation", "SwimAnimation" }) do
+        pcall(function() add(d[prop]) end)
+    end
+    for _, prop in ipairs({ "HatAccessory", "HairAccessory", "FaceAccessory", "NeckAccessory",
+        "ShouldersAccessory", "FrontAccessory", "BackAccessory", "WaistAccessory" }) do
+        pcall(function() for part in tostring(d[prop]):gmatch("%d+") do add(part) end end)
+    end
+    pcall(function() for _, a in ipairs(d:GetAccessories(true)) do add(a.AssetId) end end)
+    return set
+end
+
+-- equipa as 6 roupas pelo Brookhaven, uma por vez, sem repetir (repetir desequipa)
+function FantasmaGoner.wear(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    local spec = FantasmaGoner.getSpec(char)
+    if spec.wornDone then return end
+    spec.wornDone = true
+    if not FantasmaGoner.getWear() then
+        notify("Goner", "Remote Wear do Brookhaven não encontrado. Aplicando direto no boneco.")
+        FantasmaGoner.applyLocal(char)
+        FantasmaGoner.startWatcher()
+        return
+    end
+    if FantasmaGoner.BODY then
+        local holder = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local cb = holder and holder:FindFirstChild("ChangeCharacterBody")
+        local b = FantasmaGoner.BODY
+        if cb then
+            pcall(function() cb:InvokeServer({ b[1] or 0, b[2] or 0, b[3] or 0, b[4] or 0, b[5] or 0, b[6] or 0 }) end)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+    end
+    local have = FantasmaGoner.appliedSet(char)
+    for i, id in ipairs(FantasmaGoner.CLOTHES) do
+        if not have[id] then
+            FantasmaGoner.wearId(id)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+    end
+end
+
+-- transforma o PRÓPRIO jogador em goner (usado pelo comando de rede)
+-- chama um remote (RemoteEvent ou RemoteFunction) sem travar
+function FantasmaGoner.callRemote(r, ...)
+    local args = { ... }
+    local n = select("#", ...)
+    local done = false
+    task.spawn(function()
+        pcall(function()
+            if r:IsA("RemoteFunction") then r:InvokeServer(table.unpack(args, 1, n))
+            else r:FireServer(table.unpack(args, 1, n)) end
+        end)
+        done = true
+    end)
+    local t0 = os.clock()
+    while not done and os.clock() - t0 < 6 do task.wait(0.1) end
+end
+
+function FantasmaGoner.remote(name)
+    local holder = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+    return holder and holder:FindFirstChild(name)
+end
+
+-- IDs dos cabelos que o personagem está usando (fora os itens do goner)
+function FantasmaGoner.hairIds(char)
+    local ids = {}
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return ids end
+    local ok, d = pcall(function() return hum:GetAppliedDescription() end)
+    if not ok or not d then return ids end
+    local skip = { [FantasmaGoner.AXE_ID] = true, [FantasmaGoner.ANIM_ID] = true, [FantasmaGoner.CLICK_ID] = true, [FantasmaGoner.WALK_ID] = true }
+    for _, id in ipairs(FantasmaGoner.CLOTHES) do skip[id] = true end
+    local seen = {}
+    local function add(v)
+        v = tonumber(v)
+        if v and v > 0 and not skip[v] and not seen[v] then seen[v] = true table.insert(ids, v) end
+    end
+    pcall(function()
+        for _, a in ipairs(d:GetAccessories(true)) do
+            if a.AccessoryType == Enum.AccessoryType.Hair then add(a.AssetId) end
+        end
+    end)
+    pcall(function() for part in tostring(d.HairAccessory):gmatch("%d+") do add(part) end end)
+    return ids
+end
+
+-- tira o cabelo no Brookhaven: Wear num item já equipado desequipa (um por vez, com pausa)
+function FantasmaGoner.removeHair(char)
+    char = char or LocalPlayer.Character
+    if not char or not FantasmaGoner.getWear() then return end
+    for _, id in ipairs(FantasmaGoner.hairIds(char)) do
+        FantasmaGoner.wearId(id)
+        task.wait(FantasmaGoner.WEAR_GAP)
+    end
+end
+
+-- tira a camisa que o personagem está usando (Wear num item equipado desequipa)
+function FantasmaGoner.removeShirt(char)
+    char = char or LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum or not FantasmaGoner.getWear() then return end
+    local ok, d = pcall(function() return hum:GetAppliedDescription() end)
+    if not ok or not d then return end
+    local skip = {}
+    for _, id in ipairs(FantasmaGoner.CLOTHES) do skip[id] = true end
+    for _, prop in ipairs({ "Shirt", "GraphicTShirt" }) do
+        local id
+        pcall(function() id = tonumber(d[prop]) end)
+        if id and id > 0 and not skip[id] then
+            FantasmaGoner.wearId(id)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+    end
+end
+
+function FantasmaGoner.isBlack(char)
+    local bc = char and char:FindFirstChildOfClass("BodyColors")
+    if not bc then return false end
+    local b = BrickColor.new("Black")
+    return bc.HeadColor == b and bc.TorsoColor == b and bc.LeftArmColor == b
+        and bc.RightArmColor == b and bc.LeftLegColor == b and bc.RightLegColor == b
+end
+
+-- pinta de preto só visualmente (usado em quem não tem o hub / se o remote falhar)
+function FantasmaGoner.paintLocal(char)
+    if not char then return end
+    local b = BrickColor.new("Black")
+    local bc = char:FindFirstChildOfClass("BodyColors")
+    if not bc then bc = Instance.new("BodyColors") bc.Parent = char end
+    bc.HeadColor = b bc.TorsoColor = b bc.LeftArmColor = b
+    bc.RightArmColor = b bc.LeftLegColor = b bc.RightLegColor = b
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.BrickColor = b end
+    end
+end
+
+-- cor da pele preta no Brookhaven: Remotes.ChangeBodyColor
+function FantasmaGoner.paintBlack(char)
+    char = char or LocalPlayer.Character
+    if not char or FantasmaGoner.isBlack(char) then return end
+    local r = FantasmaGoner.remote("ChangeBodyColor")
+    if not r then FantasmaGoner.paintLocal(char) return end
+    FantasmaGoner.callRemote(r, "Black")
+    task.wait(1.2)
+    if not FantasmaGoner.isBlack(char) then
+        FantasmaGoner.callRemote(r, { BrickColor.new("Black") })
+        task.wait(1.2)
+    end
+    if not FantasmaGoner.isBlack(char) then FantasmaGoner.paintLocal(char) end
+end
+
+-- sem cabelo + pele preta, no servidor do Brookhaven
+function FantasmaGoner.styleSelf(char)
+    FantasmaGoner.removeHair(char)
+    FantasmaGoner.removeShirt(char)
+    FantasmaGoner.paintBlack(char)
+end
+
+-- mesmo visual, só na sua tela (para o alvo que não usa o hub)
+function FantasmaGoner.styleLocal(char)
+    if not char then return end
+    for _, o in ipairs(char:GetChildren()) do
+        if o:IsA("Accessory") and o.AccessoryType == Enum.AccessoryType.Hair then o:Destroy() end
+    end
+    FantasmaGoner.paintLocal(char)
+end
+
+-- transformação completa do PRÓPRIO jogador pelo Brookhaven
+function FantasmaGoner.goner(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    FantasmaGoner.wear(char)
+    FantasmaGoner.styleSelf(char)
+    FantasmaGoner.equipAnim(char)
+end
+
+-- clique com o machado: anima na hora e também equipa a animação pelo Wear (depois volta ao goner parado)
+FantasmaGoner.clickBusy = false
+function FantasmaGoner.clickAnim()
+    local char = LocalPlayer.Character
+    if not char then return end
+    safePlayAnimation(char, FantasmaGoner.CLICK_ANIM)
+    if FantasmaGoner.clickBusy or not FantasmaGoner.getWear() then return end
+    FantasmaGoner.clickBusy = true
+    task.spawn(function()
+        local click, idle = FantasmaGoner.CLICK_ID, FantasmaGoner.ANIM_ID
+        if not FantasmaGoner.appliedSet(char)[click] then
+            FantasmaGoner.wearId(click)
+            task.wait(FantasmaGoner.SWING_TIME + 0.5)
+        end
+        local set = FantasmaGoner.appliedSet(char)
+        if set[click] then
+            FantasmaGoner.wearId(click)          -- desequipa a animação do clique
+            task.wait(FantasmaGoner.WEAR_GAP)
+            set = FantasmaGoner.appliedSet(char)
+        end
+        for _, id in ipairs({ idle, FantasmaGoner.WALK_ID }) do   -- volta parado + andando do goner
+            if not set[id] then
+                FantasmaGoner.wearId(id)
+                task.wait(FantasmaGoner.WEAR_GAP)
+            end
+        end
+        FantasmaGoner.clickBusy = false
+    end)
+end
+
+function FantasmaGoner.turnSelf()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local track = safePlayAnimation(char, FantasmaGoner.GONER_ANIM)
+    task.wait(FantasmaGoner.TURN_DELAY)
+    if track then pcall(function() track:Stop() end) end
+    FantasmaGoner.goner(char)
+end
+
+-- transforma outro jogador (animação -> volta ao normal -> goner)
+function FantasmaGoner.turnOther(plr)
+    local char = plr and plr.Character
+    if not char then return end
+    local now = os.clock()
+    if FantasmaGoner.hit[plr] and now - FantasmaGoner.hit[plr] < 6 then return end
+    FantasmaGoner.hit[plr] = now
+    sendNetCmd(";GONER_TURN " .. plr.Name)           -- quem usa o hub aplica no próprio client
+    local track = safePlayAnimation(char, FantasmaGoner.GONER_ANIM)
+    task.wait(FantasmaGoner.TURN_DELAY)
+    if track then pcall(function() track:Stop() end) end
+    FantasmaGoner.applyLocal(char)
+    FantasmaGoner.styleLocal(char)
+    notify("Goner", plr.Name .. " virou goner!")
+end
+
+-- espera o usuário tocar em algo no menu do Brookhaven para aprender o remote
+function FantasmaGoner.learn(kind, msg)
+    if FantasmaGoner.templates[kind] or not FantasmaGoner.hookOK then return FantasmaGoner.templates[kind] ~= nil end
+    FantasmaGoner.armed = kind
+    notify("Goner", msg)
+    local t0 = os.clock()
+    while not FantasmaGoner.templates[kind] and os.clock() - t0 < 120 do task.wait(0.25) end
+    FantasmaGoner.armed = false
+    if FantasmaGoner.templates[kind] then
+        notify("Goner", "Aprendi! Continuando...")
+        task.wait(1.5)
+        return true
+    end
+    notify("Goner", "Tempo esgotado.")
+    return false
+end
+
+-- equipa a animação do goner pelo Brookhaven (uma vez por personagem)
+function FantasmaGoner.equipAnim(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    local spec = FantasmaGoner.getSpec(char)
+    if spec.animDone then return end
+    spec.animDone = true
+    -- a animação também é equipada pelo Wear (o Brookhaven trata como item de animação)
+    if FantasmaGoner.getWear() then
+        local set = FantasmaGoner.appliedSet(char)
+        for _, id in ipairs({ FantasmaGoner.ANIM_ID, FantasmaGoner.WALK_ID }) do
+            if not set[id] then
+                FantasmaGoner.wearId(id)
+                task.wait(FantasmaGoner.WEAR_GAP)
+            end
+        end
+        return
+    end
+    -- sem remote: toca a animação do goner em loop no próprio personagem
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local animator = hum and (hum:FindFirstChildOfClass("Animator") or hum:WaitForChild("Animator", 3))
+    if not animator then return end
+    local a = Instance.new("Animation")
+    a.AnimationId = "rbxassetid://" .. FantasmaGoner.ANIM_ID
+    local ok, track = pcall(function() return animator:LoadAnimation(a) end)
+    if ok and track then
+        track.Priority = Enum.AnimationPriority.Movement
+        track.Looped = true
+        track:Play()
+        spec.animTrack = track
+    end
+end
+
+-- liga clique + encostar em um tool (parts = peças que detectam o encontro)
+function FantasmaGoner.setupTool(tool, parts)
+    local swingUntil = 0
+    tool.Activated:Connect(function()
+        swingUntil = os.clock() + FantasmaGoner.SWING_TIME
+        FantasmaGoner.clickAnim()
+    end)
+    local function onTouch(part)
+        if FantasmaGoner.SWING_ONLY and os.clock() > swingUntil then return end
+        local model = part:FindFirstAncestorOfClass("Model")
+        local plr = model and Players:GetPlayerFromCharacter(model)
+        if plr and plr ~= LocalPlayer then task.spawn(FantasmaGoner.turnOther, plr) end
+    end
+    for _, root in ipairs(parts) do
+        if root:IsA("BasePart") then root.Touched:Connect(onTouch) end
+        for _, p in ipairs(root:GetDescendants()) do
+            if p:IsA("BasePart") then p.Touched:Connect(onTouch) end
+        end
+        root.DescendantAdded:Connect(function(p)
+            if p:IsA("BasePart") then p.Touched:Connect(onTouch) end
+        end)
+    end
+end
+
+-- monta um Tool COM Handle a partir do asset (para o machado aparecer na mão ao equipar)
+function FantasmaGoner.buildToolFromAsset()
+    local objs = FantasmaGoner.load(FantasmaGoner.AXE_ID)
+    if not objs then return nil end
+    local root = objs[1]
+    if root:IsA("Tool") then return root end
+    local tool = Instance.new("Tool")
+    tool.RequiresHandle = true
+    tool.CanBeDropped = false
+    local source = root:IsA("Accessory") and root:FindFirstChild("Handle") or nil
+    if not source then
+        if root:IsA("BasePart") then source = root
+        else
+            local best, size = nil, -1
+            for _, d in ipairs(root:GetDescendants()) do
+                if d:IsA("BasePart") and d.Size.Magnitude > size then best, size = d, d.Size.Magnitude end
+            end
+            source = best
+        end
+    end
+    if not source then return nil end
+    local container = root:Clone()
+    local handle
+    if container:IsA("Accessory") then handle = container:FindFirstChild("Handle")
+    elseif container:IsA("BasePart") then handle = container
+    else
+        for _, d in ipairs(container:GetDescendants()) do
+            if d:IsA("BasePart") and d.Size == source.Size and d.Name == source.Name then handle = d break end
+        end
+    end
+    if not handle then return nil end
+    for _, d in ipairs(container:GetDescendants()) do
+        if d:IsA("BasePart") then
+            d.Anchored = false d.CanCollide = false
+            if d ~= handle then
+                local w = Instance.new("WeldConstraint")
+                w.Part0 = handle w.Part1 = d w.Parent = d
+            end
+        end
+    end
+    handle.Name = "Handle"
+    handle.Anchored = false
+    handle.CanCollide = false
+    handle.Parent = tool
+    if container ~= handle then
+        for _, c in ipairs(container:GetChildren()) do
+            if c ~= handle and not c:IsA("Attachment") then c.Parent = tool end
+        end
+    end
+    return tool
+end
+
+function FantasmaGoner.giveAxe()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local backpack = LocalPlayer:FindFirstChild("Backpack") or char
+    for _, holder in ipairs({ backpack, char }) do
+        local old = holder:FindFirstChild("Machado Goner")
+        if old then old:Destroy() end
+    end
+    local okIcon, img = pcall(resolveImage, FantasmaGoner.ICON)
+    local icon = (okIcon and img) or FantasmaGoner.ICON
+
+    -- 1) machado equipado pelo Brookhaven (Wear), como as roupas
+    if FantasmaGoner.getWear() then
+        local before = {}
+        for _, h in ipairs({ backpack, char }) do
+            for _, o in ipairs(h:GetChildren()) do before[o] = true end
+        end
+        if not FantasmaGoner.appliedSet(char)[FantasmaGoner.AXE_ID] then
+            FantasmaGoner.wearId(FantasmaGoner.AXE_ID)
+            task.wait(FantasmaGoner.WEAR_GAP + 0.7)
+        end
+        -- veio um Tool?
+        for _, h in ipairs({ backpack, char }) do
+            for _, o in ipairs(h:GetChildren()) do
+                if not before[o] and o:IsA("Tool") then
+                    o.Name = "Machado Goner"
+                    o.TextureId = icon
+                    FantasmaGoner.setupTool(o, { o })
+                    return
+                end
+            end
+        end
+        -- veio como acessório: acha pelo formato e liga ao tool (mostra ao equipar, some ao desequipar)
+        local axeAcc
+        local objs = FantasmaGoner.load(FantasmaGoner.AXE_ID)
+        local want = ""
+        if objs then
+            for _, o in ipairs(objs) do
+                local acc = o:IsA("Accessory") and o or o:FindFirstChildWhichIsA("Accessory", true)
+                if acc then want = FantasmaGoner.meshOf(acc) break end
+            end
+        end
+        for _, o in ipairs(char:GetChildren()) do
+            if o:IsA("Accessory") and ((want ~= "" and FantasmaGoner.meshOf(o) == want)
+                or (not before[o] and want == "")) then
+                axeAcc = o break
+            end
+        end
+        if axeAcc then
+            local tool = Instance.new("Tool")
+            tool.Name = "Machado Goner"
+            tool.ToolTip = "Machado Goner"
+            tool.RequiresHandle = false
+            tool.CanBeDropped = false
+            tool.TextureId = icon
+            local function show(v)
+                for _, d in ipairs(axeAcc:GetDescendants()) do
+                    if d:IsA("BasePart") then d.LocalTransparencyModifier = v and 0 or 1 end
+                end
+            end
+            show(false)
+            tool.Equipped:Connect(function() show(true) end)
+            tool.Unequipped:Connect(function() show(false) end)
+            FantasmaGoner.setupTool(tool, { axeAcc })
+            tool.Parent = backpack
+            return
+        end
+    end
+
+    -- 2) fallback: monta o tool localmente (aparece na mão ao equipar, some ao desequipar)
+    local tool = FantasmaGoner.buildToolFromAsset()
+    if not tool then
+        tool = Instance.new("Tool")
+        tool.RequiresHandle = false
+        notify("Goner", "Não consegui carregar o modelo do machado.")
+    end
+    tool.Name = "Machado Goner"
+    tool.ToolTip = "Machado Goner"
+    tool.CanBeDropped = false
+    tool.TextureId = icon
+    FantasmaGoner.setupTool(tool, { tool })
+    tool.Parent = backpack
+end
+
+function FantasmaGoner.activate()
+    if not FantasmaGoner.respawnConn then
+        FantasmaGoner.respawnConn = LocalPlayer.CharacterAdded:Connect(function(c)
+            if not FantasmaGoner.keep then return end
+            task.wait(3)
+            FantasmaGoner.goner(c)
+            FantasmaGoner.giveAxe()
+        end)
+    end
+    FantasmaGoner.keep = true
+    task.spawn(function()
+        if FantasmaGoner.forceLearn then
+            FantasmaGoner.forceLearn = false
+            FantasmaGoner.learn("wear", "1/2: abra o menu de ROUPA do Brookhaven e toque em QUALQUER item 1 vez.")
+            FantasmaGoner.learn("anim", "2/2: agora abra o menu de ANIMAÇÃO do Brookhaven e toque em QUALQUER animação 1 vez.")
+        end
+        FantasmaGoner.goner(LocalPlayer.Character)
+        FantasmaGoner.giveAxe()
+        notify("Goner", "Gonerplayer ativado! Roupa + sem cabelo + pele preta + animação + Machado Goner.")
+    end)
+end
+
+function FantasmaGoner.relearn()
+    FantasmaGoner.templates = {}
+    FantasmaGoner.forceLearn = true
+    local ch = LocalPlayer.Character
+    if ch and FantasmaGoner.specs[ch] then FantasmaGoner.specs[ch].wornDone = false FantasmaGoner.specs[ch].animDone = false end
+    FantasmaGoner.activate()
+end
+
 local function triggerCommand(action, target, extraArg)
     if not target or target == "" then return end
     if action == "GOJO_DOMAIN" then
@@ -6100,7 +8125,7 @@ if not ok or not WindUI then
     notify("Erro", "Falha ao carregar WindUI.")
 else
     local HUB_NAME   = "Fantasma1l hub"
-    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.20"
+    local HUB_VER    = "FANTASMA1L HUB | Administrator Version | V1.29"
     local HUB_AUTHOR = "By Fantasma1l / renegado6661l"
 
     -- chama método do WindUI tentando as duas assinaturas (obj:método e obj.método)
@@ -6351,6 +8376,8 @@ else
                 end),
                 cmd(";ak47",      "Pegar AK-47", function() giveAK47() end),
                 cmd(";yoru",      "Equipar Yoru", function() giveYoru() end),
+                cmd(";gonerplayer", "Goner Player (roupa + Machado Goner)", function() FantasmaGoner.activate() end),
+                cmd(";gonerlearn", "Modo manual: ensinar roupa/animação (só se o automático falhar)", function() FantasmaGoner.relearn() end),
                 cmd(";tacos",     "Chuva de Tacos (Server)", function() triggerCommand("TACO_RAIN", "ALL") end),
                 cmd(";renegado",  "Chuva do Renegado (Server)", function() triggerCommand("RENEGADO_RAIN", "ALL") end),
             },
@@ -6382,14 +8409,7 @@ else
             name = "Authorized", icon = "shield-check",
             section = "Authorized", sectionIcon = "shield",
             items = {
-                cmd(";verify", "Verificar Usuários do Script", function()
-                    activeScriptUsers = { [LocalPlayer.Name] = true }
-                    sendNetCmd(";PING ALL")
-                    task.wait(2)
-                    local l = {}
-                    for n in pairs(activeScriptUsers) do table.insert(l, n) end
-                    notify("Rede", table.concat(l, ", "))
-                end),
+                cmd(";verificar", "Ver quem está usando o hub", function() FantasmaTag.verify() end),
                 cmd(";spawn", "Sair dos mundos (voltar ao spawn)", function() task.spawn(sair) end),
             },
         },
@@ -6428,6 +8448,33 @@ else
 
     -- ================== ABA CONFIGURAÇÃO ==================
     local TabCfg = Window:Tab({ Title = "Configuração", Icon = "settings" })
+
+    -- ---- Tag ----
+    TabCfg:Section({ Title = "Tag", Icon = "tag" })
+    TabCfg:Toggle({
+        Title = "Tag ativada",
+        Desc  = "Liga/desliga a tag (a sua e as que você vê)",
+        Value = true,
+        Callback = function(v) FantasmaTag.setEnabled(v) end,
+    })
+    TabCfg:Dropdown({
+        Title  = "Cor da tag",
+        Desc   = "Muda a cor da sua tag (os outros veem a cor escolhida)",
+        Values = FantasmaTag.presetNames(),
+        Value  = FantasmaTag.PRESETS[FantasmaTag.myColor()].name,
+        Callback = function(name) FantasmaTag.setColor(FantasmaTag.indexOf(name)) end,
+    })
+
+    -- ---- Desempenho ----
+    TabCfg:Section({ Title = "Desempenho", Icon = "gauge" })
+    TabCfg:Dropdown({
+        Title  = "Anti-lag",
+        Desc   = "Reduz sombras/efeitos do mapa para não travar. Nenhuma função do hub é removida",
+        Values = { "Desligado", "Leve", "Forte" },
+        Value  = "Leve",
+        Callback = function(v) FantasmaPerf.set(v) end,
+    })
+    FantasmaPerf.set("Leve")
 
     -- ---- Aparência: transparência do painel ----
     TabCfg:Section({ Title = "Aparência", Icon = "paintbrush" })
@@ -6568,6 +8615,17 @@ else
         end,
     })
 
+    TabCfg:Section({ Title = "Santuário do Sukuna", Icon = "landmark" })
+    TabCfg:Dropdown({
+        Title  = "Direção do santuário",
+        Desc   = "Se o santuário aparecer de lado ou de costas, troque aqui",
+        Values = { "0°", "90°", "180°", "270°" },
+        Value  = "0°",
+        Callback = function(v)
+            SHRINE_YAW = tonumber(tostring(v):match("%d+")) or 0
+        end,
+    })
+
     pcall(function() Window:SelectTab(1) end)
 
     -- Mantém o dropdown de alvo atualizado
@@ -6583,8 +8641,8 @@ else
     Players.PlayerAdded:Connect(refreshPlayers)
     Players.PlayerRemoving:Connect(function() task.defer(refreshPlayers) end)
 end
-
 end -- fim IS_ADMIN
+
 
 
 -- ================================================================
