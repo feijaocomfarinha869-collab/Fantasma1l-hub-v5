@@ -8649,5 +8649,4 @@ task.spawn(function()
     
     pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub/refs/heads/main/hub2.lua"))()
-    end)
 end)
