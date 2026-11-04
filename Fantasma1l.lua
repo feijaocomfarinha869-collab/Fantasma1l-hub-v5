@@ -8641,12 +8641,5 @@ else
     Players.PlayerAdded:Connect(refreshPlayers)
     Players.PlayerRemoving:Connect(function() task.defer(refreshPlayers) end)
 end
-end -- fim IS_ADMIN
 
-task.spawn(function()
-    -- Espera 12 segundos para o celular terminar de carregar o Hub 1 e respirar
-    task.wait(12) 
-    
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub/refs/heads/main/hub2.lua"))()
-end)
+end -- fim IS_ADMIN
