@@ -26,7 +26,7 @@ local WHITELIST = {
     ["darkADM_ofc"]  = { Role = "SUB DONO" },
     
     -- ADMS (9 VAGAS)
-    ["Fantasma1l40"]       = { Role = "ADM" },
+    [""]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
