@@ -26,7 +26,7 @@ local WHITELIST = {
     ["darkADM_ofc"]  = { Role = "SUB DONO" },
     
     -- ADMS (9 VAGAS)
-    ["Fantasma1l40"]       = { Role = "ADM" },
+    ["Fantasma1lhack"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_2"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
@@ -8643,30 +8643,11 @@ else
 end
 end -- fim IS_ADMIN
 
--- ==========================================
--- CARREGANDO O HUB 2 (BROOKHAVEN) VIA LINK
--- ==========================================
 task.spawn(function()
-    task.wait(3) -- Espera o WindUI (Hub 1) abrir primeiro
+    -- Espera 12 segundos para o celular terminar de carregar o Hub 1 e respirar
+    task.wait(12) 
     
-    local link = "https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub/refs/heads/main/hub2.lua"
-    
-    local sucesso, erro = pcall(function()
-        loadstring(game:HttpGet(link))()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/feijaocomfarinha869-collab/Fantasma1l-hub/refs/heads/main/hub2.lua"))()
     end)
-    
-    if sucesso then
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Hub 2", Text = "Brookhaven carregado!", Duration = 5
-            })
-        end)
-    else
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Hub 2 - Erro", Text = "Não carregou. Verifique o link no GitHub.", Duration = 10
-            })
-        end)
-        warn("[Hub 2] Erro: " .. tostring(erro))
-    end
 end)
