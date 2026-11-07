@@ -4499,7 +4499,7 @@ local function handleNet(senderName, msg)
     local cmd, arg = string.match(msg, "^;%s*(%S+)%s*(.-)%s*$")
     if not cmd then return end
     cmd = string.upper(cmd)
-    if cmd ~= "TORNADO_SPAWN" and cmd ~= "TORNADO_CLEAR" and cmd ~= "GONER_TURN" then return end
+    if cmd ~= "TORNADO_SPAWN" and cmd ~= "TORNADO_CLEAR" and cmd ~= "GONER_TURN" and cmd ~= "COOLKIDP_TURN" then return end
 
     -- evita executar 2x a mesma mensagem (chat antigo + novo)
     local key = senderName .. "|" .. msg
@@ -4516,6 +4516,10 @@ local function handleNet(senderName, msg)
 
     if cmd == "GONER_TURN" then
         if not isAll and FantasmaGoner then task.spawn(FantasmaGoner.turnSelf) end
+        return
+    end
+    if cmd == "COOLKIDP_TURN" then
+        if not isAll and FantasmaCoolkid then task.spawn(FantasmaCoolkid.turnSelf) end
         return
     end
     if cmd == "TORNADO_SPAWN" then
@@ -7287,6 +7291,50 @@ local function toggleAura()
     end
 end
 
+-- ================== GOJO: BOLAS VERMELHA + AZUL (visual, sem dano) ==================
+FantasmaGojoBall = {
+    ANIM    = "rbxassetid://106255828844338",
+    ANIM_ID = 106255828844338,
+    RED_ID  = 6685365462,
+    BLUE_ID = 14819624358,
+    BALL_ID = "14819645681",
+    clickBusy = false,
+}
+
+-- toca a animação na hora (sem esperar rede) e, em segundo plano, tenta fixá-la pelo
+-- mesmo método do Goner/Coolkid (Wear), para o Brookhaven não sobrescrever a animação
+function FantasmaGojoBall.clickAnim(char)
+    safePlayAnimation(char, FantasmaGojoBall.ANIM)
+    if FantasmaGojoBall.clickBusy or not (FantasmaGoner and FantasmaGoner.getWear and FantasmaGoner.getWear()) then return end
+    FantasmaGojoBall.clickBusy = true
+    task.spawn(function()
+        local set = FantasmaGoner.appliedSet(char)
+        if not set[FantasmaGojoBall.ANIM_ID] then
+            FantasmaGoner.wearId(FantasmaGojoBall.ANIM_ID)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+        FantasmaGojoBall.clickBusy = false
+    end)
+end
+
+-- carrega um asset pequeno (bola) e deixa com o diâmetro pedido
+function FantasmaGojoBall.loadBall(id, size)
+    local objs = FantasmaGoner.load(id)
+    if not objs then return nil end
+    local m = Instance.new("Model")
+    for _, o in ipairs(objs) do o.Parent = m end
+    for _, d in ipairs(m:GetDescendants()) do
+        if d:IsA("BasePart") then d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch = true, false, false, false end
+    end
+    if not m.PrimaryPart then m.PrimaryPart = m:FindFirstChildWhichIsA("BasePart", true) end
+    if m.PrimaryPart then
+        local _, bs = m:GetBoundingBox()
+        local maxDim = math.max(bs.X, bs.Y, bs.Z)
+        if maxDim > 0 then pcall(function() m:ScaleTo(size / maxDim) end) end
+    end
+    return m
+end
+
 local function giveGojo()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -7295,23 +7343,66 @@ local function giveGojo()
     t.Name, t.RequiresHandle = "Vazio Roxo", false
     t.Parent = LocalPlayer:FindFirstChild("Backpack") or char
     t.Activated:Connect(function()
-        safePlayAnimation(char, CUSTOM_ANIM_ID)
+        FantasmaGojoBall.clickAnim(char)
         task.spawn(function()
-            local p = fetchAssetAsModel("14819645681")
+            local folder = Instance.new("Folder")
+            folder.Name = "GojoCharge"
+            folder.Parent = workspace
+
+            local red = FantasmaGojoBall.loadBall(FantasmaGojoBall.RED_ID, 1.6)
+            local blue = FantasmaGojoBall.loadBall(FantasmaGojoBall.BLUE_ID, 1.6)
+            if not red or not blue then
+                if red then red:Destroy() end
+                if blue then blue:Destroy() end
+                folder:Destroy()
+                return
+            end
+            red.Parent, blue.Parent = folder, folder
+
+            local DURATION = 1.1
+            local t0 = os.clock()
+            local cn
+            cn = RunService.RenderStepped:Connect(function()
+                local c = LocalPlayer.Character
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                if not h or not red.Parent then
+                    if cn then cn:Disconnect() end
+                    return
+                end
+                local a = math.clamp((os.clock() - t0) / DURATION, 0, 1)
+                local backCF = h.CFrame * CFrame.new(-1.3, 0.3, 1.8)
+                local backCF2 = h.CFrame * CFrame.new(1.3, 0.3, 1.8)
+                local handCF = h.CFrame * CFrame.new(-0.6, -0.5, -1.6)
+                local handCF2 = h.CFrame * CFrame.new(0.6, -0.5, -1.6)
+                red:PivotTo(backCF:Lerp(handCF, a * a))
+                blue:PivotTo(backCF2:Lerp(handCF2, a * a))
+                if a >= 1 then
+                    if cn then cn:Disconnect() end
+                end
+            end)
+
+            task.wait(DURATION + 0.05)
+            pcall(function() red:Destroy() end)
+            pcall(function() blue:Destroy() end)
+            pcall(function() folder:Destroy() end)
+
+            local hrp2 = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp2 then return end
+            local p = fetchAssetAsModel(FantasmaGojoBall.BALL_ID)
             if p and p.PrimaryPart then
-                pcall(function() p:ScaleTo(300) end)
+                pcall(function() p:ScaleTo(170) end)   -- um pouco menor que o original (300)
                 for _, x in ipairs(p:GetDescendants()) do
                     if x:IsA("BasePart") then x.Anchored, x.CanCollide = true, false end
                 end
-                p:PivotTo(hrp.CFrame * CFrame.new(0, 2, -20))
+                p:PivotTo(hrp2.CFrame * CFrame.new(0, 2, -14))
                 p.Parent = workspace
-                local dir = hrp.CFrame.LookVector
-                local cn
-                cn = RunService.RenderStepped:Connect(function(dt)
+                local dir = hrp2.CFrame.LookVector
+                local cn2
+                cn2 = RunService.RenderStepped:Connect(function(dt)
                     if p and p.Parent then p:PivotTo(p:GetPivot() + dir * 150 * dt)
-                    else cn:Disconnect() end
+                    else cn2:Disconnect() end
                 end)
-                task.delay(4, function() if cn then cn:Disconnect() end if p then p:Destroy() end end)
+                task.delay(4, function() if cn2 then cn2:Disconnect() end if p then p:Destroy() end end)
             end
         end)
     end)
@@ -7344,12 +7435,12 @@ end
 
 -- ================== GONER PLAYER ==================
 FantasmaGoner = {
-    CLOTHES    = {17812417356, 17770317484, 17822722698, 17822749561, 17772174303, 17771175724},
+    CLOTHES    = {17812417356, 17770317484, 17822722698, 17822749561, 17772174303, 17771175724, 10089869281},
     GONER_ANIM = "rbxassetid://71611618090433",
     CLICK_ANIM = "rbxassetid://118273721275238",   -- animação ao clicar com o machado
     CLICK_ID   = 118273721275238,
     ANIM_ID    = 97005849733115,                   -- animação do goner parado (idle)
-    WALK_ID    = 108059497211872,                  -- animação do goner andando
+    WALK_ID    = 118801578983397,                  -- animação do goner andando
     AXE_ID     = 14054756735,
     ICON       = "rbxassetid://130540399630094",
     SWING_ONLY = true,   -- true: só transforma se acertar durante o golpe (clique). false: qualquer encostada
@@ -8088,6 +8179,262 @@ function FantasmaGoner.activate()
     end)
 end
 
+
+-- ================== COOLKID EFFECT PLAYER (roupa + martelo, igual goner) ==================
+FantasmaCoolkid = {
+    CLOTHES    = {87560241153484, 129138676667607, 122172916928401, 82466679852006, 123703043118660, 12289720586},
+    IDLE_ANIM  = "rbxassetid://135586253433745",
+    IDLE_ID    = 135586253433745,
+    WALK_ANIM  = "rbxassetid://103108206614856",
+    WALK_ID    = 103108206614856,
+    HAMMER_ID  = 82707077257631,
+    ICON       = "rbxassetid://82707077257631",
+    SWING_ONLY = true,
+    SWING_TIME = 1.0,
+    hit = {},
+}
+
+function FantasmaCoolkid.getSpec(char)
+    local sp = FantasmaGoner.specs[char]  -- reaproveita o mesmo rastreador de instâncias do goner
+    if not sp then
+        sp = { items = {}, worn = {} }
+        FantasmaGoner.specs[char] = sp
+    end
+    return sp
+end
+
+-- equipa as roupas + animações pelo Wear, igual ao goner (um ID por vez, sem repetir)
+function FantasmaCoolkid.wear(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    local spec = FantasmaCoolkid.getSpec(char)
+    if spec.coolkidDone then return end
+    spec.coolkidDone = true
+    if not FantasmaGoner.getWear() then
+        for _, id in ipairs(FantasmaCoolkid.CLOTHES) do
+            FantasmaGoner.applyId(char, id)
+            task.wait(0.15)
+        end
+        FantasmaGoner.startWatcher()
+        return
+    end
+    local have = FantasmaGoner.appliedSet(char)
+    for _, id in ipairs(FantasmaCoolkid.CLOTHES) do
+        if not have[id] then
+            FantasmaGoner.wearId(id)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+    end
+end
+
+FantasmaCoolkid.clickBusy = false
+function FantasmaCoolkid.clickAnim()
+    local char = LocalPlayer.Character
+    if not char then return end
+    safePlayAnimation(char, FantasmaCoolkid.WALK_ANIM)   -- toca na hora, sem esperar rede
+    if FantasmaCoolkid.clickBusy or not FantasmaGoner.getWear() then return end
+    FantasmaCoolkid.clickBusy = true
+    task.spawn(function()
+        local set = FantasmaGoner.appliedSet(char)
+        if not set[FantasmaCoolkid.WALK_ID] then
+            FantasmaGoner.wearId(FantasmaCoolkid.WALK_ID)
+            task.wait(FantasmaGoner.WEAR_GAP)
+        end
+        FantasmaCoolkid.clickBusy = false
+    end)
+end
+
+function FantasmaCoolkid.equipAnim(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    local spec = FantasmaCoolkid.getSpec(char)
+    if spec.coolkidAnimDone then return end
+    spec.coolkidAnimDone = true
+    if FantasmaGoner.getWear() then
+        local set = FantasmaGoner.appliedSet(char)
+        for _, id in ipairs({ FantasmaCoolkid.IDLE_ID, FantasmaCoolkid.WALK_ID }) do
+            if not set[id] then
+                FantasmaGoner.wearId(id)
+                task.wait(FantasmaGoner.WEAR_GAP)
+            end
+        end
+        return
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local animator = hum and (hum:FindFirstChildOfClass("Animator") or hum:WaitForChild("Animator", 3))
+    if not animator then return end
+    local a = Instance.new("Animation")
+    a.AnimationId = FantasmaCoolkid.IDLE_ANIM
+    local ok, track = pcall(function() return animator:LoadAnimation(a) end)
+    if ok and track then
+        track.Priority = Enum.AnimationPriority.Movement
+        track.Looped = true
+        track:Play()
+        spec.coolkidTrack = track
+    end
+end
+
+
+function FantasmaCoolkid.isRed(char)
+    local bc = char and char:FindFirstChildOfClass("BodyColors")
+    if not bc then return false end
+    local b = BrickColor.new("Really red")
+    return bc.HeadColor == b and bc.TorsoColor == b and bc.LeftArmColor == b
+        and bc.RightArmColor == b and bc.LeftLegColor == b and bc.RightLegColor == b
+end
+
+function FantasmaCoolkid.paintRedLocal(char)
+    if not char then return end
+    local b = BrickColor.new("Really red")
+    local bc = char:FindFirstChildOfClass("BodyColors")
+    if not bc then bc = Instance.new("BodyColors") bc.Parent = char end
+    bc.HeadColor = b bc.TorsoColor = b bc.LeftArmColor = b
+    bc.RightArmColor = b bc.LeftLegColor = b bc.RightLegColor = b
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.BrickColor = b end
+    end
+end
+
+-- cor da pele vermelha no Brookhaven: mesmo remote do goner (Remotes.ChangeBodyColor)
+function FantasmaCoolkid.paintRed(char)
+    char = char or LocalPlayer.Character
+    if not char or FantasmaCoolkid.isRed(char) then return end
+    local r = FantasmaGoner.remote("ChangeBodyColor")
+    if not r then FantasmaCoolkid.paintRedLocal(char) return end
+    FantasmaGoner.callRemote(r, "Really red")
+    task.wait(1.2)
+    if not FantasmaCoolkid.isRed(char) then
+        FantasmaGoner.callRemote(r, { BrickColor.new("Really red") })
+        task.wait(1.2)
+    end
+    if not FantasmaCoolkid.isRed(char) then FantasmaCoolkid.paintRedLocal(char) end
+end
+
+-- transformação completa de um personagem pelo Brookhaven
+function FantasmaCoolkid.apply(char)
+    char = char or LocalPlayer.Character
+    if not char then return end
+    FantasmaCoolkid.wear(char)
+    FantasmaCoolkid.paintRed(char)
+    FantasmaCoolkid.equipAnim(char)
+end
+
+function FantasmaCoolkid.turnSelf()
+    FantasmaCoolkid.apply(LocalPlayer.Character)
+end
+
+function FantasmaCoolkid.turnOther(plr)
+    local char = plr and plr.Character
+    if not char then return end
+    local now = os.clock()
+    if FantasmaCoolkid.hit[plr] and now - FantasmaCoolkid.hit[plr] < 6 then return end
+    FantasmaCoolkid.hit[plr] = now
+    sendNetCmd(";COOLKIDP_TURN " .. plr.Name)
+    for _, id in ipairs(FantasmaCoolkid.CLOTHES) do
+        FantasmaGoner.applyId(char, id)
+        task.wait(0.1)
+    end
+    for _, o in ipairs(char:GetChildren()) do
+        if o:IsA("Accessory") and o.AccessoryType == Enum.AccessoryType.Hair then o:Destroy() end
+    end
+    FantasmaCoolkid.paintRedLocal(char)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
+    if animator then
+        local a = Instance.new("Animation")
+        a.AnimationId = FantasmaCoolkid.IDLE_ANIM
+        local ok, track = pcall(function() return animator:LoadAnimation(a) end)
+        if ok and track then track.Looped = true track:Play() end
+    end
+    notify("Coolkid", plr.Name .. " foi transformado!")
+end
+
+-- martelo: clique toca animação de golpe, encostar transforma o outro jogador (sem dano)
+function FantasmaCoolkid.giveHammer()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local backpack = LocalPlayer:FindFirstChild("Backpack") or char
+    for _, holder in ipairs({ backpack, char }) do
+        local old = holder:FindFirstChild("Martelo Coolkid")
+        if old then old:Destroy() end
+    end
+    local okIcon, img = pcall(resolveImage, FantasmaCoolkid.ICON)
+    local icon = (okIcon and img) or FantasmaCoolkid.ICON
+
+    local tool
+    local objs = FantasmaGoner.load(FantasmaCoolkid.HAMMER_ID)
+    if objs and objs[1] then
+        if objs[1]:IsA("Tool") then
+            tool = objs[1]
+        else
+            -- monta um Tool com Handle a partir do modelo (mesma técnica do machado do goner)
+            local root = objs[1]
+            local source = root:IsA("BasePart") and root or root:FindFirstChildWhichIsA("BasePart", true)
+            if source then
+                tool = Instance.new("Tool")
+                tool.RequiresHandle = true
+                local container = root:Clone()
+                local handle = container:IsA("BasePart") and container or container:FindFirstChildWhichIsA("BasePart", true)
+                if handle then
+                    for _, d in ipairs(container:GetDescendants()) do
+                        if d:IsA("BasePart") then
+                            d.Anchored, d.CanCollide = false, false
+                            if d ~= handle then
+                                local w = Instance.new("WeldConstraint")
+                                w.Part0, w.Part1, w.Parent = handle, d, d
+                            end
+                        end
+                    end
+                    handle.Name = "Handle"
+                    handle.Anchored, handle.CanCollide = false, false
+                    handle.Parent = tool
+                    if container ~= handle then
+                        for _, c in ipairs(container:GetChildren()) do
+                            if c ~= handle and not c:IsA("Attachment") then c.Parent = tool end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if not tool then
+        tool = Instance.new("Tool")
+        tool.RequiresHandle = false
+        notify("Coolkid", "Não consegui carregar o modelo do martelo.")
+    end
+    tool.Name = "Martelo Coolkid"
+    tool.ToolTip = "Martelo Coolkid"
+    tool.CanBeDropped = false
+    tool.TextureId = icon
+
+    local swingUntil = 0
+    tool.Activated:Connect(function()
+        swingUntil = os.clock() + FantasmaCoolkid.SWING_TIME
+        FantasmaCoolkid.clickAnim()   -- instantâneo: toca a animação no clique, sem esperar nada
+    end)
+    local function onTouch(part)
+        if FantasmaCoolkid.SWING_ONLY and os.clock() > swingUntil then return end
+        local model = part:FindFirstAncestorOfClass("Model")
+        local plr = model and Players:GetPlayerFromCharacter(model)
+        if plr and plr ~= LocalPlayer then task.spawn(FantasmaCoolkid.turnOther, plr) end
+    end
+    for _, p in ipairs(tool:GetDescendants()) do
+        if p:IsA("BasePart") then p.Touched:Connect(onTouch) end
+    end
+    tool.DescendantAdded:Connect(function(p)
+        if p:IsA("BasePart") then p.Touched:Connect(onTouch) end
+    end)
+    tool.Parent = backpack
+end
+
+function FantasmaCoolkid.activate()
+    task.spawn(function()
+        FantasmaCoolkid.apply(LocalPlayer.Character)
+        FantasmaCoolkid.giveHammer()
+        notify("Coolkid", "Coolkid Effect Player ativado!")
+    end)
+end
+
 function FantasmaGoner.relearn()
     FantasmaGoner.templates = {}
     FantasmaGoner.forceLearn = true
@@ -8378,6 +8725,7 @@ else
                 cmd(";yoru",      "Equipar Yoru", function() giveYoru() end),
                 cmd(";gonerplayer", "Goner Player (roupa + Machado Goner)", function() FantasmaGoner.activate() end),
                 cmd(";gonerlearn", "Modo manual: ensinar roupa/animação (só se o automático falhar)", function() FantasmaGoner.relearn() end),
+                cmd(";coolkideffectplayer", "Coolkid Effect Player (roupa + Martelo)", function() FantasmaCoolkid.activate() end),
                 cmd(";tacos",     "Chuva de Tacos (Server)", function() triggerCommand("TACO_RAIN", "ALL") end),
                 cmd(";renegado",  "Chuva do Renegado (Server)", function() triggerCommand("RENEGADO_RAIN", "ALL") end),
             },
