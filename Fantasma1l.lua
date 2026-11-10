@@ -35,8 +35,8 @@ local WHITELIST = {
     
     -- ADMS (9 VAGAS)
     ["Fantasma1l40"]       = { Role = "ADM" },
-    [""]       = { Role = "ADM" },
-    ["PREENCHA_AQUI_ADM_3"]       = { Role = "ADM" },
+    ["oooooe"]       = { Role = "ADM" },
+    ["pro2229208"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_4"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_5"]       = { Role = "ADM" },
     ["PREENCHA_AQUI_ADM_6"]       = { Role = "ADM" },
