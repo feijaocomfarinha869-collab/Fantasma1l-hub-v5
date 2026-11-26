@@ -1,4 +1,4 @@
-local Libary = loadstring(game:HttpGet("https://pastefy.app/TYVuPNOS/raw"))()
+local Libary = loadstring(game:HttpGet("https://raw.githubusercontent.com/darkDev667/Painel-/refs/heads/main/Library.txt"))()
 workspace.FallenPartsDestroyHeight = -math.huge
 
 local Window = Libary:MakeWindow({
